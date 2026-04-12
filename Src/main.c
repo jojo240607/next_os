@@ -63,7 +63,16 @@ static void MPU_Config(void);
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
+#define SYSTICK_LOAD_VAL (SystemCoreClock / 1000 - 1) // 设置系统Tick为1ms
 
+void systick_init(void) {
+    // 1. 设置重装载值
+    SysTick->LOAD = SYSTICK_LOAD_VAL;
+    // 2. 清空当前值
+    SysTick->VAL = 0;
+    // 3. 使能SysTick，使能中断，使用处理器时钟
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+}
 /**
   * @brief  The application entry point.
   * @retval int
@@ -81,7 +90,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+
 
   /* USER CODE BEGIN Init */
 
@@ -89,7 +98,7 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
-
+    HAL_Init();
   /* Configure the peripherals common clocks */
   PeriphCommonClock_Config();
 
@@ -107,7 +116,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-
+    systick_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
