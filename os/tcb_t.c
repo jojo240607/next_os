@@ -1,12 +1,14 @@
 #include "tcb_t.h"
 #include <stdio.h>
+#include "thread_schedule.h"
 
 // 析构函数声明
 static void tcb_t_destroy(Tcb_t* self);
-
+static void tcb_t_sleep(Tcb_t* self, uint32_t ms);
 // TODO: 初始化数据成员
 static const Tcb_tFun tcb_t_fun = {
     .destroy = tcb_t_destroy,
+    .os_sleep = tcb_t_sleep,
 };
 // 构造函数实现
 Tcb_t* tcb_t_create() {
@@ -34,4 +36,17 @@ static void tcb_t_destroy(Tcb_t* self) {
         tcb_t_deinit(self);
         free(self);
     }
+}
+
+static void tcb_t_sleep(Tcb_t* self, uint32_t ms) {
+    uint32_t ticks = ms;//ms_to_ticks(ms);   // 毫秒转节拍数
+    DISABLE_IRQ;
+    self->delay_ticks = ticks;
+    self->state = TCB_STATER_DELAYED;          // 延时阻塞状态
+    // 可选：将任务插入一个专门的延时队列（按唤醒时间排序）
+    gloable_thread_schedule->delay_list->fun->enqueue(gloable_thread_schedule->delay_list, GET_NODE(self));
+    // 按 delay_ticks 升序插入
+    ENABLE_IRQ;
+    // 触发调度，切换到下一个就绪任务
+    Trigger_PendSV;
 }
