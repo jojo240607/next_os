@@ -16,6 +16,10 @@
 #define def_thread(obj) (GET_BASE_TASK_VTABLE(obj)->thread)
 #define virtual_thread(obj, ...) def_thread(obj)(obj, ##__VA_ARGS__)
 
+#define quick_task_override(func_name) static void func_name(Tcb_t* self, void *arg)
+#define def_quick_task(obj) (GET_BASE_TASK_VTABLE(obj)->quick_task)
+#define virtual_quick_task(obj, ...) def_quick_task(obj)(obj, ##__VA_ARGS__)
+
 #define GET_BASE_TASK(obj) ((Base_task *)obj)
 // 类声明
 typedef struct _Base_task Base_task;
@@ -27,12 +31,16 @@ typedef struct _Base_taskVTable {
     // TODO : 添加其他虚函数
 
 	void (*init)(Base_task* self);
-    void (*thread)(Tcb_t* self, void *arg);
+    Tcb_Entey thread;
+    Tcb_Entey quick_task;
+	//void (*quick_task)(Base_task* self, void *arg);
 
 };
 // 类成员函数结构
 struct _Base_taskFun {
     void (*destroy)(Base_task* self);
+	void (*add_task)(Base_task* self, const char *name);
+
 };
 // 类结构
 struct _Base_task {
@@ -43,8 +51,8 @@ struct _Base_task {
 };
 
 // 构造函数声明
-Base_task* base_task_create(const char *name);
-void base_task_init(Base_task* self, const char *name);
+Base_task* base_task_create();
+void base_task_init(Base_task* self);
 
 // 析构函数声明
 void base_task_deinit(Base_task* self);

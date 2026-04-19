@@ -38,6 +38,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         os/tcb_t.c
         os/thread_schedule.c
         os/semaphore.c
+        os/base_task.c
+        os/real_time_task.c
 )
 
 # Add STM32CubeMX generated sources

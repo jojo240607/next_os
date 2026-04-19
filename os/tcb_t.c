@@ -11,19 +11,20 @@ static const Tcb_tFun tcb_t_fun = {
     .os_sleep = tcb_t_sleep,
 };
 // 构造函数实现
-Tcb_t* tcb_t_create() {
+Tcb_t* tcb_t_create(void *parent) {
     Tcb_t* obj = (Tcb_t*)malloc(sizeof(Tcb_t));
     if (obj) {
         memset(obj, 0, sizeof(Tcb_t));
-        tcb_t_init(obj);
+        tcb_t_init(obj, parent);
     }
     return obj;
 }
 
-void tcb_t_init(Tcb_t* self) {
+void tcb_t_init(Tcb_t* self, void *parent) {
     self->fun = &(tcb_t_fun);
     // TODO: 初始化数据成员
-
+    self->semaphore = NULL;
+    self->parent = parent;
 }
 
 void tcb_t_deinit(Tcb_t* self) {

@@ -1,6 +1,7 @@
 #include "semaphore.h"
 #include <stdio.h>
 #include "main.h"
+#include "thread_schedule.h"
 
 static void semaphore_take(Semaphore* self);
 static void semaphore_give(Semaphore* self);

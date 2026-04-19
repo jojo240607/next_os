@@ -1,7 +1,8 @@
 #include "thread_schedule.h"
 #include <stdio.h>
 
-static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey *entey);
+
+static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey entey);
 
 static void thread_schedule_add_readly_list(Thread_schedule* self, Tcb_t *tcb);
 
@@ -187,7 +188,7 @@ static void thread_schedule_add_readly_list(Thread_schedule* self, Tcb_t *tcb) {
 
 
 // create_thread method
-static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey *entey) {
+static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey entey) {
     // TODO: add create_thread method
     
 }

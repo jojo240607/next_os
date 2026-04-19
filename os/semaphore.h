@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include "queue.h"
-#include "tcb_t.h"
-#include "thread_schedule.h"
 
 
 #define GET_SEMAPHORE(obj) ((Semaphore *)obj)

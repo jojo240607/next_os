@@ -10,6 +10,10 @@
 #define def_top_half_task(obj) (GET_REAL_TIME_TASK_VTABLE(obj)->top_half_task)
 #define virtual_top_half_task(obj, ...) def_top_half_task(obj)(obj, ##__VA_ARGS__)
 
+#define button_half_task_override(func_name) static void func_name(Real_time_task* self, void *arg)
+#define def_button_half_task(obj) (GET_REAL_TIME_TASK_VTABLE(obj)->button_half_task)
+#define virtual_button_half_task(obj, ...) def_button_half_task(obj)(obj, ##__VA_ARGS__)
+
 #define GET_REAL_TIME_TASK(obj) ((Real_time_task *)obj)
 
 // 派生类声明
@@ -20,9 +24,10 @@ typedef struct _Real_time_taskVTable Real_time_taskVTable;
 typedef struct _Real_time_taskVTable {
     Base_taskVTable vtbase;
     // TODO: 添加其他虚函数
-
 	void (*top_half_task)(Real_time_task* self);
-    Semaphore *semaphore;
+    Tcb_Entey button_half_task;
+	//void (*button_half_task)(Tcb_t * self, void *arg);
+
 };
 // 类成员函数结构
 struct _Real_time_taskFun {

@@ -6,6 +6,8 @@
 #include <string.h>
 #include "node.h"
 #include "main.h"
+#include "semaphore.h"
+
 //// 触发 PendSV 中断
 #define Trigger_PendSV SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk
 #define DISABLE_IRQ __disable_irq()
@@ -35,10 +37,12 @@ struct _Tcb_t {
     Node base;
     const Tcb_tFun* fun;
     // TODO: 添加数据成员
+    void *parent;//base_task
     const char *name;
     uint16_t tid;
     uint16_t priority;
     Tcb_tState state;
+    Semaphore *semaphore;
     Tcb_Entey entey;
     uint32_t delay_ticks;   // 剩余等待节拍数
     uint32_t sp;
@@ -47,8 +51,8 @@ struct _Tcb_t {
 };
 
 // 构造函数声明
-Tcb_t* tcb_t_create();
-void tcb_t_init(Tcb_t* self);
+Tcb_t* tcb_t_create(void *parent);
+void tcb_t_init(Tcb_t* self, void *parent);
 
 // 析构函数声明
 void tcb_t_deinit(Tcb_t* self);
