@@ -34,7 +34,7 @@ void semaphore_init(Semaphore* self, uint8_t count) {
 void semaphore_deinit(Semaphore* self) {
     // TODO: 数据成员申请资源释放
     if (self->wait_list != NULL) {
-        Tcb_t *tcb = self->wait_list->fun->dequeue(self->wait_list);
+        Tcb_t *tcb = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         while (tcb != NULL) {
             tcb->fun->destroy(tcb);
             tcb = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
@@ -81,7 +81,7 @@ static void semaphore_give(Semaphore* self) {
     DISABLE_IRQ;
     if (self->wait_list->size > 0) {
         // 有任务在等待：取出队首任务
-        Tcb_t *task = self->wait_list->fun->dequeue(self->wait_list);
+        Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         //sem->wait_list = task->next;
         task->state = TCB_STATER_READY;
         //task->waiting_object = NULL;

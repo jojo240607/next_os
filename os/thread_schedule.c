@@ -117,3 +117,18 @@ static void thread_schedule_delay_ticks(Thread_schedule* self) {
 
 }
 
+void thread_schedule_context_switch(Thread_schedule* self) {
+    if (NULL == self) {
+        return;
+    }
+    if (self->current->state == TCB_STATER_READY || self->current->state == TCB_STATER_RUNNING) {
+        self->priority_list[self->current->priority]->fun->enqueue(self->priority_list[self->current->priority],
+                                                                   GET_NODE(self->current));
+    } else {
+
+        thread_schedule_clear_priority_ready(self, self->current->priority);
+        
+    }
+
+}
+

@@ -40,5 +40,7 @@ void thread_schedule_init(Thread_schedule* self);
 
 // 析构函数声明
 void thread_schedule_deinit(Thread_schedule* self);
+void thread_schedule_context_switch(Thread_schedule* self);
+
 extern Thread_schedule *gloable_thread_schedule;
 #endif // THREAD_SCHEDULE_H
