@@ -1,6 +1,8 @@
 #include "thread_schedule.h"
 #include <stdio.h>
 
+static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey *entey);
+
 static void thread_schedule_add_readly_list(Thread_schedule* self, Tcb_t *tcb);
 
 static void thread_schedule_delay_ticks(Thread_schedule* self);
@@ -18,6 +20,7 @@ static const Thread_scheduleFun thread_schedule_fun = {
     .destroy = thread_schedule_destroy,
 	.delay_ticks = thread_schedule_delay_ticks,
 	.add_readly_list = thread_schedule_add_readly_list,
+	.create_thread = thread_schedule_create_thread,
 };
 
 Thread_schedule *gloable_thread_schedule = NULL;
@@ -180,5 +183,12 @@ static void thread_schedule_add_readly_list(Thread_schedule* self, Tcb_t *tcb) {
     if (tcb->priority > self->current->priority) {
         Trigger_PendSV;
     }
+}
+
+
+// create_thread method
+static void thread_schedule_create_thread(Thread_schedule* self, const char *name, Tcb_Entey *entey) {
+    // TODO: add create_thread method
+    
 }
 

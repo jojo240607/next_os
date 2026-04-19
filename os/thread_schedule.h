@@ -20,6 +20,8 @@ struct _Thread_scheduleFun {
 	void (*delay_ticks)(Thread_schedule* self);
 	void (*add_readly_list)(Thread_schedule* self, Tcb_t *tcb);
 
+	void (*create_thread)(Thread_schedule* self, const char *name, Tcb_Entey *entey);
+
 };
 // 类结构
 struct _Thread_schedule {

@@ -16,6 +16,7 @@
 typedef struct _Tcb_t Tcb_t;
 typedef struct _Tcb_tFun Tcb_tFun;
 typedef enum _Tcb_tState Tcb_tState;
+typedef void (*Tcb_Entey)(Tcb_t* self, void *arg);
 // 类成员函数结构
 struct _Tcb_tFun {
     void (*destroy)(Tcb_t* self);
@@ -38,6 +39,7 @@ struct _Tcb_t {
     uint16_t tid;
     uint16_t priority;
     Tcb_tState state;
+    Tcb_Entey entey;
     uint32_t delay_ticks;   // 剩余等待节拍数
     uint32_t sp;
     size_t strack_size;
