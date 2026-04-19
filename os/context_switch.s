@@ -4,7 +4,7 @@
     .text
 
     .global PendSV_Handler          // 导出符号，覆盖弱定义
-    .global pxCurrentTCB            // 引用C文件中定义的当前TCB指针
+    .global gloable_current_stack            // 引用C文件中定义的当前TCB指针
 
     .type   PendSV_Handler, %function
 PendSV_Handler:
@@ -17,16 +17,16 @@ PendSV_Handler:
     stmdb   r0!, {r4-r11}
 
     // 3. 将新的栈顶指针保存到当前任务的TCB中
-    ldr     r1, =pxCurrentTCB
-    ldr     r2, [r1]        // r2 = pxCurrentTCB (TCB指针)
+    ldr     r1, =gloable_current_stack
+    ldr     r2, [r1]        // r2 = gloable_current_stack (TCB指针)
     str     r0, [r2]        // TCB->stack_ptr = 新栈顶
 
     // 4. 调用C调度器，选择下一个要运行的任务
-    //    注意：C函数 vTaskSwitchContext 会修改 pxCurrentTCB
-    bl      vTaskSwitchContext
+    //    注意：C函数 thread_schedule_context_switch 会修改 gloable_current_stack
+    bl      thread_schedule_context_switch
 
     // 5. 恢复新任务的上下文
-    ldr     r1, =pxCurrentTCB
+    ldr     r1, =gloable_current_stack
     ldr     r2, [r1]        // r2 = 新任务的TCB指针
     ldr     r0, [r2]        // r0 = 新任务的栈顶指针
     ldmia   r0!, {r4-r11}   // 从新任务堆栈恢复 R4-R11

@@ -82,17 +82,10 @@ static void semaphore_give(Semaphore* self) {
     if (self->wait_list->size > 0) {
         // 有任务在等待：取出队首任务
         Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
-        //sem->wait_list = task->next;
         task->state = TCB_STATER_READY;
-        //task->waiting_object = NULL;
-
         // 将任务放回就绪队列（根据优先级插入）
-        gloable_thread_schedule->priority_list[task->priority]->fun->enqueue(gloable_thread_schedule->priority_list[task->priority], GET_NODE(task));
-        gloable_thread_schedule->fun->set_priority_ready(gloable_thread_schedule, task->priority);
-        // 如果唤醒的任务优先级高于当前任务，请求抢占
-        if (task->priority > gloable_thread_schedule->current->priority) {
-            Trigger_PendSV;
-        }
+        gloable_thread_schedule->fun->add_readly_list(gloable_thread_schedule, task);
+
     } else {
         self->count++;
     }

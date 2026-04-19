@@ -17,11 +17,8 @@ typedef struct _Thread_scheduleFun Thread_scheduleFun;
 // 类成员函数结构
 struct _Thread_scheduleFun {
     void (*destroy)(Thread_schedule* self);
-	void (*set_priority_ready)(Thread_schedule* self, uint8_t p);
-	uint8_t (*get_highest_priority)(Thread_schedule* self);
-	void (*clear_priority_ready)(Thread_schedule* self, uint8_t p);
-
 	void (*delay_ticks)(Thread_schedule* self);
+	void (*add_readly_list)(Thread_schedule* self, Tcb_t *tcb);
 
 };
 // 类结构
@@ -31,6 +28,7 @@ struct _Thread_schedule {
     uint32_t priority_bitmap;                    // 位图，标记哪些优先级有就绪任务
     Queue *priority_list[MAX_PRIORITY];          // 每个优先级的就绪任务链表（可简化成单任务）
     Queue *delay_list;
+    Queue *destory_list;
     Tcb_t *current;
 };
 
@@ -43,4 +41,5 @@ void thread_schedule_deinit(Thread_schedule* self);
 void thread_schedule_context_switch(Thread_schedule* self);
 
 extern Thread_schedule *gloable_thread_schedule;
+extern uint32_t *gloable_current_stack;
 #endif // THREAD_SCHEDULE_H
