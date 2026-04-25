@@ -122,15 +122,17 @@ static void intc_dispatch(Intc* self, intc_irq_num irq_num) {
     }
     // 1. 执行上半部回调
     if (irq->handler) {
-        irq->handler(irq->arg);
+        if (irq->handler(irq->arg)) {
+            // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
+            if (irq->bottom_sem) {
+                // 假设你的信号量有 semaphore_give_from_isr 函数
+                // 并根据返回值决定是否需要请求调度
+                irq->bottom_sem->fun->give(irq->bottom_sem);
+            }
+        }
     }
 
-    // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
-    if (irq->bottom_sem) {
-        // 假设你的信号量有 semaphore_give_from_isr 函数
-        // 并根据返回值决定是否需要请求调度
-        irq->bottom_sem->fun->give(irq->bottom_sem);
-    }
+
 }
 
 void dispatch(intc_irq_num irq_num) {

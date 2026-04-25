@@ -33,7 +33,7 @@ override void irq_handler(void *arg);
 #define def_dev_ioctl(obj) (GET_DEVICE_VTABLE(obj)->dev_ioctl)
 #define virtual_dev_ioctl(obj, ...) def_dev_ioctl(obj)(obj, ##__VA_ARGS__)
 
-#define irq_handler_override(func_name) static void func_name(void *arg)
+#define irq_handler_override(func_name) static bool func_name(void *arg)
 #define def_irq_handler(obj) (GET_DEVICE_VTABLE(obj)->irq_handler)
 #define virtual_irq_handler(obj, ...) def_irq_handler(obj)(obj, ##__VA_ARGS__)
 
@@ -52,7 +52,7 @@ typedef struct _DeviceVTable {
 	void (*dev_write)(Device* self, const void *buf, size_t count);
 	void (*dev_ioctl)(Device* self, int cmd, void *arg);
     
-	void (*irq_handler)(void *arg);
+	bool (*irq_handler)(void *arg);
 
 };
 // 类成员函数结构

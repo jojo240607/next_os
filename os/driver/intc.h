@@ -14,7 +14,7 @@ typedef struct _IntcFun IntcFun;
 typedef struct _intc_irq_t intc_irq_t;
 typedef enum _Intc_Irq intc_irq_num;
 // 中断上半部回调函数原型（运行于中断上下文）
-typedef void (*intc_handler_t)(void *arg);
+typedef bool (*intc_handler_t)(void *arg);
 enum _Intc_Irq {
     SYSTIC_IRQ = 0,
     USART4_IRQ,

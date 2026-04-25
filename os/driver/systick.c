@@ -100,5 +100,6 @@ irq_handler_override(systick_irq_handler_impl) {
         // 触发 PendSV 中断
         Trigger_PendSV;
     }
+    return false;
 }
 

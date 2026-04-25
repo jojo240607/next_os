@@ -173,8 +173,10 @@ irq_handler_override(usart_irq_handler_impl) {
                 usart->rx_buffer[usart->rx_index] = '\0'; // 字符串结束符
                 usart->rx_complete = 1;
                 usart->rx_index = 0;
+                return true;
             }
         }
     }
+    return false;
 }
 
