@@ -21,6 +21,7 @@ struct _Usart {
     char rx_buffer[256];
     volatile uint8_t rx_index;
     volatile uint8_t rx_complete;
+    bool feedback;
 };
 
 // 构造函数声明

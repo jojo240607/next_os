@@ -33,6 +33,7 @@ void log_task_init(Log_task* self) {
 	def_task_thread(self) = log_task_task_thread_impl;
     self->log_buf = queue_create();
     self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART);
+    GET_USART(self->usart)->feedback = true;
 }
 
 void log_task_deinit(Log_task* self) {
@@ -73,7 +74,17 @@ task_thread_override(log_task_task_thread_impl) {
     //params , void *arg
     while (1) {
         self->semaphore->fun->take(self->semaphore);
-        GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, GET_USART(log_task->usart)->rx_buffer, 1);
+        if (GET_USART(log_task->usart)->rx_complete == 1) {
+            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
+            //直接输出收到的数据缓存
+            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "recv---> ", 9);
+            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart,
+                                                             GET_USART(log_task->usart)->rx_buffer +
+                                                             GET_USART(log_task->usart)->rx_index,
+                                                             strlen(GET_USART(log_task->usart)->rx_buffer +
+                                                                    GET_USART(log_task->usart)->rx_index));
+
+        }
     }
     /*
     while (true) {

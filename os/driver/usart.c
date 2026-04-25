@@ -41,6 +41,7 @@ void usart_init(Usart* self) {
 	def_irq_handler(self) = usart_irq_handler_impl;
     self->rx_complete = 0;
     self->rx_index = 0;
+    self->feedback = false;
 }
 
 void usart_deinit(Usart* self) {
@@ -166,14 +167,19 @@ irq_handler_override(usart_irq_handler_impl) {
     // 检查SR寄存器的RXNE位，表示接收到了新数据
     if (UART4->SR & (1 << 5)) {
         char received_char = UART4->DR; // 读取数据寄存器，硬件会自动清除RXNE标志
+        if (usart->feedback) {
+            while (!(UART4->SR & (1 << 7)));
+            UART4->DR = received_char;
+        }
         // 将数据存入缓冲区
         if (usart->rx_index < sizeof(usart->rx_buffer) - 1) {
             usart->rx_buffer[usart->rx_index++] = received_char;
             if (received_char == '\n' || received_char == '\r') {
+                usart->rx_buffer[usart->rx_index++] = '\n';
                 usart->rx_buffer[usart->rx_index] = '\0'; // 字符串结束符
                 usart->rx_complete = 1;
                 usart->rx_index = 0;
-                return true;
+                return true;//收到结束符，才触发信号量通知程序解析
             }
         }
     }
