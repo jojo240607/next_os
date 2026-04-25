@@ -10,7 +10,7 @@ cpu PerformanceInMips 125
 # 添加这一行：启动 GDB 服务器
 machine StartGdbServer 3333 true
 
-$bin?=@cmake-build-debug-stm32/stm32f4discovery.elf
+$bin?=@cmake-build-debug/stm32f4discovery.elf
 
 showAnalyzer sysbus.uart4
 
