@@ -69,9 +69,13 @@ task_init_override(log_task_task_init_impl) {
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
     // TODO: add task_thread method
-    Log_task *log_task = (Log_task *)self;
+    Log_task *log_task = (Log_task *)self->parent;
     //params , void *arg
-    //self->semaphore->fun->take(self->semaphore);
+    while (1) {
+        self->semaphore->fun->take(self->semaphore);
+        GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, GET_USART(log_task->usart)->rx_buffer, 1);
+    }
+    /*
     while (true) {
         //String *str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
         //while (str) {
@@ -79,6 +83,8 @@ task_thread_override(log_task_task_thread_impl) {
         //    str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
         //}
         self->fun->os_sleep(self, 10);
+        GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "hello world\n", 13);
     }
+     */
 }
 

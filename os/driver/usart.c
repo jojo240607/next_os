@@ -2,6 +2,9 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "main.h"
+
+irq_handler_override(usart_irq_handler_impl);
 
 dev_init_override(usart_dev_init_impl);
 dev_read_override(usart_dev_read_impl);
@@ -35,6 +38,9 @@ void usart_init(Usart* self) {
     GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
+	def_irq_handler(self) = usart_irq_handler_impl;
+    self->rx_complete = 0;
+    self->rx_index = 0;
 }
 
 void usart_deinit(Usart* self) {
@@ -56,20 +62,91 @@ dev_init_override(usart_dev_init_impl) {
     //params 
     gloable_intc->fun->register_handler(gloable_intc, USART4_IRQ, GET_DEVICE_VTABLE(self)->irq_handler, self);
     gloable_intc->fun->attach_semaphore(gloable_intc, USART4_IRQ, sem);
+
+    // 使能UART4时钟 (APB1总线，位19)
+    RCC->APB1ENR |= (1 << 19);
+// 使能GPIOC时钟 (AHB1总线，位2)
+    RCC->AHB1ENR |= (1 << 2);
+
+    // 1. 将PC10和PC11配置为复用功能
+    GPIOC->MODER &= ~(0xF << (10*2)); // 清除原有的模式位
+    GPIOC->MODER |=  (0x2 << (10*2)); // 10: Alternate Function mode
+    GPIOC->MODER |=  (0x2 << (11*2));
+
+// 2. 将PC10（TX）配置为推挽输出
+    GPIOC->OTYPER &= ~(1 << 10);      // 0: Output push-pull
+// 3. 设置输出速度为50MHz
+    GPIOC->OSPEEDR |= (0x2 << (10*2)); // 10: 50MHz
+// 4. 配置无上拉/下拉
+    GPIOC->PUPDR &= ~(0x3 << (10*2));
+    GPIOC->PUPDR &= ~(0x3 << (11*2));
+
+// 5. 配置复用功能为AF8 (UART4)
+    GPIOC->AFR[1] &= ~(0xF << ((10-8)*4));
+    GPIOC->AFR[1] |=  (0x8 << ((10-8)*4)); // AF8 for PC10
+    GPIOC->AFR[1] &= ~(0xF << ((11-8)*4));
+    GPIOC->AFR[1] |=  (0x8 << ((11-8)*4)); // AF8 for PC11
+
+
+    // 1. 配置数据位8位 (M位0) 和 无校验 (PCE位0)
+    UART4->CR1 &= ~(1 << 12); // 清除PCE位: 无校验
+    UART4->CR1 &= ~(1 << 12); // 重复清除是为了保险, 确保PCE位为0
+    UART4->CR1 &= ~(1 << 13); // UE bit, 稍后使能
+// 注意: M位在CR1的第12位, 但我们刚刚清除了PCE位, 这可能会影响M位。正确做法：
+    UART4->CR1 &= ~(1 << 12); // PCE=0
+    UART4->CR1 &= ~(1 << 12); // 确保PCE位清除
+
+// 正确设置数据位8位 (M=0)
+    UART4->CR1 &= ~(1 << 12); // 清除M位 (注意: 如果PCE=1, M位在USART_CR1的第12位, 但这里我们PCE=0, 所以M位配置独立)
+// 澄清: 在STM32F4中, CR1寄存器第12位是M位, 第10位是PCE位。
+// 为了避免混淆，先清除M位和PCE位：
+    UART4->CR1 &= ~((1 << 12) | (1 << 10)); // M=0, 8位; PCE=0, 无校验
+
+// 2. 配置停止位 (默认为1个停止位，CR2的第13、12位均为0)
+    UART4->CR2 &= ~(0x3 << 12); // 清除STOP位
+
+// 3. 计算波特率 (假设系统时钟为84MHz, 目标波特率115200)
+// BRR = 时钟频率 / 目标波特率 (当OVER8=0时)
+    uint32_t brr_value = 84000000 / 115200;
+    UART4->BRR = brr_value; // 整数部分直接写入
+// 更精确的分数波特率生成公式：
+// USARTDIV = 84MHz / (115200 * 16) = 45.5729...
+// DIV_Mantissa = 45, DIV_Fraction = 16 * 0.5729 = 9.166 -> 9
+// BRR = (45 << 4) | 9 = 729
+    UART4->BRR = 729; // 对应84MHz时钟下, 115200波特率
+
+// 4. 使能发送器 (TE位=1) 和 接收器 (RE位=1)
+    UART4->CR1 |= (1 << 3) | (1 << 2); // 设置TE位和RE位
+
+// 5. 使能UART4外设 (UE位=1)
+    UART4->CR1 |= (1 << 13);
+
+
+    // --- 中断配置 (例如使能接收中断) ---
+    UART4->CR1 |= (1 << 5); // 使能接收中断 (RXNEIE)
+    // 配置NVIC: 设置中断优先级、使能UART4_IRQn中断
+    NVIC_SetPriority(UART4_IRQn, 0);
+    NVIC_EnableIRQ(UART4_IRQn);
+
 }
 // dev_read method
 dev_read_override(usart_dev_read_impl) {
     // TODO: add dev_read method
     Usart *usart = (Usart *)self;
     //params , void *buf, size_t count
-    
+    while(!(UART4->SR & (1 << 5)));
+    *(char *)buf = (char)UART4->DR;
 }
 // dev_write method
 dev_write_override(usart_dev_write_impl) {
     // TODO: add dev_write method
     Usart *usart = (Usart *)self;
     //params , const void *buf, size_t count
-    
+    // 检查发送数据寄存器是否为空 (TXE标志位)
+    while (count--) {
+        while (!(UART4->SR & (1 << 7)));
+        UART4->DR = *(char *) buf++;
+    }
 }
 // dev_ioctl method
 dev_ioctl_override(usart_dev_ioctl_impl) {
@@ -79,4 +156,25 @@ dev_ioctl_override(usart_dev_ioctl_impl) {
     
 }
 
+
+
+// irq_handler method
+irq_handler_override(usart_irq_handler_impl) {
+    // TODO: add irq_handler method
+    Usart *usart = (Usart *)arg;
+    //params , void *arg
+    // 检查SR寄存器的RXNE位，表示接收到了新数据
+    if (UART4->SR & (1 << 5)) {
+        char received_char = UART4->DR; // 读取数据寄存器，硬件会自动清除RXNE标志
+        // 将数据存入缓冲区
+        if (usart->rx_index < sizeof(usart->rx_buffer) - 1) {
+            usart->rx_buffer[usart->rx_index++] = received_char;
+            if (received_char == '\n' || received_char == '\r') {
+                usart->rx_buffer[usart->rx_index] = '\0'; // 字符串结束符
+                usart->rx_complete = 1;
+                usart->rx_index = 0;
+            }
+        }
+    }
+}
 

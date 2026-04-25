@@ -186,7 +186,9 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   /* USER CODE END SysTick_IRQn 1 */
 }
-
+void UART4_IRQHandler() {
+    dispatch(USART4_IRQ);
+}
 /******************************************************************************/
 /* STM32F4xx Peripheral Interrupt Handlers                                    */
 /* Add here the Interrupt Handlers for the used peripherals.                  */

@@ -22,7 +22,7 @@ static const Task_list task_lists[] = {
         {.tag = TASK_SYSTICK, .name = "systick", .priority = 1, .stack_size = 0, .task_create = (Task_create) systick_task_create},
         {.tag = TASK_IDLE, .name = "idle", .priority = 0, .stack_size = 32, .task_create = (Task_create) idle_task_create},
         {.tag = TASK_MONITOR, .name = "monitor", .priority = 0, .stack_size = 32, .task_create = (Task_create) monitor_task_create},
-        {.tag = TASK_LOG, .name = "log", .priority = 0, .stack_size = 128, .task_create = (Task_create) log_task_create},
+        {.tag = TASK_LOG, .name = "log", .priority = 1, .stack_size = 128, .task_create = (Task_create) log_task_create},
         {.tag = TASK_TEST1, .name = "test1", .priority = 1, .stack_size = DEFAULT_STACK_SIZE, .task_create = (Task_create) task_test1_create},
 
 };

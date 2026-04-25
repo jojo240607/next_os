@@ -17,6 +17,10 @@ struct _Usart {
     Device base;  // 基类作为第一个成员
     const UsartFun* fun;
     // TODO: 添加派生类特有的数据成员
+    // 假设的全局变量，用于存储接收到的数据
+    char rx_buffer[256];
+    volatile uint8_t rx_index;
+    volatile uint8_t rx_complete;
 };
 
 // 构造函数声明
