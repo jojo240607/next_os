@@ -99,7 +99,7 @@ static Tcb_t *thread_scheduler_create_thread(Thread_scheduler* self, const char 
         return NULL;
     }
     entry_s->exit = thread_scheduler_thread_exit;
-    Tcb_t *new_thread = tcb_t_create(name, entry_s, DEFAULT_STACK_SIZE);
+    Tcb_t *new_thread = tcb_t_create(name, entry_s, entry_s->stack_size);
     new_thread->tid = self->tid_num++;
     thread_scheduler_add_readly_list(self, new_thread);
     //self->priority_list[entry_s->priority]->fun->enqueue(self->priority_list[entry_s->priority], GET_NODE(new_thread));

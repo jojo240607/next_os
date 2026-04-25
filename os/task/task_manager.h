@@ -21,7 +21,8 @@ struct _Task_managerFun {
 };
 
 enum _Task_Tag {
-    TASK_IDLE = 0,
+    TASK_SYSTICK = 0,
+    TASK_IDLE,
     TASK_MONITOR,
     TASK_LOG,
     TASK_TEST1,
@@ -31,6 +32,7 @@ struct _Task_list {
     const char *name;
     //Base_task *task;
     uint8_t priority;
+    size_t stack_size;
     Task_create task_create;
 };
 // 类结构

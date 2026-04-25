@@ -31,10 +31,10 @@ void usart_init(Usart* self) {
     self->fun = &(usart_fun);
     // TODO: 初始化派生类特有成员
 
-	def_dev_init(self) = usart_dev_init_impl;
-	def_dev_read(self) = usart_dev_read_impl;
-	def_dev_write(self) = usart_dev_write_impl;
-	def_dev_ioctl(self) = usart_dev_ioctl_impl;
+    GET_DEVICE_VTABLE(self)->dev_init = usart_dev_init_impl;
+    GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
+    GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
+    GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
 }
 
 void usart_deinit(Usart* self) {
@@ -49,12 +49,13 @@ static void usart_destroy(Usart* self) {
     }
 }
 
-// dev_init method
+// dev_init method Semaphore *sem, intc_handler_t handle, void* arg
 dev_init_override(usart_dev_init_impl) {
     // TODO: add dev_init method
-    Usart *usart = (Usart *)self;
+    //Usart *usart = (Usart *)self;
     //params 
-    
+    gloable_intc->fun->register_handler(gloable_intc, USART4_IRQ, GET_DEVICE_VTABLE(self)->irq_handler, self);
+    gloable_intc->fun->attach_semaphore(gloable_intc, USART4_IRQ, sem);
 }
 // dev_read method
 dev_read_override(usart_dev_read_impl) {

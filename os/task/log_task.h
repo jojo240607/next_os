@@ -22,7 +22,7 @@ struct _Log_task {
     Base_task base;  // 基类作为第一个成员
     const Log_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
-    Usart *usart;
+    Device *usart;
     Queue *log_buf;//String
 };
 

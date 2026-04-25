@@ -184,14 +184,6 @@ void SysTick_Handler(void)
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
   /* USER CODE END SysTick_IRQn 0 */
-  HAL_IncTick();
-  /* USER CODE BEGIN SysTick_IRQn 1 */
-  if (gloable_current_stack != NULL) {
-
-      global_thread_scheduler->fun->delay_ticks(global_thread_scheduler);
-      // 触发 PendSV 中断
-      SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
-  }
   /* USER CODE END SysTick_IRQn 1 */
 }
 

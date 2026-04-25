@@ -17,7 +17,8 @@ typedef enum _Intc_Irq intc_irq_num;
 typedef void (*intc_handler_t)(void *arg);
 enum _Intc_Irq {
     SYSTIC_IRQ = 0,
-    USART4_IRQ = 1,
+    USART4_IRQ,
+    MAX_IRQ
 };
 // 类成员函数结构
 struct _IntcFun {

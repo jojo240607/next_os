@@ -10,12 +10,16 @@
 #include <string.h>
 #include "../scheduler/tcb_t.h"
 #include "../scheduler/thread_scheduler.h"
+#include "../driver/intc.h"
+#include "../driver/device_manager.h"
+
 
 #define GET_BASE_TASK_VTABLE(obj) (*(Base_taskVTable **)obj)
 
 #define task_init_override(func_name) static void func_name(Base_task* self, void *parent)
 #define def_task_init(obj) (GET_BASE_TASK_VTABLE(obj)->task_init)
 #define virtual_task_init(obj, ...) def_task_init(obj)(obj, ##__VA_ARGS__)
+
 #define task_thread_override(func_name) static void func_name(Tcb_t* self, void *arg)
 #define def_task_thread(obj) (GET_BASE_TASK_VTABLE(obj)->task_thread)
 #define virtual_task_thread(obj, ...) def_task_thread(obj)(obj, ##__VA_ARGS__)
@@ -32,14 +36,11 @@ typedef struct _Base_taskVTable {
 
 	void (*task_init)(Base_task* self, void *parent);
     Tcb_entry task_thread;
-    //Tcb_entry quick_task;
-	//void (*quick_task)(Base_task* self, void *arg);
-
 };
 // 类成员函数结构
 struct _Base_taskFun {
     void (*destroy)(Base_task* self);
-	void (*add_task)(Base_task* self, const char *name, uint8_t priority);
+	void (*add_task)(Base_task* self, const char *name, uint8_t priority, size_t stack_size);
 
 };
 // 类结构

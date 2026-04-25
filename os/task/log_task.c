@@ -32,7 +32,7 @@ void log_task_init(Log_task* self) {
 	def_task_init(self) = log_task_task_init_impl;
 	def_task_thread(self) = log_task_task_thread_impl;
     self->log_buf = queue_create();
-    self->usart = GET_USART(gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART));
+    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART);
 }
 
 void log_task_deinit(Log_task* self) {
@@ -56,6 +56,7 @@ static void log_task_destroy(Log_task* self) {
 }
 
 // task_init method
+//add task ---> init task
 task_init_override(log_task_task_init_impl) {
     // TODO: add task_init method
     Log_task *log_task = (Log_task *)self;
@@ -63,13 +64,14 @@ task_init_override(log_task_task_init_impl) {
     if (!log_task) {
         return;
     }
-    virtual_dev_init(GET_DEVICE(log_task->usart));
+    virtual_dev_init(log_task->usart, self->task_tcb->semaphore);
 }
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
     // TODO: add task_thread method
     Log_task *log_task = (Log_task *)self;
     //params , void *arg
+    //self->semaphore->fun->take(self->semaphore);
     while (true) {
         //String *str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
         //while (str) {

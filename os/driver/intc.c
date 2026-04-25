@@ -20,7 +20,7 @@ static const IntcFun intc_fun = {
 	.attach_semaphore = intc_attach_semaphore,
 	.set_priority = intc_set_priority,
 };
-static intc_irq_t irq_table[INTC_MAX_IRQ];
+static intc_irq_t irq_table[MAX_IRQ];
 
 // 构造函数实现
 Intc* intc_create() {
@@ -36,7 +36,7 @@ void intc_init(Intc* self) {
     self->fun = &(intc_fun);
     // TODO: 初始化数据成员
     //self->irq_tab = irq_table;
-    for (uint32_t i = 0; i < INTC_MAX_IRQ; i++) {
+    for (uint32_t i = 0; i < MAX_IRQ; i++) {
         irq_table[i].handler = NULL;
         irq_table[i].arg = NULL;
         irq_table[i].bottom_sem = NULL;
@@ -63,7 +63,7 @@ static void intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handl
     if (self == NULL) {
         return;
     }
-    if (irq_num >= INTC_MAX_IRQ || handler == NULL)
+    if (irq_num >= MAX_IRQ || handler == NULL)
         return;
     // 临界区保护（关中断）
     DISABLE_IRQ;
@@ -79,7 +79,7 @@ static void intc_unregister(Intc* self, intc_irq_num irq_num) {
     if (self == NULL) {
         return;
     }
-    if (irq_num >= INTC_MAX_IRQ) {
+    if (irq_num >= MAX_IRQ) {
         return;
     }
     DISABLE_IRQ;
@@ -93,7 +93,7 @@ static void intc_unregister(Intc* self, intc_irq_num irq_num) {
 }
 // attach_semaphore method
 static void intc_attach_semaphore(Intc* self, intc_irq_num irq_num, Semaphore *sem) {
-    if (irq_num >= INTC_MAX_IRQ || sem == NULL)
+    if (irq_num >= MAX_IRQ || sem == NULL)
         return;
     DISABLE_IRQ;
     irq_table[irq_num].bottom_sem = sem;
@@ -104,7 +104,7 @@ static void intc_set_priority(Intc* self, intc_irq_num irq_num, uint32_t priorit
     if (self == NULL) {
         return;
     }
-    if (irq_num >= INTC_MAX_IRQ)
+    if (irq_num >= MAX_IRQ)
         return;
     NVIC_SetPriority((IRQn_Type)irq_num, priority);
 }
@@ -113,7 +113,7 @@ static void intc_dispatch(Intc* self, intc_irq_num irq_num) {
     if (self == NULL) {
         return;
     }
-    if (irq_num >= INTC_MAX_IRQ)
+    if (irq_num >= MAX_IRQ)
         return;
 
     intc_irq_t *irq = &irq_table[irq_num];

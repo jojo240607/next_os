@@ -1,4 +1,5 @@
 #include "linear_pool.h"
+#include "util.h"
 
 static void noram_error();
 

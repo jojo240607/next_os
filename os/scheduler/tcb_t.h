@@ -9,10 +9,7 @@
 #include "semaphore.h"
 #include "../common/util.h"
 
-#define DEFAULT_STACK_SIZE (512) //2k
 
-
-#define SYSTEM_TICKS_PER_SEC (1000) //1000hz / 1ms
 
 #define GET_TCB_T(obj) ((Tcb_t *)obj)
 // 类声明
@@ -58,6 +55,7 @@ struct _Tcb_t {
 
 struct _Thread_entry_t {
     uint8_t priority;
+    size_t stack_size;
     void *parent;
     Tcb_entry entry_fun;
     void *arg;

@@ -9,8 +9,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define DEFAULT_OBJBUF_SIZE (1024 * 10)//10k
-
 // 线性分配器（Linear Allocator）
 typedef struct {
     uint8_t *start;      // 内存池起始地址

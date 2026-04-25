@@ -21,7 +21,8 @@ struct _Device_managerFun {
 
 };
 enum _Dev_Tag {
-    DEVICE_USART = 0,
+    DEVICE_SYSTICK = 0,
+    DEVICE_USART,
     DEVICE_MAX
 };
 
