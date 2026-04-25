@@ -73,7 +73,7 @@ task_thread_override(log_task_task_thread_impl) {
     Log_task *log_task = (Log_task *)self->parent;
     //params , void *arg
     while (1) {
-        self->semaphore->fun->take(self->semaphore);
+        //self->semaphore->fun->take(self->semaphore);
         if (GET_USART(log_task->usart)->rx_complete == 1) {
             GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
             //直接输出收到的数据缓存
@@ -83,8 +83,9 @@ task_thread_override(log_task_task_thread_impl) {
                                                              GET_USART(log_task->usart)->rx_index,
                                                              strlen(GET_USART(log_task->usart)->rx_buffer +
                                                                     GET_USART(log_task->usart)->rx_index));
-
+            GET_USART(log_task->usart)->rx_complete = 0;
         }
+        self->fun->os_sleep(self, 10);
     }
     /*
     while (true) {
