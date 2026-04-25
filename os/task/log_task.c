@@ -1,0 +1,82 @@
+#include "log_task.h"
+#include "../common/linear_pool.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+task_init_override(log_task_task_init_impl);
+task_thread_override(log_task_task_thread_impl);
+
+// 析构函数声明
+static void log_task_destroy(Log_task* self);
+
+// TODO: 初始化数据成员
+static const Log_taskFun log_task_fun = {
+    .destroy = log_task_destroy,
+};
+// 构造函数实现
+Log_task* log_task_create() {
+    Log_task* obj = (Log_task*)os_malloc(sizeof(Log_task));
+    if (obj) {
+        memset(obj, 0, sizeof(Log_task));
+        log_task_init(obj);
+    }
+    return obj;
+}
+
+void log_task_init(Log_task* self) {
+    // 初始化基类部分
+    base_task_init(&self->base);
+    self->fun = &(log_task_fun);
+    // TODO: 初始化派生类特有成员
+
+	def_task_init(self) = log_task_task_init_impl;
+	def_task_thread(self) = log_task_task_thread_impl;
+    self->log_buf = queue_create();
+    self->usart = GET_USART(gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART));
+}
+
+void log_task_deinit(Log_task* self) {
+    base_task_deinit(GET_BASE_TASK(self));
+    // TODO: 数据成员申请资源释放
+    if (self->log_buf) {
+        //String *str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));
+        //while (str) {
+        //    str->fun->destroy(str);
+        //    str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));
+        //}
+        self->log_buf->fun->destroy(self->log_buf);
+    }
+}
+// 析构函数实现
+static void log_task_destroy(Log_task* self) {
+    if (self != NULL) {
+        log_task_deinit(self);
+        os_free(self);
+    }
+}
+
+// task_init method
+task_init_override(log_task_task_init_impl) {
+    // TODO: add task_init method
+    Log_task *log_task = (Log_task *)self;
+    //params , void *parent
+    if (!log_task) {
+        return;
+    }
+    virtual_dev_init(GET_DEVICE(log_task->usart));
+}
+// task_thread method
+task_thread_override(log_task_task_thread_impl) {
+    // TODO: add task_thread method
+    Log_task *log_task = (Log_task *)self;
+    //params , void *arg
+    while (true) {
+        //String *str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
+        //while (str) {
+        //    virtual_dev_write(GET_DEVICE(log_task->usart), str->str, strlen(str->str));
+        //    str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
+        //}
+        self->fun->os_sleep(self, 10);
+    }
+}
+
