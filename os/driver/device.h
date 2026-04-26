@@ -60,6 +60,8 @@ struct _DeviceFun {
 
 	void (*redirect_semaphore)(Device* self, Semaphore *sem);
 
+	bool (*transfer)(Device* self, const void *data, size_t count);
+
 };
 // 类结构
 struct _Device {

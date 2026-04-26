@@ -32,7 +32,7 @@ void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, size_t stack_size
     // TODO: 初始化数据成员
     self->priority = entry->priority;
     self->parent = entry->parent;
-    self->semaphore = semaphore_create(1);
+    self->semaphore = semaphore_create(0);
     GET_NODE(self)->next = NULL;
     self->name = name;
     self->stack_size = stack_size;

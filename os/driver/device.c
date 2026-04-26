@@ -2,6 +2,8 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 
+static bool device_transfer(Device* self, const void *data, size_t count);
+
 static void device_redirect_semaphore(Device* self, Semaphore *sem);
 
 static void device_attach_semaphore(Device* self, Semaphore *sem);
@@ -14,6 +16,7 @@ static const DeviceFun device_fun = {
     .destroy = device_destroy,
 	.attach_semaphore = device_attach_semaphore,
 	.redirect_semaphore = device_redirect_semaphore,
+	.transfer = device_transfer,
 };
 // 构造函数实现
 Device* device_create() {
@@ -77,5 +80,18 @@ static void device_redirect_semaphore(Device* self, Semaphore *sem) {
         gloable_intc->fun->register_handler(gloable_intc, self->irq_num, GET_DEVICE_VTABLE(self)->irq_handler, self);
         gloable_intc->fun->attach_semaphore(gloable_intc, self->irq_num, sem);
     }
+}
+
+
+// transfer method
+static bool device_transfer(Device* self, const void *data, size_t count) {
+    if (self->vtable->dev_write == NULL) {
+        return false;
+    }
+    self->vtable->dev_write(self, data, count);
+    if (self->semaphore) {
+        self->semaphore->fun->take(self->semaphore);
+    }
+    return true;
 }
 

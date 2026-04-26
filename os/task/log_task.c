@@ -74,18 +74,22 @@ task_thread_override(log_task_task_thread_impl) {
     //params , void *arg
     while (1) {
         //self->semaphore->fun->take(self->semaphore);
+        log_task->usart->fun->transfer(log_task->usart, "\r\nwait---> \n", 12);
         if (GET_USART(log_task->usart)->rx_complete == 1) {
-            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
-            //直接输出收到的数据缓存
-            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "recv---> ", 9);
-            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart,
-                                                             GET_USART(log_task->usart)->rx_buffer +
-                                                             GET_USART(log_task->usart)->rx_index,
-                                                             strlen(GET_USART(log_task->usart)->rx_buffer +
-                                                                    GET_USART(log_task->usart)->rx_index));
+            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
             GET_USART(log_task->usart)->rx_complete = 0;
+            //直接输出收到的数据缓存
+
+            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "recv---> ", 9);
+            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart,
+            //                                                 GET_USART(log_task->usart)->rx_buffer +
+            //                                                 GET_USART(log_task->usart)->rx_index,
+            //                                                 strlen(GET_USART(log_task->usart)->rx_buffer +
+            //                                                        GET_USART(log_task->usart)->rx_index));
+
         }
-        self->fun->os_sleep(self, 10);
+
+        //self->fun->os_sleep(self, 10);
     }
     /*
     while (true) {

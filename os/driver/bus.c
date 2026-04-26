@@ -51,9 +51,6 @@ static void bus_destroy(Bus* self) {
 
 // transfer method
 static bool bus_transfer(Bus* self, Device *device, const void *data, size_t count) {
-    if (self == NULL || device == NULL) {
-        return false;
-    }
     if (device->vtable->dev_write == NULL) {
         return false;
     }
