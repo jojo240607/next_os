@@ -2,7 +2,7 @@
 #define LOG_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "Base_task.h"
+#include "task.h"
 #include "../driver/usart.h"
 #include "String.h"
 #include "../driver/device_manager.h"
@@ -19,7 +19,7 @@ struct _Log_taskFun {
 };
 
 struct _Log_task {
-    Base_task base;  // 基类作为第一个成员
+    Task base;  // 基类作为第一个成员
     const Log_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Device *usart;

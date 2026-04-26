@@ -25,7 +25,7 @@ Log_task* log_task_create() {
 
 void log_task_init(Log_task* self) {
     // 初始化基类部分
-    base_task_init(&self->base);
+    task_init(&self->base);
     self->fun = &(log_task_fun);
     // TODO: 初始化派生类特有成员
 
@@ -37,7 +37,7 @@ void log_task_init(Log_task* self) {
 }
 
 void log_task_deinit(Log_task* self) {
-    base_task_deinit(GET_BASE_TASK(self));
+    task_deinit(GET_Task(self));
     // TODO: 数据成员申请资源释放
     if (self->log_buf) {
         //String *str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));

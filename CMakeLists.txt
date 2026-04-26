@@ -53,7 +53,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/scheduler/tcb_t.c
         os/scheduler/thread_scheduler.c
         os/scheduler/semaphore.c
-        os/task/base_task.c
+        os/task/task.c
         #os/task/real_time_task.c
         os/task/task_manager.c
         os/task/idle_task.c
@@ -61,6 +61,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/task/log_task.c
         os/task/systick_task.c
         os/driver/device.c
+        os/driver/bus.c
         os/driver/usart.c
         os/driver/intc.c
         os/driver/systick.c

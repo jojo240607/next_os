@@ -2,7 +2,7 @@
 #define MONITOR_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "base_task.h"
+#include "task.h"
 #include "idle_task.h"
 
 #define GET_MONITOR_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Monitor_taskVTable **)obj)
@@ -18,7 +18,7 @@ struct _Monitor_taskFun {
 
 };
 struct _Monitor_task {
-    Base_task base;  // 基类作为第一个成员
+    Task base;  // 基类作为第一个成员
     const Monitor_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Idle_task *idletask;

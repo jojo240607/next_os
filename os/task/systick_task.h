@@ -2,7 +2,7 @@
 #define SYSTICK_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "Base_task.h"
+#include "task.h"
 #include "../driver/systick.h"
 
 #define GET_SYSTICK_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Systick_taskVTable **)obj)
@@ -16,7 +16,7 @@ struct _Systick_taskFun {
     void (*destroy)(Systick_task* self);
 };
 struct _Systick_task {
-    Base_task base;  // 基类作为第一个成员
+    Task base;  // 基类作为第一个成员
     const Systick_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Device *systick;

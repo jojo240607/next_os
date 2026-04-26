@@ -28,9 +28,9 @@ static const Task_list task_lists[] = {
 };
 // 构造函数实现
 Task_manager* task_manager_create() {
-    Task_manager* obj = (Task_manager*)os_malloc(sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Base_task *));
+    Task_manager* obj = (Task_manager*)os_malloc(sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Task *));
     if (obj) {
-        memset(obj, 0, sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Base_task *));
+        memset(obj, 0, sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Task *));
         task_manager_init(obj);
     }
     return obj;

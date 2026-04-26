@@ -63,6 +63,7 @@ dev_init_override(usart_dev_init_impl) {
     //params 
     gloable_intc->fun->register_handler(gloable_intc, USART4_IRQ, GET_DEVICE_VTABLE(self)->irq_handler, self);
     gloable_intc->fun->attach_semaphore(gloable_intc, USART4_IRQ, sem);
+    self->semaphore = sem;
 
     // 使能UART4时钟 (APB1总线，位19)
     RCC->APB1ENR |= (1 << 19);

@@ -26,7 +26,7 @@ void device_init(Device* self) {
     }
     self->fun = &(device_fun);
     // TODO: 初始化数据成员
-
+    self->semaphore = NULL;
 }
 
 void device_deinit(Device* self) {

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "base_task.h"
+#include "task.h"
 #include "../common/util.h"
 
 // 类声明
@@ -12,7 +12,7 @@ typedef struct _Task_manager Task_manager;
 typedef struct _Task_managerFun Task_managerFun;
 typedef struct _Task_list Task_list;
 typedef enum _Task_Tag Task_tag;
-typedef Base_task* (*Task_create)();
+typedef Task* (*Task_create)();
 // 类成员函数结构
 struct _Task_managerFun {
     void (*destroy)(Task_manager* self);
@@ -30,7 +30,7 @@ enum _Task_Tag {
 struct _Task_list {
     const Task_tag tag;
     const char *name;
-    //Base_task *task;
+    //Task *task;
     uint8_t priority;
     size_t stack_size;
     Task_create task_create;
@@ -41,7 +41,7 @@ struct _Task_manager {
     // TODO: 添加数据成员
     const Task_list* task_list;
     size_t task_size;
-    Base_task *task_tab[];
+    Task *task_tab[];
 };
 
 // 构造函数声明
