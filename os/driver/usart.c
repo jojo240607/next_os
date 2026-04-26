@@ -39,6 +39,7 @@ void usart_init(Usart* self) {
     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
 	def_irq_handler(self) = usart_irq_handler_impl;
+    GET_DEVICE(self)->irq_num = USART4_IRQ;
     self->rx_complete = 0;
     self->rx_index = 0;
     self->feedback = false;
@@ -60,9 +61,8 @@ static void usart_destroy(Usart* self) {
 dev_init_override(usart_dev_init_impl) {
     // TODO: add dev_init method
     //Usart *usart = (Usart *)self;
-    //params 
-    gloable_intc->fun->register_handler(gloable_intc, USART4_IRQ, GET_DEVICE_VTABLE(self)->irq_handler, self);
-    gloable_intc->fun->attach_semaphore(gloable_intc, USART4_IRQ, sem);
+    //params
+    self->fun->attach_semaphore(self, sem);
     self->semaphore = sem;
 
     // 使能UART4时钟 (APB1总线，位19)

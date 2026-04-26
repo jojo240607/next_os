@@ -41,7 +41,7 @@ void monitor_task_init(Monitor_task* self) {
 }
 
 void monitor_task_deinit(Monitor_task* self) {
-    task_deinit(GET_Task(self));
+    task_deinit(GET_TASK(self));
     // TODO: 数据成员申请资源释放
 }
 // 析构函数实现

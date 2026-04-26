@@ -22,6 +22,7 @@ struct _Task_managerFun {
 
 enum _Task_Tag {
     TASK_SYSTICK = 0,
+    TASK_BUS,
     TASK_IDLE,
     TASK_MONITOR,
     TASK_LOG,

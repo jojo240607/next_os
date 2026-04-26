@@ -75,6 +75,8 @@ static bool bus_transfer_async(Bus* self, Device *device, const void *data, size
     }
     device->vtable->dev_write(device, data, count);
     device->semaphore = GET_DEVICE(self)->semaphore;
+    //将驱动的信号量指向bus，这样bus的任务中可以收到回调了
+    device->fun->attach_semaphore(device, GET_DEVICE(self)->semaphore);
     return true;
 }
 
@@ -84,6 +86,6 @@ dev_init_override(bus_dev_init_impl) {
     // TODO: add dev_init method
     Bus *bus = (Bus *)self;
     //params 
-    self->semaphore = sem;
+    self->fun->attach_semaphore(self, sem);
 }
 

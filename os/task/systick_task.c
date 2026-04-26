@@ -32,7 +32,7 @@ void systick_task_init(Systick_task* self) {
 }
 
 void systick_task_deinit(Systick_task* self) {
-    task_deinit(GET_Task(self));
+    task_deinit(GET_TASK(self));
     // TODO: 数据成员申请资源释放
     if (self->systick) {
         self->systick->fun->destroy(self->systick);

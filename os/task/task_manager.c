@@ -4,6 +4,8 @@
 #include "idle_task.h"
 #include "monitor_task.h"
 #include "log_task.h"
+#include "bus_task.h"
+
 #include "../test/task_test1.h"
 #include "../common/linear_pool.h"
 
@@ -20,6 +22,7 @@ static const Task_managerFun task_manager_fun = {
 
 static const Task_list task_lists[] = {
         {.tag = TASK_SYSTICK, .name = "systick", .priority = 1, .stack_size = 0, .task_create = (Task_create) systick_task_create},
+        {.tag = TASK_BUS, .name = "bus", .priority = 2, .stack_size = 32, .task_create = (Task_create) bus_task_create},
         {.tag = TASK_IDLE, .name = "idle", .priority = 0, .stack_size = 32, .task_create = (Task_create) idle_task_create},
         {.tag = TASK_MONITOR, .name = "monitor", .priority = 0, .stack_size = 32, .task_create = (Task_create) monitor_task_create},
         {.tag = TASK_LOG, .name = "log", .priority = 1, .stack_size = 128, .task_create = (Task_create) log_task_create},

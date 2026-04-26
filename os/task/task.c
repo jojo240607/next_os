@@ -53,7 +53,7 @@ static void task_add_task(Task* self, const char *name, uint8_t priority, size_t
     if (NULL == self) {
         return;
     }
-    if (GET_Task_VTABLE(self)->task_thread != NULL && stack_size > 0) {
+    if (GET_TASK_VTABLE(self)->task_thread != NULL && stack_size > 0) {
         Entry_t entry_s = {
                 .priority = priority,
                 .stack_size = stack_size,

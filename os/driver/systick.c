@@ -40,7 +40,7 @@ void systick_init(Systick* self) {
 	GET_DEVICE_VTABLE(self)->dev_write = systick_dev_write_impl;
 	GET_DEVICE_VTABLE(self)->dev_ioctl = systick_dev_ioctl_impl;
 	def_irq_handler(self) = systick_irq_handler_impl;
-
+    GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
     self->timetick = 0;
 }
 
@@ -59,8 +59,8 @@ static void systick_destroy(Systick* self) {
 // dev_init method
 dev_init_override(systick_dev_init_impl) {
     // TODO: add dev_init method
-    gloable_intc->fun->register_handler(gloable_intc, SYSTIC_IRQ, GET_DEVICE_VTABLE(self)->irq_handler, self);
-    gloable_intc->fun->attach_semaphore(gloable_intc, SYSTIC_IRQ, sem);
+
+    self->fun->attach_semaphore(self, sem);
     //params 
     
 }

@@ -35,7 +35,7 @@ void idle_task_init(Idle_task* self) {
 }
 
 void idle_task_deinit(Idle_task* self) {
-    task_deinit(GET_Task(self));
+    task_deinit(GET_TASK(self));
     // TODO: 数据成员申请资源释放
 }
 // 析构函数实现

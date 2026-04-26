@@ -37,7 +37,7 @@ void log_task_init(Log_task* self) {
 }
 
 void log_task_deinit(Log_task* self) {
-    task_deinit(GET_Task(self));
+    task_deinit(GET_TASK(self));
     // TODO: 数据成员申请资源释放
     if (self->log_buf) {
         //String *str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));

@@ -56,6 +56,10 @@ typedef struct _DeviceVTable {
 // 类成员函数结构
 struct _DeviceFun {
     void (*destroy)(Device* self);
+	void (*attach_semaphore)(Device* self, Semaphore *sem);
+
+	void (*redirect_semaphore)(Device* self, Semaphore *sem);
+
 };
 // 类结构
 struct _Device {
@@ -63,6 +67,7 @@ struct _Device {
     const DeviceFun* fun;
     // TODO: 添加数据成员
     Semaphore * semaphore;
+    intc_irq_num irq_num;
     //void (*irq_handler)(Real_time_task* self);
 };
 

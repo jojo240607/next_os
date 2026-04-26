@@ -63,8 +63,12 @@ static void intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handl
     if (self == NULL) {
         return;
     }
-    if (irq_num >= MAX_IRQ || handler == NULL)
+    if (irq_num >= MAX_IRQ || handler == NULL) {
         return;
+    }
+    if (irq_table[irq_num].registered) {
+        return;
+    }
     // 临界区保护（关中断）
     DISABLE_IRQ;
     irq_table[irq_num].handler = handler;

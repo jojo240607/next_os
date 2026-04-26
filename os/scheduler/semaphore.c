@@ -17,18 +17,19 @@ static const SemaphoreFun semaphore_fun = {
 	.give = semaphore_give,
 };
 // 构造函数实现
-Semaphore* semaphore_create(uint8_t count) {
+Semaphore* semaphore_create(uint8_t id, uint8_t count) {
     Semaphore* obj = (Semaphore*)os_malloc(sizeof(Semaphore));
     if (obj) {
         memset(obj, 0, sizeof(Semaphore));
-        semaphore_init(obj, count);
+        semaphore_init(obj, id, count);
     }
     return obj;
 }
 
-void semaphore_init(Semaphore* self, uint8_t count) {
+void semaphore_init(Semaphore* self, uint8_t id, uint8_t count) {
     self->fun = &(semaphore_fun);
     // TODO: 初始化数据成员
+    self->id = id;
     self->count = count;
     self->wait_list = queue_create();
 }

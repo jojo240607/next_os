@@ -14,17 +14,17 @@
 #include "../driver/device_manager.h"
 
 
-#define GET_Task_VTABLE(obj) (*(TaskVTable **)obj)
+#define GET_TASK_VTABLE(obj) (*(TaskVTable **)obj)
 
 #define task_init_override(func_name) static void func_name(Task* self, void *parent)
-#define def_task_init(obj) (GET_Task_VTABLE(obj)->task_init)
+#define def_task_init(obj) (GET_TASK_VTABLE(obj)->task_init)
 #define virtual_task_init(obj, ...) def_task_init(obj)(obj, ##__VA_ARGS__)
 
 #define task_thread_override(func_name) static void func_name(Tcb_t* self, void *arg)
-#define def_task_thread(obj) (GET_Task_VTABLE(obj)->task_thread)
+#define def_task_thread(obj) (GET_TASK_VTABLE(obj)->task_thread)
 #define virtual_task_thread(obj, ...) def_task_thread(obj)(obj, ##__VA_ARGS__)
 
-#define GET_Task(obj) ((Task *)obj)
+#define GET_TASK(obj) ((Task *)obj)
 // 类声明
 typedef struct _Task Task;
 typedef struct _TaskFun TaskFun;
