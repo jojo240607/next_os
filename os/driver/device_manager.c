@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "usart.h"
 #include "systick.h"
+#include "bus.h"
 #include "../common/linear_pool.h"
 
 static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag);
@@ -17,6 +18,7 @@ static const Device_managerFun device_manager_fun = {
 
 static const Device_list dev_lists[] = {
         {.tag = DEVICE_SYSTICK, .name = "sys_tick", .device_create = (Device_create) systick_create},
+        {.tag = DEVICE_BUS, .name = "bus", .device_create = (Device_create) bus_create},
         {.tag = DEVICE_USART, .name = "usart", .device_create = (Device_create) usart_create},
 };
 Device_manager *gloable_deviceManager = NULL;

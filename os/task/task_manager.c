@@ -69,7 +69,7 @@ static void task_manager_boot_init(Task_manager* self) {
     if (NULL == self) {
         return;
     }
-    uint16_t task_num = 0;;
+    uint16_t task_num = 0;
     while (task_num < self->task_size) {
         self->task_tab[(self->task_list + task_num)->tag] = (self->task_list + task_num)->task_create();
         self->task_tab[(self->task_list + task_num)->tag]->fun->add_task(
