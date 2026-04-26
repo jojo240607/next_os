@@ -2,6 +2,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../log/log.h"
 
 task_init_override(log_task_task_init_impl);
 task_thread_override(log_task_task_thread_impl);
@@ -13,6 +14,16 @@ static void log_task_destroy(Log_task* self);
 static const Log_taskFun log_task_fun = {
     .destroy = log_task_destroy,
 };
+
+/* 级别字符串 */
+static const char *level_str[] = {
+        [LOG_LEVEL_DEBUG] = "DBG",
+        [LOG_LEVEL_INFO]  = "INF",
+        [LOG_LEVEL_WARN]  = "WRN",
+        [LOG_LEVEL_ERROR] = "ERR",
+        [LOG_LEVEL_FATAL] = "FAT"
+};
+
 // 构造函数实现
 Log_task* log_task_create() {
     Log_task* obj = (Log_task*)os_malloc(sizeof(Log_task));
@@ -66,15 +77,18 @@ task_init_override(log_task_task_init_impl) {
         return;
     }
     virtual_dev_init(log_task->usart, self->task_tcb->semaphore);
+    log_setsem(self->task_tcb->semaphore);
 }
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
     // TODO: add task_thread method
     Log_task *log_task = (Log_task *)self->parent;
     //params , void *arg
+    Ring *log_buf = log_buffer();
+    log_entry_t entry;
     while (1) {
-        //self->semaphore->fun->take(self->semaphore);
-        log_task->usart->fun->transfer(log_task->usart, "\r\nwait---> \n", 12);
+        self->semaphore->fun->take(self->semaphore);
+
         if (GET_USART(log_task->usart)->rx_complete == 1) {
             //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
             GET_USART(log_task->usart)->rx_complete = 0;
@@ -88,7 +102,22 @@ task_thread_override(log_task_task_thread_impl) {
             //                                                        GET_USART(log_task->usart)->rx_index));
 
         }
-
+        /* 批量处理，直到缓冲区空 */
+        while (log_buf->fun->pop(log_buf, &entry)) {
+            /* 格式化并发送到串口 */
+            char line[LOG_MSG_MAX_LEN + 32];  // 额外空间给前缀
+            int len = snprintf(line, sizeof(line),
+                               "[%08lu][%s][M%d] %s\r\n",
+                               entry.timestamp,
+                               level_str[entry.level],
+                               entry.module_id,
+                               entry.text);
+            if (len > 0) {
+                //serial_send_blocking(line, len);
+               // log_task->usart->fun->transfer(log_task->usart, line, len);
+                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, line, len);
+            }
+        }
         //self->fun->os_sleep(self, 10);
     }
     /*

@@ -3,6 +3,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../log/log.h"
 
 static void monitor_task_cpu_usage(Monitor_task* self);
 
@@ -83,6 +84,6 @@ static void monitor_task_cpu_usage(Monitor_task* self) {
     // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
     self->cpu_usage = 100 - (self->idletask->idle_total_ticks * 100 / run_time);
     self->idletask->idle_total_ticks = 0;
-    
+    LOG(LOG_LEVEL_DEBUG, MODULE_SYSTEM,"cpu_usage : %d\n", self->cpu_usage);
 }
 

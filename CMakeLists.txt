@@ -32,7 +32,10 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        os/log/log.h
+        os/log/log_config.h
+        os/log/log.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -53,6 +56,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/scheduler/tcb_t.c
         os/scheduler/thread_scheduler.c
         os/scheduler/semaphore.c
+        os/log/log.c
         os/task/task.c
         #os/task/real_time_task.c
         os/task/task_manager.c

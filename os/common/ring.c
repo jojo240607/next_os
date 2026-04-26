@@ -1,6 +1,7 @@
 #include "ring.h"
 #include <stdio.h>
 #include "linear_pool.h"
+#include "util.h"
 
 static bool ring_push(Ring* self, const void *data);
 static bool ring_pop(Ring* self, void *data);
@@ -61,14 +62,16 @@ static bool ring_push(Ring* self, const void *data) {
     }
 
     char *byte_buffer = (char *)self->buffer;
+    DISABLE_IRQ;
     memcpy(byte_buffer + self->tail * self->elem_size, data, self->elem_size);
     self->tail = (self->tail + 1) % self->capacity;
     self->count++;
+    ENABLE_IRQ;
     return true;
 }
 // pop method
 static bool ring_pop(Ring* self, void *data) {
-    if (self->count == self->capacity) {
+    if (self->count == 0) {
         return false;
     }
 

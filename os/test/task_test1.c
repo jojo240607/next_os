@@ -2,6 +2,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../log/log.h"
 
 task_init_override(task_test1_init_impl);
 task_thread_override(task_test1_thread_impl);
@@ -59,10 +60,12 @@ task_thread_override(task_test1_thread_impl) {
     while (true) {
         for(uint32_t i = 0; i < 100; i++) {
             for(uint32_t j = 0; j < 100; j++) {
-                printf("idle_task\n");
+                uint32_t testdeb = 0;
+                testdeb+=90;
             }
         }
-        self->fun->os_sleep(self, 50);
+        self->fun->os_sleep(self, 5000);
+        LOG(LOG_LEVEL_DEBUG, MODULE_SYSTEM,"idle_task\n");
     }
 }
 
