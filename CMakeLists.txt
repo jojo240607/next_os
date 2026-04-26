@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
         Src/context_switch.s
         os/common/queue.c
+        os/common/ring.c
         os/common/linear_pool.c
         os/common/object_init.c
         os/scheduler/tcb_t.c
