@@ -1,4 +1,5 @@
 #include "bus_task.h"
+#include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,7 +15,7 @@ static const Bus_taskFun bus_task_fun = {
 };
 // 构造函数实现
 Bus_task* bus_task_create() {
-    Bus_task* obj = (Bus_task*)malloc(sizeof(Bus_task));
+    Bus_task* obj = (Bus_task*)os_malloc(sizeof(Bus_task));
     if (obj) {
         memset(obj, 0, sizeof(Bus_task));
         bus_task_init(obj);
@@ -41,7 +42,7 @@ void bus_task_deinit(Bus_task* self) {
 static void bus_task_destroy(Bus_task* self) {
     if (self != NULL) {
         bus_task_deinit(self);
-        free(self);
+        os_free(self);
     }
 }
 

@@ -60,6 +60,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/task/monitor_task.c
         os/task/log_task.c
         os/task/systick_task.c
+        os/task/bus_task.c
         os/driver/device.c
         os/driver/bus.c
         os/driver/usart.c
