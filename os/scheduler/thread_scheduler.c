@@ -2,13 +2,15 @@
 #include <stdio.h>
 #include "main.h"
 #include "../common/linear_pool.h"
+#include "../log/log.h"
+#include "../common/sys_time.h"
 
-static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
-static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
-static uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self);
+static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
+static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
+static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self);
 
 static void thread_scheduler_delay_ticks(Thread_scheduler* self);
-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb);
+static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected);
 
 static void thread_scheduler_start(Thread_scheduler* self);
 
@@ -41,6 +43,7 @@ Thread_scheduler* thread_scheduler_create() {
 }
 
 void thread_scheduler_init(Thread_scheduler* self) {
+    LOG_DEBUG("scheduler", "thread_scheduler_init");
     self->fun = &(thread_scheduler_fun);
     // TODO: 初始化数据成员
     self->priority_bitmap = 0;
@@ -101,7 +104,7 @@ static Tcb_t *thread_scheduler_create_thread(Thread_scheduler* self, const char 
     entry_s->exit = thread_scheduler_thread_exit;
     Tcb_t *new_thread = tcb_t_create(name, entry_s, entry_s->stack_size);
     new_thread->tid = self->tid_num++;
-    thread_scheduler_add_readly_list(self, new_thread);
+    thread_scheduler_add_readly_list(self, new_thread, true);
     //self->priority_list[entry_s->priority]->fun->enqueue(self->priority_list[entry_s->priority], GET_NODE(new_thread));
     return new_thread;
 }
@@ -111,9 +114,23 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     if (NULL == self || self->current_thread == NULL) {
         return;
     }
+    if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
+        while (1) {
+            LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
+            //stack out bound
+        }
+    } else {
+#if OS_STACK_DEBUG
+        uint16_t left = 0;
+        while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
+            left++;
+        }
+        self->current_thread->stack_left = left;
+#endif
+    }
     DISABLE_IRQ;
     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {
-        thread_scheduler_add_readly_list(self, self->current_thread);
+        thread_scheduler_add_readly_list(self, self->current_thread, true);
     } else if (TCB_STATER_TERMINATED == self->current_thread->state) {
         self->destory_list->fun->enqueue(self->destory_list, GET_NODE(self->current_thread));
     }
@@ -130,10 +147,14 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     }
     Tcb_t *next_tcb = GET_TCB_T(
             self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
-    self->current_thread->run_time = HAL_GetTick() - self->current_thread->start_time;
+    self->current_thread->run_time += getSystime()->systick - self->current_thread->start_time;
+    //if (self->current_thread->need_print) {
+    //    self->current_thread->need_print = false;
+    //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
+    //}
     self->current_thread = next_tcb;
     if (self->current_thread != NULL) {
-        self->current_thread->start_time = HAL_GetTick();
+        self->current_thread->start_time = getSystime()->systick;
         self->current_thread->state = TCB_STATER_RUNNING;
         gloable_current_stack = (uint32_t *)(&self->current_thread->sp);
     }
@@ -143,28 +164,21 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
 
 // start method
 static void thread_scheduler_start(Thread_scheduler* self) {
+    LOG_DEBUG("scheduler", "thread_scheduler_start");
     if (NULL == self) {
         return;
     }
     uint8_t highest_priority = thread_scheduler_get_highest_priority(self);
-
     self->current_thread = GET_TCB_T(self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
     if (self->current_thread == NULL) {
         return;
     }
-    /*// 设置 PSP 指向第一个任务的栈顶
-    __set_PSP((uint32_t) self->current_thread->stack_ptr);
-    // 使用 PSP 作为当前栈指针
-    __set_CONTROL( 0x02 );   // 特权线程模式，使用 PSP
-    __ISB();*/
     __set_PSP( (uint32_t)self->current_thread->sp );
     // 设置 CONTROL 寄存器，选择使用 PSP
     __set_CONTROL( __get_CONTROL() | 0x2 );
-// 执行 ISB 指令确保立即生效
+    // 执行 ISB 指令确保立即生效
     __ISB();
-    uint32_t test_psp = __get_PSP();  // 立即读回
-    // 触发 PendSV 来启动第一个任务
-    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+    Trigger_PendSV;
     // 或者直接使用 svc 指令
     // 注意：永远不会返回到这里
     while(1);
@@ -210,17 +224,22 @@ static void thread_scheduler_delay_ticks(Thread_scheduler* self) {
                         self->delay_list->tail = GET_NODE(prev);
                     }
                 }
-                thread_scheduler_add_readly_list(self, delay_task);
+                LOG_DEBUG("delay", "delay over, add_readly %s", delay_task->name);
+                thread_scheduler_add_readly_list(self, delay_task, false);
             }
         }
         num++;
         prev = delay_task;
         delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
+        //while (delay_task->state != TCB_STATER_WAITING_MUTEX) {
+        //    prev = delay_task;
+        //    delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
+        //}
     }
     
 }
 // add_readly_list method
-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb) {
+static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected) {
     if (NULL == self) {
         return;
     }
@@ -228,13 +247,13 @@ static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb)
     self->priority_list[tcb->priority]->fun->enqueue(self->priority_list[tcb->priority], GET_NODE(tcb));
     thread_scheduler_set_priority_ready(self, tcb->priority);
     // 如果该任务优先级高于当前任务，请求抢占
-    if (self->current_thread != NULL && tcb->priority > self->current_thread->priority) {
+    if (!protected && self->current_thread != NULL && tcb->priority > self->current_thread->priority) {
         Trigger_PendSV;
     }
 }
 
 // set_priority_ready method
-static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p) {
+static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p) {
     if (NULL == self) {
         return;
     }
@@ -245,7 +264,7 @@ static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t 
     }
 }
 // clear_priority_ready method
-static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p) {
+static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p) {
     if (NULL == self) {
         return;
     }
@@ -254,7 +273,7 @@ static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_
     }
 }
 // get_highest_priority method
-inline static uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self) {
+static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self) {
     //用于计算一个无符号整数的前导零个数  优先级31 返回值0， 优先级0 返回31
     return 31 - __builtin_clz(self->priority_bitmap);
 }

@@ -6,6 +6,8 @@
 #include "../driver/usart.h"
 #include "String.h"
 #include "../driver/device_manager.h"
+#include "../log/log.h"
+
 #define GET_LOG_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Log_taskVTable **)obj)
 #define GET_LOG_TASK(obj) ((Log_task *)obj)
 
@@ -24,6 +26,7 @@ struct _Log_task {
     // TODO: 添加派生类特有的数据成员
     Device *usart;
     Queue *log_buf;//String
+    char line[LOG_MSG_MAX_LEN + 32];
 };
 
 // 构造函数声明

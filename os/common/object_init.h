@@ -4,7 +4,6 @@
 
 #ifndef STM32F4DISCOVERY_OBJECT_INIT_H
 #define STM32F4DISCOVERY_OBJECT_INIT_H
-#include "object_pool.h"
 
 void all_object_init();
 #endif //STM32F4DISCOVERY_OBJECT_INIT_H

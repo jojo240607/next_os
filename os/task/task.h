@@ -31,7 +31,7 @@ typedef struct _TaskFun TaskFun;
 typedef struct _TaskVTable TaskVTable;
 
 // 虚函数表结构
-typedef struct _TaskVTable {
+struct _TaskVTable {
     // TODO : 添加其他虚函数
 
 	void (*task_init)(Task* self, void *parent);

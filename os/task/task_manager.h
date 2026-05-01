@@ -22,11 +22,12 @@ struct _Task_managerFun {
 
 enum _Task_Tag {
     TASK_SYSTICK = 0,
-    TASK_BUS,
     TASK_IDLE,
+    TASK_OS_CALLBACK,
     TASK_MONITOR,
     TASK_LOG,
     TASK_TEST1,
+    TASK_TIME,
 };
 struct _Task_list {
     const Task_tag tag;
@@ -51,5 +52,5 @@ void task_manager_init(Task_manager* self);
 
 // 析构函数声明
 void task_manager_deinit(Task_manager* self);
-
+extern Task_manager * gloable_taskManager;
 #endif // TASK_MANAGER_H

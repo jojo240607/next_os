@@ -18,7 +18,6 @@ struct _Idle_task {
     Task base;  // 基类作为第一个成员
     const Idle_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
-    uint32_t idle_total_ticks;
 };
 
 // 构造函数声明

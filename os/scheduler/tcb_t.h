@@ -10,7 +10,7 @@
 #include "../common/util.h"
 
 
-
+#define MAGIC_NUM (0xDEADBEEF)
 #define GET_TCB_T(obj) ((Tcb_t *)obj)
 // 类声明
 typedef struct _Tcb_t Tcb_t;
@@ -24,6 +24,7 @@ enum thread_state {
     TCB_STATER_RUNNING,
     TCB_STATER_BLOCKED,
     TCB_STATER_DELAYED,
+    TCB_STATER_WAITING_MUTEX,
     TCB_STATER_TERMINATED
 };
 
@@ -41,13 +42,15 @@ struct _Tcb_t {
     void *parent;//base_task
     const char *name;       //名称
     uint16_t tid;           //线程id
-    uint8_t priority;      //优先级
+    uint8_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
+    uint8_t original_priority; //原始优先级，优先级提升后需要恢复原始优先级
     Tcb_State state;    /* 线程状态 */
     Semaphore *semaphore;   //信号量
-    //Tcb_entry entey;        //入口函数
     uint32_t start_time;    //时间片开始时刻计数
     uint32_t run_time;    //时间片结束运行计数
+    size_t stack_left;      //栈剩余大小
     uint32_t delay_ticks;   //剩余等待节拍数
+   // bool need_print;
     uint32_t *sp;           //sp指针
     size_t stack_size;      //栈大小
     uint32_t stack_ptr[];   //栈空间

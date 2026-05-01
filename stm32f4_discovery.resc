@@ -32,4 +32,8 @@ macro reset
 """
 
 runMacro $reset
+sleep 15
+sysbus.gpioPortA OnGPIO 1 true      # 模拟电平变高
+sleep 0.01                     # 让高电平维持一个很短的时间
+sysbus.gpioPortA OnGPIO 1 false   # 模拟电平变低，产生下降沿触发中断
 

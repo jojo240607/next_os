@@ -89,7 +89,7 @@ void thread_idle(Tcb_t *self, void *arg) {
   */
 int main(void)
 {
-    all_object_init();
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -119,14 +119,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
-
+    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_3);
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  all_object_init();
   gloable_intc = intc_create();
   global_thread_scheduler = thread_scheduler_create();
   gloable_deviceManager = device_manager_create();
-  Task_manager * taskManager = task_manager_create();
-  taskManager->fun->boot_init(taskManager);
+  gloable_taskManager = task_manager_create();
+  gloable_taskManager->fun->boot_init(gloable_taskManager);
   //Entry_t entry_s = {.parent = NULL,
   //                   .entry_fun = thread_1,
   //                   .arg = NULL};

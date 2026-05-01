@@ -14,7 +14,6 @@ typedef struct _Monitor_taskFun Monitor_taskFun;
 // 类成员函数结构
 struct _Monitor_taskFun {
     void (*destroy)(Monitor_task* self);
-	void (*cpu_usage)(Monitor_task* self);
 
 };
 struct _Monitor_task {

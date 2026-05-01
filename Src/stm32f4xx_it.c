@@ -189,6 +189,26 @@ void SysTick_Handler(void)
 void UART4_IRQHandler() {
     dispatch(USART4_IRQ);
 }
+void USART3_IRQHandler() {
+    dispatch(USART3_IRQ);
+}
+void TIM2_IRQHandler() {
+    dispatch(TIM2_IRQ);
+}
+void EXTI0_IRQHandler() {
+    dispatch(EXTI0_IRQ);
+}
+void EXTI1_IRQHandler() {
+    dispatch(EXTI1_IRQ);
+}
+
+void EXTI9_5_IRQHandler() {
+    dispatch(EXTI5_9_IRQ);
+}
+
+void EXTI15_10_IRQHandler() {
+    dispatch(EXTI10_15_IRQ);
+}
 /******************************************************************************/
 /* STM32F4xx Peripheral Interrupt Handlers                                    */
 /* Add here the Interrupt Handlers for the used peripherals.                  */

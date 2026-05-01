@@ -4,13 +4,10 @@
 #include "../common/linear_pool.h"
 #include "../common/util.h"
 #include "../scheduler/thread_scheduler.h"
+#include "../log/log.h"
 
-irq_handler_override(systick_irq_handler_impl);
 
 dev_init_override(systick_dev_init_impl);
-dev_read_override(systick_dev_read_impl);
-dev_write_override(systick_dev_write_impl);
-dev_ioctl_override(systick_dev_ioctl_impl);
 
 // 析构函数声明
 static void systick_destroy(Systick* self);
@@ -20,28 +17,24 @@ static const SystickFun systick_fun = {
     .destroy = systick_destroy,
 };
 // 构造函数实现
-Systick* systick_create() {
+Systick* systick_create(systick_conf *conf) {
     Systick* obj = (Systick*)os_malloc(sizeof(Systick));
     if (obj) {
         memset(obj, 0, sizeof(Systick));
-        systick_init(obj);
+        systick_init(obj, conf);
     }
     return obj;
 }
 
-void systick_init(Systick* self) {
+void systick_init(Systick* self, systick_conf *conf) {
     // 初始化基类部分
     device_init(&self->base);
     self->fun = &(systick_fun);
     // TODO: 初始化派生类特有成员
 
 	GET_DEVICE_VTABLE(self)->dev_init = systick_dev_init_impl;
-	GET_DEVICE_VTABLE(self)->dev_read = systick_dev_read_impl;
-	GET_DEVICE_VTABLE(self)->dev_write = systick_dev_write_impl;
-	GET_DEVICE_VTABLE(self)->dev_ioctl = systick_dev_ioctl_impl;
-	def_irq_handler(self) = systick_irq_handler_impl;
-    GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
-    self->timetick = 0;
+    //GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
+    self->conf = conf;
 }
 
 void systick_deinit(Systick* self) {
@@ -58,41 +51,38 @@ static void systick_destroy(Systick* self) {
 
 // dev_init method
 dev_init_override(systick_dev_init_impl) {
+    Systick *systick = (Systick *)self;
     // TODO: add dev_init method
-
-    self->fun->attach_semaphore(self, sem);
+    if (systick->conf->irq_conf.handler != NULL) {
+        if (!self->fun->attach_irq(self, &systick->conf->irq_conf, sem)) {
+            LOG_ERROR("systick", "attach SYSTIC_IRQ error");
+        }
+    }
     //params 
-    
-}
-// dev_read method
-dev_read_override(systick_dev_read_impl) {
-    // TODO: add dev_read method
-    Systick *systick = (Systick *)self;
-    //params , void *buf, size_t count
-    
-}
-// dev_write method
-dev_write_override(systick_dev_write_impl) {
-    // TODO: add dev_write method
-    Systick *systick = (Systick *)self;
-    //params , const void *buf, size_t count
-    
-}
-// dev_ioctl method
-dev_ioctl_override(systick_dev_ioctl_impl) {
-    // TODO: add dev_ioctl method
-    Systick *systick = (Systick *)self;
-    //params , int cmd, void *arg
-    
+    // 1. 设置重装载值，产生1ms中断
+    //    (168000000 Hz / 1000) - 1 = 167999
+    SysTick->LOAD = (systick->conf->systick_frequency / 1000) - 1;
+    // 2. 设置优先级 (可选，在NVIC中设置)
+    //    SysTick是内核中断，优先级通过SCB的SHPR3寄存器设置[reference:7]
+    //    NVIC_SetPriority(SysTick_IRQn, 0x0F); // 使用CMSIS库函数
+
+    // 3. 配置控制寄存器(CTRL)
+    //    选择时钟源HCLK | 使能中断 | 使能定时器
+    SysTick->CTRL = (1 << 2) |  // CLKSOURCE: HCLK (168MHz)
+                    (1 << 1) |  // TICKINT: 使能中断
+                    (1 << 0);   // ENABLE: 使能定时器
+
+    // 4. 清空当前值寄存器，确保从LOAD值开始计数
+    SysTick->VAL = 0;
 }
 
 
 // irq_handler method
-irq_handler_override(systick_irq_handler_impl) {
+bool systick_irq_handler_impl(void *arg) {
     // TODO: add irq_handler method
-    Systick *systick = (Systick *)arg;
+    //Systick *systick = (Systick *)arg;
     //params , void *arg
-    systick->timetick++;
+    getSystime()->systick++;
     HAL_IncTick();
     /* USER CODE BEGIN SysTick_IRQn 1 */
     if (gloable_current_stack != NULL) {

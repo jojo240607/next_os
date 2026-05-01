@@ -1,0 +1,3785 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5a8df84..5b2b1cf 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -32,10 +32,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
+ enable_language(C ASM)
+ 
+ # Create an executable object type
+-add_executable(${CMAKE_PROJECT_NAME}
+-        os/log/log.h
+-        os/log/log_config.h
+-        os/log/log.c)
++add_executable(${CMAKE_PROJECT_NAME})
+ 
+ # Add STM32CubeMX generated sources
+ add_subdirectory(cmake/stm32cubemx)
+@@ -53,25 +50,30 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+         os/common/ring.c
+         os/common/linear_pool.c
+         os/common/object_init.c
++        os/common/sys_time.c
++        os/common/sys_mutex.c
+         os/scheduler/tcb_t.c
+         os/scheduler/thread_scheduler.c
+         os/scheduler/semaphore.c
++        os/scheduler/mutex.c
+         os/log/log.c
+         os/task/task.c
+-        #os/task/real_time_task.c
+         os/task/task_manager.c
+         os/task/idle_task.c
+         os/task/monitor_task.c
+         os/task/log_task.c
+         os/task/systick_task.c
+-        os/task/bus_task.c
++        os/task/os_cb_task.c
+         os/driver/device.c
+-        os/driver/bus.c
++        os/driver/device_config.c
+         os/driver/usart.c
+         os/driver/intc.c
+         os/driver/systick.c
++        os/driver/timer.c
++        os/driver/exti.c
+         os/driver/device_manager.c
+         os/test/task_test1.c
++        os/test/time_task.c
+ 
+ )
+ 
+diff --git a/Inc/stm32f4xx_it.h b/Inc/stm32f4xx_it.h
+index 6f5f371..acd63eb 100644
+--- a/Inc/stm32f4xx_it.h
++++ b/Inc/stm32f4xx_it.h
+@@ -55,7 +55,14 @@ void SVC_Handler(void);
+ void DebugMon_Handler(void);
+ void PendSV_Handler(void);
+ void SysTick_Handler(void);
++void USART3_IRQHandler();
+ void UART4_IRQHandler();
++void TIM2_IRQHandler();
++
++void EXTI0_IRQHandler();
++void EXTI1_IRQHandler();
++void EXTI9_5_IRQHandler();
++void EXTI15_10_IRQHandler();
+ void OTG_FS_IRQHandler(void);
+ /* USER CODE BEGIN EFP */
+ 
+diff --git a/Src/main.c b/Src/main.c
+index d1d1dab..ddf34a7 100644
+--- a/Src/main.c
++++ b/Src/main.c
+@@ -89,7 +89,7 @@ void thread_idle(Tcb_t *self, void *arg) {
+   */
+ int main(void)
+ {
+-    all_object_init();
++
+   /* USER CODE BEGIN 1 */
+ 
+   /* USER CODE END 1 */
+@@ -119,14 +119,15 @@ int main(void)
+   /* USER CODE BEGIN 2 */
+ 
+   /* USER CODE END 2 */
+-
++    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_3);
+   /* Infinite loop */
+   /* USER CODE BEGIN WHILE */
++  all_object_init();
+   gloable_intc = intc_create();
+   global_thread_scheduler = thread_scheduler_create();
+   gloable_deviceManager = device_manager_create();
+-  Task_manager * taskManager = task_manager_create();
+-  taskManager->fun->boot_init(taskManager);
++  gloable_taskManager = task_manager_create();
++  gloable_taskManager->fun->boot_init(gloable_taskManager);
+   //Entry_t entry_s = {.parent = NULL,
+   //                   .entry_fun = thread_1,
+   //                   .arg = NULL};
+diff --git a/Src/stm32f4xx_it.c b/Src/stm32f4xx_it.c
+index a983022..0304f1c 100644
+--- a/Src/stm32f4xx_it.c
++++ b/Src/stm32f4xx_it.c
+@@ -189,6 +189,26 @@ void SysTick_Handler(void)
+ void UART4_IRQHandler() {
+     dispatch(USART4_IRQ);
+ }
++void USART3_IRQHandler() {
++    dispatch(USART3_IRQ);
++}
++void TIM2_IRQHandler() {
++    dispatch(TIM2_IRQ);
++}
++void EXTI0_IRQHandler() {
++    dispatch(EXTI0_IRQ);
++}
++void EXTI1_IRQHandler() {
++    dispatch(EXTI1_IRQ);
++}
++
++void EXTI9_5_IRQHandler() {
++    dispatch(EXTI5_9_IRQ);
++}
++
++void EXTI15_10_IRQHandler() {
++    dispatch(EXTI10_15_IRQ);
++}
+ /******************************************************************************/
+ /* STM32F4xx Peripheral Interrupt Handlers                                    */
+ /* Add here the Interrupt Handlers for the used peripherals.                  */
+diff --git a/Src/system_stm32f4xx.c b/Src/system_stm32f4xx.c
+index 7a61e9c..2613f73 100644
+--- a/Src/system_stm32f4xx.c
++++ b/Src/system_stm32f4xx.c
+@@ -134,7 +134,7 @@
+                is no need to call the 2 first functions listed above, since SystemCoreClock
+                variable is updated automatically.
+   */
+-uint32_t SystemCoreClock = 16000000;
++uint32_t SystemCoreClock = 168000000;
+ const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
+ const uint8_t APBPrescTable[8]  = {0, 0, 0, 0, 1, 2, 3, 4};
+ /**
+diff --git a/os/common/linear_pool.c b/os/common/linear_pool.c
+index 39b8941..93a0194 100644
+--- a/os/common/linear_pool.c
++++ b/os/common/linear_pool.c
+@@ -5,7 +5,7 @@ static void noram_error();
+ 
+ static linear_allocator_t gloable_alloc = {0};
+ 
+-linear_allocator_t *linear_pool_create() {
++linear_allocator_t *linear_pool_get() {
+     return &gloable_alloc;
+ }
+ // 初始化：buffer 可以是静态数组或 malloc 的动态内存
+diff --git a/os/common/linear_pool.h b/os/common/linear_pool.h
+index 96eb328..d23db00 100644
+--- a/os/common/linear_pool.h
++++ b/os/common/linear_pool.h
+@@ -19,5 +19,5 @@ typedef struct {
+ void os_pool_init();
+ void *os_malloc(size_t num_bytes);
+ void os_free (void *p);
+-
++linear_allocator_t *linear_pool_get();
+ #endif //STM32F4DISCOVERY_LINEAR_POOL_H
+diff --git a/os/common/object_init.c b/os/common/object_init.c
+index a8c73a3..184ec34 100644
+--- a/os/common/object_init.c
++++ b/os/common/object_init.c
+@@ -1,8 +1,14 @@
+ #include "object_init.h"
+ #include "linear_pool.h"
+ #include "../log/log.h"
++#include "sys_time.h"
++#include "sys_mutex.h"
+ 
+ void all_object_init() {
++
+     os_pool_init();
+     log_init();
++    LOG_DEBUG("obj_init", "all_object_init");
++    systime_init();
++    sys_mutex_init();
+ }
+diff --git a/os/common/object_init.h b/os/common/object_init.h
+index 242ee56..e5b5839 100644
+--- a/os/common/object_init.h
++++ b/os/common/object_init.h
+@@ -4,7 +4,6 @@
+ 
+ #ifndef STM32F4DISCOVERY_OBJECT_INIT_H
+ #define STM32F4DISCOVERY_OBJECT_INIT_H
+-#include "object_pool.h"
+ 
+ void all_object_init();
+ #endif //STM32F4DISCOVERY_OBJECT_INIT_H
+diff --git a/os/common/object_pool.c b/os/common/object_pool.c
+deleted file mode 100644
+index 297c413..0000000
+--- a/os/common/object_pool.c
++++ /dev/null
+@@ -1,32 +0,0 @@
+-#include "object_pool.h"
+-#include <stddef.h>
+-
+-
+-void mem_pool_init(mem_pool_t *pool, void *buffer, size_t buffer_size, size_t block_size) {
+-    pool->block_size = block_size;
+-    size_t num_blocks = buffer_size / block_size;
+-    char *p = (char*)buffer;
+-    pool_block_t **prev_next = (pool_block_t**)&pool->free_list;
+-    for (size_t i = 0; i < num_blocks; i++) {
+-        *prev_next = (pool_block_t*)p;
+-        prev_next = &((pool_block_t*)p)->next;
+-        p += block_size;
+-    }
+-    *prev_next = NULL;
+-}
+-
+-void *mem_pool_alloc(mem_pool_t *pool) {
+-    if (!pool->free_list) {
+-        return NULL;
+-    }
+-    void *block = pool->free_list;
+-    pool->free_list = pool->free_list->next;
+-    return block;
+-}
+-
+-void mem_pool_free(mem_pool_t *pool, void *block) {
+-    if (!block) return;
+-    pool_block_t *node = (pool_block_t*)block;
+-    node->next = pool->free_list;
+-    pool->free_list = node;
+-}
+\ No newline at end of file
+diff --git a/os/common/object_pool.h b/os/common/object_pool.h
+deleted file mode 100644
+index 4a140b9..0000000
+--- a/os/common/object_pool.h
++++ /dev/null
+@@ -1,57 +0,0 @@
+-#ifndef OBJECT_POOL_H
+-#define OBJECT_POOL_H
+-
+-#include <stddef.h>
+-#include <stdint.h>
+-
+-// 注册一个类型为 type 的对象池需求
+-// 每个调用该宏的 .c 文件会增加一个占位符，链接器将统计总数
+-//#define REGISTER_OBJECT_POOL(type) \
+-    static char __obj_pool_##type##_##__LINE__ __attribute__((used, section(".object_pool." #type)))
+-#define REGISTER_OBJECT_POOL(type) \
+-    static char __obj_pool_##type##_##__LINE__[sizeof(type)] __attribute__((used, section(".object_pool_" #type)))
+-// 获取类型 type 的对象池中对象的最大数量（编译时确定）
+-#define GET_OBJECT_POOL_SIZE(type) \
+-    ( (size_t)( (uintptr_t)&__stop_object_pool_##type - (uintptr_t)&__start_object_pool_##type ) )
+-
+-// 声明外部链接器符号（由链接器自动提供）
+-#define DECLARE_OBJECT_POOL_SYMBOLS(type) \
+-    extern char __start_object_pool_##type[]; \
+-    extern char __stop_object_pool_##type[]
+-
+-// 简单的静态内存池实现（固定块大小）
+-typedef struct pool_block {
+-    struct pool_block *next;
+-} pool_block_t;
+-// 初始化对象池：需要外部提供 mem_pool_t 结构和内存池管理函数
+-typedef struct mem_pool {
+-    //void *next;
+-    pool_block_t *free_list;
+-    size_t block_size;
+-} mem_pool_t;
+-
+-void mem_pool_init(mem_pool_t *pool, void *buffer, size_t buffer_size, size_t block_size);
+-void *mem_pool_alloc(mem_pool_t *pool);
+-void mem_pool_free(mem_pool_t *pool, void *block);
+-
+-// 初始化类型 type 的对象池
+-#define INIT_OBJECT_POOL(type, pool_var) \
+-    do { \
+-        DECLARE_OBJECT_POOL_SYMBOLS(type); \
+-        size_t pool_size = GET_OBJECT_POOL_SIZE(type); \
+-        mem_pool_init(&(pool_var), __start_object_pool_##type, pool_size, sizeof(type)); \
+-    } while(0)
+-#define DEC_INIT_POOL(type) \
+-void pool_##type##_init(void)
+-
+-#define DEF_INIT_POOL(type) \
+-static mem_pool_t type##_pool; \
+-void pool_##type##_init(void) { \
+-        INIT_OBJECT_POOL(type, type##_pool); \
+-}
+-
+-#define INV_INIT_POOL(type) \
+-pool_##type##_init()
+-
+-
+-#endif // OBJECT_POOL_H
+\ No newline at end of file
+diff --git a/os/common/queue.c b/os/common/queue.c
+index 613459d..1dbd9f5 100644
+--- a/os/common/queue.c
++++ b/os/common/queue.c
+@@ -2,9 +2,11 @@
+ #include "linear_pool.h"
+ #include <stdio.h>
+ 
++static Node * queue_dequeue_node(Queue* self, Node *node);
++
+ static void queue_enqueue(Queue* self, Node *data);
+ static Node * queue_dequeue(Queue* self);
+-static bool queue_contain(Queue* self, Node *data);
++static inline bool queue_contain(Queue* self, Node *data);
+ 
+ // 析构函数声明
+ static void queue_destroy(Queue* self);
+@@ -14,6 +16,7 @@ static const QueueFun queue_fun = {
+     .destroy = queue_destroy,
+ 	.enqueue = queue_enqueue,
+ 	.dequeue = queue_dequeue,
++	.dequeue_node = queue_dequeue_node,
+ };
+ // 构造函数实现
+ Queue* queue_create() {
+@@ -82,7 +85,7 @@ static Node * queue_dequeue(Queue* self) {
+ }
+ 
+ //检测data是否已存在队列中
+-static bool queue_contain(Queue* self, Node *data) {
++static inline bool queue_contain(Queue* self, Node *data) {
+     if (NULL == self) {
+         return false;
+     }
+@@ -96,3 +99,30 @@ static bool queue_contain(Queue* self, Node *data) {
+     return false;
+ }
+ 
++
++// dequeue_node method
++static Node * queue_dequeue_node(Queue* self, Node *node) {
++    if (NULL == self) {
++        return NULL;
++    }
++    if (self->size == 0) {
++        return NULL;
++    }
++    Node *priv = NULL;
++    Node *current = self->head;
++    while (current != NULL) {
++        if (current == node) {
++            if (priv == NULL) {
++                self->head = current->next;
++            } else {
++                priv->next = current->next;
++            }
++            break;
++        }
++        priv = current;
++        current = current->next;
++    }
++
++    return current;
++}
++
+diff --git a/os/common/queue.h b/os/common/queue.h
+index 7aef0a5..c697204 100644
+--- a/os/common/queue.h
++++ b/os/common/queue.h
+@@ -16,6 +16,8 @@ struct _QueueFun {
+ 	void (*enqueue)(Queue* self, Node *data);
+ 	Node * (*dequeue)(Queue* self);
+ 
++	Node * (*dequeue_node)(Queue* self, Node *node);
++
+ };
+ // 类结构
+ struct _Queue {
+diff --git a/os/common/sys_mutex.c b/os/common/sys_mutex.c
+new file mode 100644
+index 0000000..0b2ac98
+--- /dev/null
++++ b/os/common/sys_mutex.c
+@@ -0,0 +1,11 @@
++//
++// Created by zhiwei.gong on 2026/4/29.
++//
++
++#include "sys_mutex.h"
++
++Mutex *gloable_mutex;
++
++void sys_mutex_init() {
++    gloable_mutex = mutex_create();
++}
+\ No newline at end of file
+diff --git a/os/common/sys_mutex.h b/os/common/sys_mutex.h
+new file mode 100644
+index 0000000..418cfbb
+--- /dev/null
++++ b/os/common/sys_mutex.h
+@@ -0,0 +1,13 @@
++//
++// Created by zhiwei.gong on 2026/4/29.
++//
++
++#ifndef STM32F4DISCOVERY_SYS_MUTEX_H
++#define STM32F4DISCOVERY_SYS_MUTEX_H
++#include "../scheduler/mutex.h"
++
++extern Mutex *gloable_mutex;
++
++void sys_mutex_init();
++
++#endif //STM32F4DISCOVERY_SYS_MUTEX_H
+diff --git a/os/common/sys_time.c b/os/common/sys_time.c
+new file mode 100644
+index 0000000..0c867c0
+--- /dev/null
++++ b/os/common/sys_time.c
+@@ -0,0 +1,16 @@
++//
++// Created by zhiwei.gong on 2026/4/27.
++//
++
++#include "sys_time.h"
++#include "linear_pool.h"
++#include "../log/log.h"
++
++
++sys_time *gloable_sys_time;
++
++void systime_init() {
++    LOG_DEBUG("sys_time", "systime_init");
++    gloable_sys_time = os_malloc(sizeof(sys_time));
++}
++
+diff --git a/os/common/sys_time.h b/os/common/sys_time.h
+new file mode 100644
+index 0000000..88d774d
+--- /dev/null
++++ b/os/common/sys_time.h
+@@ -0,0 +1,22 @@
++//
++// Created by zhiwei.gong on 2026/4/27.
++//
++
++#ifndef STM32F4DISCOVERY_SYS_TIME_H
++#define STM32F4DISCOVERY_SYS_TIME_H
++#include <stdlib.h>
++#include <stdint.h>
++#include <stdbool.h>
++#include <string.h>
++typedef struct _sys_time sys_time;
++
++struct _sys_time {
++    volatile uint32_t systick;
++};
++void systime_init();
++
++extern sys_time *gloable_sys_time;
++static inline sys_time *getSystime() {
++    return gloable_sys_time;
++}
++#endif //STM32F4DISCOVERY_SYS_TIME_H
+diff --git a/os/common/util.h b/os/common/util.h
+index f93cda2..8e913c8 100644
+--- a/os/common/util.h
++++ b/os/common/util.h
+@@ -5,19 +5,22 @@
+ #ifndef STM32F4DISCOVERY_UTIL_H
+ #define STM32F4DISCOVERY_UTIL_H
+ #include "main.h"
++#define OS_STACK_DEBUG (1)
+ 
+ #define GET_TASK_MANAGER(obj) ((Task_manager *)obj)
+ //// 触发 PendSV 中断
+-#define Trigger_PendSV (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk)
+-#define DISABLE_IRQ __disable_irq()
+-#define ENABLE_IRQ __enable_irq()
+-#define LOW_POWER __WFI()
++//  __DSB() 确保所有内存访问完成
++#define Trigger_PendSV __asm volatile("" ::: "memory"); (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk); __DSB()
++#define DISABLE_IRQ __disable_irq(); __DSB()
++#define ENABLE_IRQ __enable_irq(); __DSB()
++#define LOW_POWER __WFI(); __DSB()
++
+ #define ARRAY_SIZE(OBJ) (sizeof(OBJ) / sizeof(OBJ[0]))
+ 
+ #define TO_OBJ(type, obj) ((type *)obj)
+ #define GET_OBJ_VTAB(type, obj) (*(type##VTable **)obj)
+ 
+-#define DEFAULT_OBJBUF_SIZE (1024 * 10)     //10k 对象池
++#define DEFAULT_OBJBUF_SIZE (1024 * 16)     //10k 对象池
+ #define DEFAULT_STACK_SIZE (512)            //512 x 4 = 2k   默认任务栈大小
+ #define SYSTEM_TICKS_PER_SEC (1000)         //1000hz / 时间片默认切换周期1ms
+ 
+diff --git a/os/driver/bus.c b/os/driver/bus.c
+deleted file mode 100644
+index 2cc468f..0000000
+--- a/os/driver/bus.c
++++ /dev/null
+@@ -1,88 +0,0 @@
+-#include "bus.h"
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include "../common/linear_pool.h"
+-
+-dev_init_override(bus_dev_init_impl);
+-
+-static bool bus_transfer_async(Bus* self, Device *device, const void *data, size_t count, transfer_done cb, void *arg);
+-
+-static bool bus_transfer(Bus* self, Device *device, const void *data, size_t count);
+-
+-// 析构函数声明
+-static void bus_destroy(Bus* self);
+-
+-// TODO: 初始化数据成员
+-static const BusFun bus_fun = {
+-    .destroy = bus_destroy,
+-	.transfer = bus_transfer,
+-	.transfer_async = bus_transfer_async,
+-};
+-// 构造函数实现
+-Bus* bus_create() {
+-    Bus* obj = (Bus*)os_malloc(sizeof(Bus));
+-    if (obj) {
+-        memset(obj, 0, sizeof(Bus));
+-        bus_init(obj);
+-    }
+-    return obj;
+-}
+-
+-void bus_init(Bus* self) {
+-    // 初始化基类部分
+-    device_init(&self->base);
+-    self->fun = &(bus_fun);
+-    // TODO: 初始化派生类特有成员
+-
+-	def_dev_init(self) = bus_dev_init_impl;
+-}
+-
+-void bus_deinit(Bus* self) {
+-    device_deinit(GET_DEVICE(self));
+-    // TODO: 数据成员申请资源释放
+-}
+-// 析构函数实现
+-static void bus_destroy(Bus* self) {
+-    if (self != NULL) {
+-        bus_deinit(self);
+-        os_free(self);
+-    }
+-}
+-
+-// transfer method
+-static bool bus_transfer(Bus* self, Device *device, const void *data, size_t count) {
+-    if (device->vtable->dev_write == NULL) {
+-        return false;
+-    }
+-    device->vtable->dev_write(device, data, count);
+-    if (device->semaphore) {
+-        device->semaphore->fun->take(device->semaphore);
+-    }
+-    return true;
+-}
+-
+-
+-// transfer_async method
+-static bool bus_transfer_async(Bus* self, Device *device, const void *data, size_t count, transfer_done cb, void *arg) {
+-    if (self == NULL || device == NULL) {
+-        return false;
+-    }
+-    if (device->vtable->dev_write == NULL) {
+-        return false;
+-    }
+-    device->vtable->dev_write(device, data, count);
+-    device->semaphore = GET_DEVICE(self)->semaphore;
+-    //将驱动的信号量指向bus，这样bus的任务中可以收到回调了
+-    device->fun->attach_semaphore(device, GET_DEVICE(self)->semaphore);
+-    return true;
+-}
+-
+-
+-// dev_init method
+-dev_init_override(bus_dev_init_impl) {
+-    // TODO: add dev_init method
+-    Bus *bus = (Bus *)self;
+-    //params 
+-    self->fun->attach_semaphore(self, sem);
+-}
+-
+diff --git a/os/driver/bus.h b/os/driver/bus.h
+deleted file mode 100644
+index ae52ce0..0000000
+--- a/os/driver/bus.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-#ifndef BUS_H
+-#define BUS_H
+-#include <stdint.h>
+-#include <stdbool.h>
+-#include "Device.h"
+-
+-#define GET_BUS_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(BusVTable **)obj)
+-#define GET_BUS(obj) ((Bus *)obj)
+-
+-// 派生类声明
+-typedef struct _Bus Bus;
+-typedef struct _BusFun BusFun;
+-typedef void (*transfer_done)(void *arg);
+-// 类成员函数结构
+-struct _BusFun {
+-    void (*destroy)(Bus* self);
+-	bool (*transfer)(Bus* self, Device *device, const void *data, size_t count);
+-	bool (*transfer_async)(Bus* self, Device *device, const void *data, size_t count, transfer_done cb, void *arg);
+-
+-};
+-struct _Bus {
+-    Device base;  // 基类作为第一个成员
+-    const BusFun* fun;
+-    // TODO: 添加派生类特有的数据成员
+-};
+-
+-// 构造函数声明
+-Bus* bus_create();
+-void bus_init(Bus* self);
+-
+-// 析构函数声明
+-void bus_deinit(Bus* self);
+-
+-#endif // BUS_H
+\ No newline at end of file
+diff --git a/os/driver/device.c b/os/driver/device.c
+index 3c9524f..b03579f 100644
+--- a/os/driver/device.c
++++ b/os/driver/device.c
+@@ -2,11 +2,9 @@
+ #include "../common/linear_pool.h"
+ #include <stdio.h>
+ 
+-static bool device_transfer(Device* self, const void *data, size_t count);
+-
+-static void device_redirect_semaphore(Device* self, Semaphore *sem);
++static bool device_attach_irq(Device* self, irq_config *conf, Semaphore * sem);
+ 
+-static void device_attach_semaphore(Device* self, Semaphore *sem);
++static bool device_transfer(Device* self, const void *data, size_t count);
+ 
+ // 析构函数声明
+ static void device_destroy(Device* self);
+@@ -14,9 +12,8 @@ static void device_destroy(Device* self);
+ // TODO: 初始化数据成员
+ static const DeviceFun device_fun = {
+     .destroy = device_destroy,
+-	.attach_semaphore = device_attach_semaphore,
+-	.redirect_semaphore = device_redirect_semaphore,
+ 	.transfer = device_transfer,
++	.attach_irq = device_attach_irq,
+ };
+ // 构造函数实现
+ Device* device_create() {
+@@ -30,12 +27,11 @@ Device* device_create() {
+ 
+ void device_init(Device* self) {
+     if (self->vtable == NULL) {
+-        self->vtable = (DeviceVTable *) malloc(sizeof(DeviceVTable));
++        self->vtable = (DeviceVTable *) os_malloc(sizeof(DeviceVTable));
+         memset(self->vtable , 0, sizeof(DeviceVTable));
+     }
+     self->fun = &(device_fun);
+     // TODO: 初始化数据成员
+-    self->irq_num = MAX_IRQ;
+     self->semaphore = NULL;
+ }
+ 
+@@ -55,33 +51,22 @@ static void device_destroy(Device* self) {
+     }
+ }
+ 
+-// attach_semaphore method
+-static void device_attach_semaphore(Device* self, Semaphore *sem) {
+-    // TODO: add attach_semaphore method
+-    if (self == NULL) {
+-        return;
+-    }
+-    self->semaphore = sem;
+-    if (GET_DEVICE_VTABLE(self)->irq_handler != NULL && self->irq_num < MAX_IRQ) {
+-        gloable_intc->fun->register_handler(gloable_intc, self->irq_num, GET_DEVICE_VTABLE(self)->irq_handler, self);
+-        gloable_intc->fun->attach_semaphore(gloable_intc, self->irq_num, sem);
++// attach_irq method
++static bool device_attach_irq(Device* self, irq_config *conf, Semaphore * sem) {
++    // TODO: add attach_irq method
++    if (conf == NULL || conf->handler == NULL || conf->irq_num >= MAX_IRQ) {
++        return false;
+     }
+ 
+-}
+-
+-
+-// redirect_semaphore method
+-static void device_redirect_semaphore(Device* self, Semaphore *sem) {
+-    // TODO: add redirect_semaphore method
+-    if (self->semaphore == NULL) {
+-    self->semaphore = sem;
+-    }
+-    if (GET_DEVICE_VTABLE(self)->irq_handler != NULL && self->irq_num < MAX_IRQ) {
+-        gloable_intc->fun->register_handler(gloable_intc, self->irq_num, GET_DEVICE_VTABLE(self)->irq_handler, self);
+-        gloable_intc->fun->attach_semaphore(gloable_intc, self->irq_num, sem);
++    if (gloable_intc->fun->register_handler(gloable_intc, conf->irq_num, conf->handler, self)) {
++        self->semaphore = sem;
++        gloable_intc->fun->attach_semaphore(gloable_intc, conf->irq_num, self->semaphore);
++        gloable_intc->fun->set_priority(gloable_intc, conf->irq_num, conf->priority);
++        return true;
+     }
+-}
+ 
++    return false;
++}
+ 
+ // transfer method
+ static bool device_transfer(Device* self, const void *data, size_t count) {
+@@ -95,3 +80,5 @@ static bool device_transfer(Device* self, const void *data, size_t count) {
+     return true;
+ }
+ 
++
++
+diff --git a/os/driver/device.h b/os/driver/device.h
+index 78514fc..30654e1 100644
+--- a/os/driver/device.h
++++ b/os/driver/device.h
+@@ -6,7 +6,7 @@ override void dev_init();
+ override void dev_read(void *buf, size_t count);
+ override void dev_write(const void *buf, size_t count);
+ override void dev_ioctl(int cmd, void *arg);
+-override void irq_handler(void *arg);
++
+  */
+ 
+ #include <stdlib.h>
+@@ -33,34 +33,32 @@ override void irq_handler(void *arg);
+ #define def_dev_ioctl(obj) (GET_DEVICE_VTABLE(obj)->dev_ioctl)
+ #define virtual_dev_ioctl(obj, ...) def_dev_ioctl(obj)(obj, ##__VA_ARGS__)
+ 
+-#define irq_handler_override(func_name) static bool func_name(void *arg)
+-#define def_irq_handler(obj) (GET_DEVICE_VTABLE(obj)->irq_handler)
+-#define virtual_irq_handler(obj, ...) def_irq_handler(obj)(obj, ##__VA_ARGS__)
+-
+ #define GET_DEVICE(obj) ((Device *)obj)
+ // 类声明
+ typedef struct _Device Device;
+ typedef struct _DeviceFun DeviceFun;
+ typedef struct _DeviceVTable DeviceVTable;
+-
++typedef struct _irq_config irq_config;
+ // 虚函数表结构
+-typedef struct _DeviceVTable {
++struct _DeviceVTable {
+     // TODO : 添加其他虚函数
+-
+ 	void (*dev_init)(Device* self, Semaphore *sem);
+ 	void (*dev_read)(Device* self, void *buf, size_t count);
+ 	void (*dev_write)(Device* self, const void *buf, size_t count);
+ 	void (*dev_ioctl)(Device* self, int cmd, void *arg);
+-	bool (*irq_handler)(void *arg);
+ };
++
++struct _irq_config {
++    intc_irq_num irq_num;
++    intc_handler_t handler;
++    uint32_t priority;
++};
++
+ // 类成员函数结构
+ struct _DeviceFun {
+     void (*destroy)(Device* self);
+-	void (*attach_semaphore)(Device* self, Semaphore *sem);
+-
+-	void (*redirect_semaphore)(Device* self, Semaphore *sem);
+-
+ 	bool (*transfer)(Device* self, const void *data, size_t count);
++    bool (*attach_irq)(Device* self, irq_config *conf, Semaphore * sem);
+ 
+ };
+ // 类结构
+@@ -69,8 +67,6 @@ struct _Device {
+     const DeviceFun* fun;
+     // TODO: 添加数据成员
+     Semaphore * semaphore;
+-    intc_irq_num irq_num;
+-    //void (*irq_handler)(Real_time_task* self);
+ };
+ 
+ // 构造函数声明
+diff --git a/os/driver/device_config.c b/os/driver/device_config.c
+new file mode 100644
+index 0000000..bb0566b
+--- /dev/null
++++ b/os/driver/device_config.c
+@@ -0,0 +1,44 @@
++//
++// 驱动舒适化配置参数表
++//
++#include "device_config.h"
++
++
++const systick_conf sys_tick_conf = {.systick_frequency = 168000000,
++        {.irq_num = SYSTIC_IRQ,
++         .handler = systick_irq_handler_impl,
++         .priority = 0}};
++
++
++const usart_config usart4_conf = {
++        .gpio_type = GPIOC,
++        .usart_type = UART4,
++        .bound = 115200,
++        .feedback = true,
++        .buffer_size = 64,
++        {.irq_num = USART4_IRQ,
++         .handler = usart_irq_handler_impl,
++         .priority = 0}};
++
++const usart_config usart3_conf = {
++        .gpio_type = GPIOC,
++        .usart_type = USART3,
++        .bound = 115200,
++        .feedback = true,
++        .buffer_size = 64,
++        {.irq_num = USART3_IRQ,
++         .handler = usart_irq_handler_impl,
++         .priority = 0}};
++
++const timer_config time2_conf = {
++        .timer_type = TIM2,
++        .time_frenqurncy = 500,
++        {.irq_num = TIM2_IRQ,
++         .handler = timer_irq_handler_impl,
++         .priority = 1}
++};
++
++const exti_config exti_conf = {
++        .gpio_type = GPIOA,
++        .exti_line = 0x0022,//0000 0000 0010 0010   1和6线
++};
+\ No newline at end of file
+diff --git a/os/driver/device_config.h b/os/driver/device_config.h
+new file mode 100644
+index 0000000..dc347d7
+--- /dev/null
++++ b/os/driver/device_config.h
+@@ -0,0 +1,20 @@
++//
++// Created by zhiwei.gong on 2026/4/28.
++//
++
++#ifndef STM32F4DISCOVERY_DEVICE_CONFIG_H
++#define STM32F4DISCOVERY_DEVICE_CONFIG_H
++
++#include "timer.h"
++#include "systick.h"
++#include "usart.h"
++#include "timer.h"
++#include "exti.h"
++
++extern const systick_conf sys_tick_conf;
++extern const usart_config usart4_conf;
++extern const usart_config usart3_conf;
++extern const timer_config time2_conf;
++extern const exti_config exti_conf;
++
++#endif //STM32F4DISCOVERY_DEVICE_CONFIG_H
+diff --git a/os/driver/device_manager.c b/os/driver/device_manager.c
+index d6e220f..d005cfa 100644
+--- a/os/driver/device_manager.c
++++ b/os/driver/device_manager.c
+@@ -2,8 +2,10 @@
+ #include <stdio.h>
+ #include "usart.h"
+ #include "systick.h"
+-#include "bus.h"
+ #include "../common/linear_pool.h"
++#include "../log/log.h"
++#include "device_config.h"
++#include "exti.h"
+ 
+ static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag);
+ 
+@@ -17,9 +19,11 @@ static const Device_managerFun device_manager_fun = {
+ };
+ 
+ static const Device_list dev_lists[] = {
+-        {.tag = DEVICE_SYSTICK, .name = "sys_tick", .device_create = (Device_create) systick_create},
+-        {.tag = DEVICE_BUS, .name = "bus", .device_create = (Device_create) bus_create},
+-        {.tag = DEVICE_USART, .name = "usart", .device_create = (Device_create) usart_create},
++        {.tag = DEVICE_SYSTICK, .name = "sys_tick", .config = &sys_tick_conf, .device_create = (Device_create) systick_create},
++        {.tag = DEVICE_USART4, .name = "usart4", .config = &usart4_conf, .device_create = (Device_create) usart_create},
++        {.tag = DEVICE_USART3, .name = "usart3", .config = &usart3_conf, .device_create = (Device_create) usart_create},
++        {.tag = DEVICE_TIME2, .name = "timer2", .config = &time2_conf, .device_create = (Device_create) timer_create},
++        {.tag = DEVICE_EXTI, .name = "exti", .config = &exti_conf, .device_create = (Device_create) exti_create},
+ };
+ Device_manager *gloable_deviceManager = NULL;
+ // 构造函数实现
+@@ -33,6 +37,7 @@ Device_manager* device_manager_create() {
+ }
+ 
+ void device_manager_init(Device_manager* self) {
++    LOG_DEBUG("device_manager", "device_manager_init");
+     self->fun = &(device_manager_fun);
+     // TODO: 初始化数据成员
+     self->devicelist = dev_lists;
+@@ -66,7 +71,7 @@ static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag) {
+         return NULL;
+     }
+     if (self->dev_tab[tag] == NULL) {
+-        self->dev_tab[tag] = (self->devicelist + tag)->device_create();
++        self->dev_tab[tag] = (self->devicelist + tag)->device_create((self->devicelist + tag)->config);
+     }
+     return self->dev_tab[tag];
+ }
+diff --git a/os/driver/device_manager.h b/os/driver/device_manager.h
+index 3a92b5c..3da2a42 100644
+--- a/os/driver/device_manager.h
++++ b/os/driver/device_manager.h
+@@ -13,7 +13,7 @@ typedef struct _Device_manager Device_manager;
+ typedef struct _Device_managerFun Device_managerFun;
+ typedef struct _Device_list Device_list;
+ typedef enum _Dev_Tag Dev_tag;
+-typedef Device * (*Device_create)();
++typedef Device * (*Device_create)(const void *config);
+ // 类成员函数结构
+ struct _Device_managerFun {
+     void (*destroy)(Device_manager* self);
+@@ -22,14 +22,17 @@ struct _Device_managerFun {
+ };
+ enum _Dev_Tag {
+     DEVICE_SYSTICK = 0,
+-    DEVICE_BUS,
+-    DEVICE_USART,
++    DEVICE_USART4,
++    DEVICE_USART3,
++    DEVICE_TIME2,
++    DEVICE_EXTI,
+     DEVICE_MAX
+ };
+ 
+ struct _Device_list {
+     const Dev_tag tag;
+     const char *name;
++    const void *config;
+     Device_create device_create;
+ };
+ 
+diff --git a/os/driver/exti.c b/os/driver/exti.c
+new file mode 100644
+index 0000000..37663e5
+--- /dev/null
++++ b/os/driver/exti.c
+@@ -0,0 +1,130 @@
++#include "exti.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include "../common/linear_pool.h"
++#include "../log/log.h"
++#include "../task/os_cb_task.h"
++
++
++dev_init_override(exti_dev_init_impl);
++
++// 析构函数声明
++static void exti_destroy(Exti* self);
++
++// TODO: 初始化数据成员
++static const ExtiFun exti_fun = {
++    .destroy = exti_destroy,
++
++};
++// 构造函数实现
++Exti* exti_create(exti_config *conf) {
++    Exti* obj = (Exti*)os_malloc(sizeof(Exti));
++    if (obj) {
++        memset(obj, 0, sizeof(Exti));
++        exti_init(obj, conf);
++    }
++    return obj;
++}
++
++
++void exti_init(Exti* self, exti_config *conf) {
++    // 初始化基类部分
++    device_init(&self->base);
++    self->fun = &(exti_fun);
++    // TODO: 初始化派生类特有成员
++
++	def_dev_init(self) = exti_dev_init_impl;
++
++    self->conf = conf;
++
++}
++
++void exti_deinit(Exti* self) {
++    device_deinit(GET_DEVICE(self));
++    // TODO: 数据成员申请资源释放
++
++}
++// 析构函数实现
++static void exti_destroy(Exti* self) {
++    if (self != NULL) {
++        exti_deinit(self);
++        os_free(self);
++    }
++}
++
++// dev_init method
++dev_init_override(exti_dev_init_impl) {
++    // TODO: add dev_init method
++
++    Exti *exti = (Exti *)self;
++    //params 
++    // 1. 使能SYSCFG时钟。配置IO映射时，必须使能此时钟（挂载在APB2总线上）
++    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
++    // 2. 使能GPIOA和GPIOB的时钟
++    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
++    //RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
++
++    // 3. 设置中断优先级分组（此函数在core_cm4.h中定义）
++   // NVIC_SetPriorityGrouping(0x03); // 选择第3组：4位抢占优先级，0位子优先级
++
++    // ---------- PA0 配置 (连接至 EXTI 线0) ----------
++
++    uint16_t exti_line = exti->conf->exti_line;
++    while (exti_line) {
++        // 最低位 1 的索引（0~15）
++        int bit = __builtin_ctz(exti_line);
++        // 1. 将GPIOA设置为输入模式并清除上下拉
++        exti->conf->gpio_type->MODER &= ~(3 << (bit * 2));     // 清除原有模式位，设为输入模式（0b00）
++        exti->conf->gpio_type->PUPDR &= ~(3 << (bit * 2));     // 清除上下拉设置，既不上拉也不下拉
++        // 2. 将PA0连接到EXTI线0。SYSCFG_EXTICR1的低4位（EXTICR1[3:0])设置为0即代表选择PA0
++//    操作后，EXTI线0的中断源就是PA0引脚了
++        SYSCFG->EXTICR[bit >> 2] &= ~(0xFUL << ((bit & 0x03) << 2));  // 清除原有设置，让EXTI0映射到PA0
++        SYSCFG->EXTICR[bit >> 2] |= 1 << ((bit & 0x03) << 2);//SYSCFG_EXTICR2_EXTI6_PB;
++
++// 3. 开启EXTI线0的中断功能，并设置为上升沿触发
++        EXTI->IMR |= (0x1UL << bit);//EXTI_IMR_MR0;   // 使能EXTI线0的中断请求
++        EXTI->RTSR |= (0x1UL << bit); // 允许EXTI线0的上升沿触发中断
++        EXTI->FTSR &= ~(0x1UL << bit) ; // 禁止下降沿触发
++
++
++        intc_irq_num new_irq_num = MAX_IRQ;
++        if (bit < 5) {
++            new_irq_num = EXTI0_IRQ + bit;
++        } else if (bit < 10) {
++            new_irq_num = EXTI5_9_IRQ;
++        } else {
++            new_irq_num = EXTI10_15_IRQ;
++        }
++        if (new_irq_num != exti->exit_irq_conf.irq_num) {
++            exti->exit_irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
++            exti->exit_irq_conf.handler = exti_irq_handler_impl;
++            exti->exit_irq_conf.irq_num = new_irq_num;
++            if (!self->fun->attach_irq(self, &exti->exit_irq_conf, sem)) {
++                LOG_ERROR("timer", "attach irq %d error", exti->exit_irq_conf.irq_num);
++            }
++        }
++        // 清除最低位的 1
++        exti_line &= exti_line - 1;
++    }
++
++}
++
++// irq_handler method
++bool exti_irq_handler_impl(void *arg) {
++    // TODO: add irq_handler method
++    Exti *exti = (Exti *)arg;
++    //params , void *arg
++
++    // 检查是否是EXTI线0的中断挂起标志
++    while (EXTI->PR) {
++        // 最低位 1 的索引（0~15）
++        uint32_t bit = __builtin_ctz(EXTI->PR);
++        //printf("Need to process bit %d\n", bit);
++        GET_DEVICE(exti)->semaphore->sem_event = OS_EVENT_EXTI0 + bit;
++        //  清除中断标志位（写1清零）
++        EXTI->PR |= (1 << bit);
++    }
++    return true;
++}
++
++
+diff --git a/os/driver/exti.h b/os/driver/exti.h
+new file mode 100644
+index 0000000..67e8cef
+--- /dev/null
++++ b/os/driver/exti.h
+@@ -0,0 +1,44 @@
++#ifndef EXTI_H
++#define EXTI_H
++#include <stdint.h>
++#include <stdbool.h>
++#include "Device.h"
++#include "stm32f407xx.h"
++
++#define GET_EXTI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(ExtiVTable **)obj)
++#define GET_EXTI(obj) ((Exti *)obj)
++
++// 派生类声明
++typedef struct _Exti Exti;
++typedef struct _ExtiFun ExtiFun;
++typedef struct _exti_config exti_config;
++
++
++// 类成员函数结构
++struct _ExtiFun {
++    void (*destroy)(Exti* self);
++};
++
++struct _exti_config {
++    GPIO_TypeDef *gpio_type;
++    uint16_t exti_line;
++    irq_config irq_conf;
++};
++struct _Exti {
++    Device base;  // 基类作为第一个成员
++    const ExtiFun* fun;
++    // TODO: 添加派生类特有的数据成员
++    exti_config *conf;
++    irq_config exit_irq_conf;
++
++};
++
++// 构造函数声明
++Exti* exti_create(exti_config *conf);
++void exti_init(Exti* self, exti_config *conf);
++
++// 析构函数声明
++void exti_deinit(Exti* self);
++bool exti_irq_handler_impl(void *arg);
++
++#endif // EXTI_H
+\ No newline at end of file
+diff --git a/os/driver/intc.c b/os/driver/intc.c
+index 41bb65e..7f930e2 100644
+--- a/os/driver/intc.c
++++ b/os/driver/intc.c
+@@ -2,8 +2,9 @@
+ #include <stdio.h>
+ #include "../common/util.h"
+ #include "../common/linear_pool.h"
++#include "../log/log.h"
+ 
+-static void intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg);
++static bool intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg);
+ static void intc_unregister(Intc* self, intc_irq_num irq_num);
+ static void intc_attach_semaphore(Intc* self, intc_irq_num irq_num, Semaphore *sem);
+ static void intc_set_priority(Intc* self, intc_irq_num irq_num, uint32_t priority);
+@@ -20,29 +21,87 @@ static const IntcFun intc_fun = {
+ 	.attach_semaphore = intc_attach_semaphore,
+ 	.set_priority = intc_set_priority,
+ };
+-static intc_irq_t irq_table[MAX_IRQ];
+-
++static const IRQn_Type irq_num_to_vt[] = {
++    SysTick_IRQn,
++    USART1_IRQn,
++    USART2_IRQn,
++    USART3_IRQn,
++    UART4_IRQn,
++    UART5_IRQn,
++    USART6_IRQn,
++    EXTI0_IRQn,
++    EXTI1_IRQn,
++    EXTI2_IRQn,
++    EXTI3_IRQn,
++    EXTI4_IRQn,
++    EXTI9_5_IRQn,
++    EXTI15_10_IRQn,
++        //DMA1_CH0_IRQ,
++        //DMA1_CH1_IRQ,
++        //DMA1_CH2_IRQ,
++        //DMA1_CH3_IRQ,
++        //DMA1_CH4_IRQ,
++        //DMA1_CH5_IRQ,
++        //DMA1_CH6_IRQ,
++        //DMA1_CH7_IRQ,
++        //DMA2_CH0_IRQ,
++        //DMA2_CH1_IRQ,
++        //DMA2_CH2_IRQ,
++        //DMA2_CH3_IRQ,
++        //DMA2_CH4_IRQ,
++        //DMA2_CH5_IRQ,
++        //DMA2_CH6_IRQ,
++        //DMA2_CH7_IRQ,
++        //ADC_IRQ,
++        //CAN1_TX_IRQ,
++        //CAN1_RX0_IRQ,
++        //CAN1_RX1_IRQ,
++        //CAN1_SCE_IRQ,
++        //CAN2_TX_IRQ,
++        //CAN2_RX0_IRQ,
++        //CAN2_RX1_IRQ,
++        //CAN2_SCE_IRQ,
++        //I2C1_EV_IRQ,
++        //I2C1_ER_IRQ,
++        //I2C2_EV_IRQ,
++        //I2C2_ER_IRQ,
++        //I2C3_EV_IRQ,
++        //I2C3_ER_IRQ,
++        //SPI1_IRQ,
++        //SPI2_IRQ,
++        //SPI3_IRQ,
++        //SDIO_IRQ,
++        //FSMC_IRQ,
++        //TIM1_BRK_TIM9_IRQ,
++        //TIM1_UP_TIM10_IRQ,
++        //TIM1_TRG_COM_TIM11_IRQ,
++        //TIM1_CC_IRQ,
++    TIM2_IRQn,
++        //TIM3_IRQ,
++        //TIM4_IRQ,
++        //TIM5_IRQ,
++        //TIM6_DAC_IRQ,
++        //TIM7_IRQ,
++        //TIM8_BRK_TIM12_IRQ,
++        //TIM8_UP_TIM13_IRQ,
++        //TIM8_TRG_COM_TIM14_IRQ,
++        //TIM8_CC_IRQ,
++        //RTC_ALARM_IRQ,
++};
+ // 构造函数实现
+ Intc* intc_create() {
+-    Intc* obj = (Intc*)os_malloc(sizeof(Intc));
++    Intc* obj = (Intc*)os_malloc(sizeof(Intc) + sizeof(intc_irq_t) * MAX_IRQ);
+     if (obj) {
+-        memset(obj, 0, sizeof(Intc));
++        memset(obj, 0, sizeof(Intc) + sizeof(intc_irq_t) * MAX_IRQ);
+         intc_init(obj);
+     }
+     return obj;
+ }
+ 
+ void intc_init(Intc* self) {
++    LOG_DEBUG("intc","intc_init");
+     self->fun = &(intc_fun);
+     // TODO: 初始化数据成员
+-    //self->irq_tab = irq_table;
+-    for (uint32_t i = 0; i < MAX_IRQ; i++) {
+-        irq_table[i].handler = NULL;
+-        irq_table[i].arg = NULL;
+-        irq_table[i].bottom_sem = NULL;
+-        irq_table[i].registered = 0;
+-    }
+-
+ }
+ 
+ void intc_deinit(Intc* self) {
+@@ -59,24 +118,27 @@ static void intc_destroy(Intc* self) {
+ 
+ 
+ // register method
+-static void intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg) {
++static bool intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg) {
+     if (self == NULL) {
+-        return;
++        return false;
+     }
+     if (irq_num >= MAX_IRQ || handler == NULL) {
+-        return;
++        return false;
+     }
+-    if (irq_table[irq_num].registered) {
+-        return;
++    if ((self->irq_table + irq_num)->registered) {
++        return false;
+     }
+     // 临界区保护（关中断）
+     DISABLE_IRQ;
+-    irq_table[irq_num].handler = handler;
+-    irq_table[irq_num].arg = arg;
+-    irq_table[irq_num].registered = 1;
++    if ((self->irq_table + irq_num)->handler == NULL) {
++        (self->irq_table + irq_num)->handler = handler;
++    }
++    (self->irq_table + irq_num)->arg = arg;
++    (self->irq_table + irq_num)->registered = true;
+     // 使能 NVIC 对应中断（假设已设置优先级）
+     NVIC_EnableIRQ((IRQn_Type)irq_num);
+     ENABLE_IRQ;
++    return true;
+ }
+ // unregister method
+ static void intc_unregister(Intc* self, intc_irq_num irq_num) {
+@@ -87,10 +149,10 @@ static void intc_unregister(Intc* self, intc_irq_num irq_num) {
+         return;
+     }
+     DISABLE_IRQ;
+-    irq_table[irq_num].handler = NULL;
+-    irq_table[irq_num].arg = NULL;
+-    irq_table[irq_num].bottom_sem = NULL;
+-    irq_table[irq_num].registered = 0;
++    (self->irq_table + irq_num)->handler = NULL;
++    (self->irq_table + irq_num)->arg = NULL;
++    (self->irq_table + irq_num)->bottom_sem = NULL;
++    (self->irq_table + irq_num)->registered = false;
+     // 可选：禁用 NVIC 中断
+     NVIC_DisableIRQ((IRQn_Type)irq_num);
+     ENABLE_IRQ;
+@@ -100,7 +162,7 @@ static void intc_attach_semaphore(Intc* self, intc_irq_num irq_num, Semaphore *s
+     if (irq_num >= MAX_IRQ || sem == NULL)
+         return;
+     DISABLE_IRQ;
+-    irq_table[irq_num].bottom_sem = sem;
++    (self->irq_table + irq_num)->bottom_sem = sem;
+     ENABLE_IRQ;
+ }
+ // set_priority method
+@@ -108,9 +170,13 @@ static void intc_set_priority(Intc* self, intc_irq_num irq_num, uint32_t priorit
+     if (self == NULL) {
+         return;
+     }
+-    if (irq_num >= MAX_IRQ)
++    if (irq_num >= MAX_IRQ) {
+         return;
+-    NVIC_SetPriority((IRQn_Type)irq_num, priority);
++    }
++
++    NVIC_SetPriority(irq_num_to_vt[irq_num], priority);
++    NVIC_EnableIRQ(irq_num_to_vt[irq_num]);
++
+ }
+ // dispatch method
+ static void intc_dispatch(Intc* self, intc_irq_num irq_num) {
+@@ -120,23 +186,26 @@ static void intc_dispatch(Intc* self, intc_irq_num irq_num) {
+     if (irq_num >= MAX_IRQ)
+         return;
+ 
+-    intc_irq_t *irq = &irq_table[irq_num];
++    intc_irq_t *irq = self->irq_table + irq_num;
+     if (irq == NULL) {
+         return;
+     }
+     // 1. 执行上半部回调
+-    if (irq->handler) {
+-        if (irq->handler(irq->arg)) {
+-            // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
+-            if (irq->bottom_sem) {
+-                // 假设你的信号量有 semaphore_give_from_isr 函数
+-                // 并根据返回值决定是否需要请求调度
+-                irq->bottom_sem->fun->give(irq->bottom_sem);
++    while (irq != NULL) {
++        if (irq->handler) {
++            if (irq->handler(irq->arg)) {
++                // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
++                if (irq->bottom_sem) {
++                    // 假设你的信号量有 semaphore_give_from_isr 函数
++                    // 并根据返回值决定是否需要请求调度
++                    irq->bottom_sem->fun->give(irq->bottom_sem, true);
++                }
+             }
++            break;
+         }
++        irq = (intc_irq_t *)GET_NODE(irq)->next;
+     }
+ 
+-
+ }
+ 
+ void dispatch(intc_irq_num irq_num) {
+diff --git a/os/driver/intc.h b/os/driver/intc.h
+index 975c906..30b4db1 100644
+--- a/os/driver/intc.h
++++ b/os/driver/intc.h
+@@ -17,23 +17,88 @@ typedef enum _Intc_Irq intc_irq_num;
+ typedef bool (*intc_handler_t)(void *arg);
+ enum _Intc_Irq {
+     SYSTIC_IRQ = 0,
++    USART1_IRQ,
++    USART2_IRQ,
++    USART3_IRQ,
+     USART4_IRQ,
++    USART5_IRQ,
++    USART6_IRQ,
++    EXTI0_IRQ,
++    EXTI1_IRQ,
++    EXTI2_IRQ,
++    EXTI3_IRQ,
++    EXTI4_IRQ,
++    EXTI5_9_IRQ,
++    EXTI10_15_IRQ,
++    //DMA1_CH0_IRQ,
++    //DMA1_CH1_IRQ,
++    //DMA1_CH2_IRQ,
++    //DMA1_CH3_IRQ,
++    //DMA1_CH4_IRQ,
++    //DMA1_CH5_IRQ,
++    //DMA1_CH6_IRQ,
++    //DMA1_CH7_IRQ,
++    //DMA2_CH0_IRQ,
++    //DMA2_CH1_IRQ,
++    //DMA2_CH2_IRQ,
++    //DMA2_CH3_IRQ,
++    //DMA2_CH4_IRQ,
++    //DMA2_CH5_IRQ,
++    //DMA2_CH6_IRQ,
++    //DMA2_CH7_IRQ,
++    //ADC_IRQ,
++    //CAN1_TX_IRQ,
++    //CAN1_RX0_IRQ,
++    //CAN1_RX1_IRQ,
++    //CAN1_SCE_IRQ,
++    //CAN2_TX_IRQ,
++    //CAN2_RX0_IRQ,
++    //CAN2_RX1_IRQ,
++    //CAN2_SCE_IRQ,
++    //I2C1_EV_IRQ,
++    //I2C1_ER_IRQ,
++    //I2C2_EV_IRQ,
++    //I2C2_ER_IRQ,
++    //I2C3_EV_IRQ,
++    //I2C3_ER_IRQ,
++    //SPI1_IRQ,
++    //SPI2_IRQ,
++    //SPI3_IRQ,
++    //SDIO_IRQ,
++    //FSMC_IRQ,
++    //TIM1_BRK_TIM9_IRQ,
++    //TIM1_UP_TIM10_IRQ,
++    //TIM1_TRG_COM_TIM11_IRQ,
++    //TIM1_CC_IRQ,
++    TIM2_IRQ,
++    //TIM3_IRQ,
++    //TIM4_IRQ,
++    //TIM5_IRQ,
++    //TIM6_DAC_IRQ,
++    //TIM7_IRQ,
++    //TIM8_BRK_TIM12_IRQ,
++    //TIM8_UP_TIM13_IRQ,
++    //TIM8_TRG_COM_TIM14_IRQ,
++    //TIM8_CC_IRQ,
++    //RTC_ALARM_IRQ,
+     MAX_IRQ
+ };
++
+ // 类成员函数结构
+ struct _IntcFun {
+     void (*destroy)(Intc* self);
+-	void (*register_handler)(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg);
++    bool (*register_handler)(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg);
+ 	void (*unregister_handler)(Intc* self, intc_irq_num irq_num);
+ 	void (*attach_semaphore)(Intc* self, intc_irq_num irq_num, Semaphore *sem);
+ 	void (*set_priority)(Intc* self, intc_irq_num irq_num, uint32_t priority);
+ };
+ // 中断控制块
+ struct _intc_irq_t {
++    Node base;
+     intc_handler_t handler;      // 上半部回调
+     void *arg;                   // 回调参数
+     Semaphore *bottom_sem;     // 关联的下半部信号量（可为 NULL）
+-    uint8_t registered;          // 是否已注册
++    bool registered;          // 是否已注册
+ };
+ 
+ // 类结构
+@@ -41,6 +106,7 @@ struct _Intc {
+     const IntcFun* fun;
+     // TODO: 添加数据成员
+     //intc_irq_t *irq_tab;
++    intc_irq_t irq_table[];
+ };
+ 
+ // 构造函数声明
+diff --git a/os/driver/systick.c b/os/driver/systick.c
+index 690edce..4e59b5e 100644
+--- a/os/driver/systick.c
++++ b/os/driver/systick.c
+@@ -4,13 +4,10 @@
+ #include "../common/linear_pool.h"
+ #include "../common/util.h"
+ #include "../scheduler/thread_scheduler.h"
++#include "../log/log.h"
+ 
+-irq_handler_override(systick_irq_handler_impl);
+ 
+ dev_init_override(systick_dev_init_impl);
+-dev_read_override(systick_dev_read_impl);
+-dev_write_override(systick_dev_write_impl);
+-dev_ioctl_override(systick_dev_ioctl_impl);
+ 
+ // 析构函数声明
+ static void systick_destroy(Systick* self);
+@@ -20,28 +17,24 @@ static const SystickFun systick_fun = {
+     .destroy = systick_destroy,
+ };
+ // 构造函数实现
+-Systick* systick_create() {
++Systick* systick_create(systick_conf *conf) {
+     Systick* obj = (Systick*)os_malloc(sizeof(Systick));
+     if (obj) {
+         memset(obj, 0, sizeof(Systick));
+-        systick_init(obj);
++        systick_init(obj, conf);
+     }
+     return obj;
+ }
+ 
+-void systick_init(Systick* self) {
++void systick_init(Systick* self, systick_conf *conf) {
+     // 初始化基类部分
+     device_init(&self->base);
+     self->fun = &(systick_fun);
+     // TODO: 初始化派生类特有成员
+ 
+ 	GET_DEVICE_VTABLE(self)->dev_init = systick_dev_init_impl;
+-	GET_DEVICE_VTABLE(self)->dev_read = systick_dev_read_impl;
+-	GET_DEVICE_VTABLE(self)->dev_write = systick_dev_write_impl;
+-	GET_DEVICE_VTABLE(self)->dev_ioctl = systick_dev_ioctl_impl;
+-	def_irq_handler(self) = systick_irq_handler_impl;
+-    GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
+-    self->timetick = 0;
++    //GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
++    self->conf = conf;
+ }
+ 
+ void systick_deinit(Systick* self) {
+@@ -58,41 +51,38 @@ static void systick_destroy(Systick* self) {
+ 
+ // dev_init method
+ dev_init_override(systick_dev_init_impl) {
++    Systick *systick = (Systick *)self;
+     // TODO: add dev_init method
+-
+-    self->fun->attach_semaphore(self, sem);
++    if (systick->conf->irq_conf.handler != NULL) {
++        if (!self->fun->attach_irq(self, &systick->conf->irq_conf, sem)) {
++            LOG_ERROR("systick", "attach SYSTIC_IRQ error");
++        }
++    }
+     //params 
+-    
+-}
+-// dev_read method
+-dev_read_override(systick_dev_read_impl) {
+-    // TODO: add dev_read method
+-    Systick *systick = (Systick *)self;
+-    //params , void *buf, size_t count
+-    
+-}
+-// dev_write method
+-dev_write_override(systick_dev_write_impl) {
+-    // TODO: add dev_write method
+-    Systick *systick = (Systick *)self;
+-    //params , const void *buf, size_t count
+-    
+-}
+-// dev_ioctl method
+-dev_ioctl_override(systick_dev_ioctl_impl) {
+-    // TODO: add dev_ioctl method
+-    Systick *systick = (Systick *)self;
+-    //params , int cmd, void *arg
+-    
++    // 1. 设置重装载值，产生1ms中断
++    //    (168000000 Hz / 1000) - 1 = 167999
++    SysTick->LOAD = (systick->conf->systick_frequency / 1000) - 1;
++    // 2. 设置优先级 (可选，在NVIC中设置)
++    //    SysTick是内核中断，优先级通过SCB的SHPR3寄存器设置[reference:7]
++    //    NVIC_SetPriority(SysTick_IRQn, 0x0F); // 使用CMSIS库函数
++
++    // 3. 配置控制寄存器(CTRL)
++    //    选择时钟源HCLK | 使能中断 | 使能定时器
++    SysTick->CTRL = (1 << 2) |  // CLKSOURCE: HCLK (168MHz)
++                    (1 << 1) |  // TICKINT: 使能中断
++                    (1 << 0);   // ENABLE: 使能定时器
++
++    // 4. 清空当前值寄存器，确保从LOAD值开始计数
++    SysTick->VAL = 0;
+ }
+ 
+ 
+ // irq_handler method
+-irq_handler_override(systick_irq_handler_impl) {
++bool systick_irq_handler_impl(void *arg) {
+     // TODO: add irq_handler method
+-    Systick *systick = (Systick *)arg;
++    //Systick *systick = (Systick *)arg;
+     //params , void *arg
+-    systick->timetick++;
++    getSystime()->systick++;
+     HAL_IncTick();
+     /* USER CODE BEGIN SysTick_IRQn 1 */
+     if (gloable_current_stack != NULL) {
+diff --git a/os/driver/systick.h b/os/driver/systick.h
+index eac2d00..fddaa63 100644
+--- a/os/driver/systick.h
++++ b/os/driver/systick.h
+@@ -3,6 +3,7 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include "Device.h"
++#include "../common/sys_time.h"
+ 
+ #define GET_SYSTICK_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(SystickVTable **)obj)
+ #define GET_SYSTICK(obj) ((Systick *)obj)
+@@ -10,22 +11,29 @@
+ // 派生类声明
+ typedef struct _Systick Systick;
+ typedef struct _SystickFun SystickFun;
++typedef struct _systick_config systick_conf;
+ // 类成员函数结构
+ struct _SystickFun {
+     void (*destroy)(Systick* self);
+ };
++
++struct _systick_config {
++    uint32_t systick_frequency;
++    irq_config irq_conf;
++};
+ struct _Systick {
+     Device base;  // 基类作为第一个成员
+     const SystickFun* fun;
+     // TODO: 添加派生类特有的数据成员
+-    volatile uint32_t timetick;
++    systick_conf *conf;
+ };
+ 
+ // 构造函数声明
+-Systick* systick_create();
+-void systick_init(Systick* self);
++Systick* systick_create(systick_conf *conf);
++void systick_init(Systick* self, systick_conf *conf);
+ 
+ // 析构函数声明
+ void systick_deinit(Systick* self);
++bool systick_irq_handler_impl(void *arg);
+ 
+ #endif // SYSTICK_H
+\ No newline at end of file
+diff --git a/os/driver/timer.c b/os/driver/timer.c
+new file mode 100644
+index 0000000..eb43c6c
+--- /dev/null
++++ b/os/driver/timer.c
+@@ -0,0 +1,93 @@
++#include "timer.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include "../common/linear_pool.h"
++#include "../log/log.h"
++
++dev_init_override(timer_dev_init_impl);
++
++// 析构函数声明
++static void timer_destroy(Timer* self);
++
++// TODO: 初始化数据成员
++static const TimerFun timer_fun = {
++    .destroy = timer_destroy,
++};
++// 构造函数实现
++Timer* timer_create(timer_config *conf) {
++    Timer* obj = (Timer*)os_malloc(sizeof(Timer));
++    if (obj) {
++        memset(obj, 0, sizeof(Timer));
++        timer_init(obj, conf);
++    }
++    return obj;
++}
++
++void timer_init(Timer* self, timer_config *conf) {
++    // 初始化基类部分
++    device_init(&self->base);
++    self->fun = &(timer_fun);
++    // TODO: 初始化派生类特有成员
++    self->conf = conf;
++	def_dev_init(self) = timer_dev_init_impl;
++}
++
++void timer_deinit(Timer* self) {
++    device_deinit(GET_DEVICE(self));
++    // TODO: 数据成员申请资源释放
++}
++// 析构函数实现
++static void timer_destroy(Timer* self) {
++    if (self != NULL) {
++        timer_deinit(self);
++        os_free(self);
++    }
++}
++
++// dev_init method
++dev_init_override(timer_dev_init_impl) {
++    // TODO: add dev_init method
++    Timer *timer = (Timer *)self;
++    //params 
++    // 1. 使能 TIM2 时钟 (RCC APB1 外设时钟使能寄存器)
++    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
++
++    // 2. 设置预分频器 (PSC) 和 自动重装载 (ARR)
++    //PSC + 1 = 16800     PSC+1=16800 ⇒ 计数时钟 = 168 MHz / 16800 = 10 kHz，周期 100 μs
++    //同样需要 5000 个计数 ⇒  ARR = 4999 ARR=4999
++    //uint16_t psc = (uint32_t)(tim_clock_hz / desired_cnt_Hz) - 1;
++    //uint32_t arr = (uint32_t)(desired_cnt_Hz * target_seconds) - 1;
++    timer->conf->timer_type->PSC = 16799;      // 分频系数 16800
++    timer->conf->timer_type->ARR = 499;       // 自动重装载值，产生 500ms 周期
++
++    // 3. 生成更新事件，让新值立即生效 (可选)
++    timer->conf->timer_type->EGR |= TIM_EGR_UG;
++
++    if (timer->conf->irq_conf.handler != NULL) {
++        // 4. 使能更新中断 (UIE)
++        timer->conf->timer_type->DIER |= TIM_DIER_UIE;
++        if (!self->fun->attach_irq(self, &timer->conf->irq_conf, sem)) {
++            LOG_ERROR("timer", "attach irq %d error", timer->conf->irq_conf.irq_num);
++        }
++    }
++
++    // 6. 启动定时器 (CEN 位)
++    timer->conf->timer_type->CR1 |= TIM_CR1_CEN;
++}
++
++// irq_handler method
++bool timer_irq_handler_impl(void *arg) {
++    // TODO: add irq_handler method
++    Timer *timer = (Timer *)arg;
++    //params , void *arg
++    // 检查更新中断标志 (UIF)
++    if (timer->conf->timer_type->SR & TIM_SR_UIF)
++    {
++        // 清除中断标志 (写 0 无效，需要写 0 的方式是清对应位)
++        timer->conf->timer_type->SR &= ~TIM_SR_UIF;
++        // 这里放置你需要每 500ms 执行的代码
++        // 例如：翻转 LED，读取传感器等
++       // LOG_DEBUG("timer irq", "----- time in -----");
++    }
++    return true;
++}
+\ No newline at end of file
+diff --git a/os/driver/timer.h b/os/driver/timer.h
+new file mode 100644
+index 0000000..c40028f
+--- /dev/null
++++ b/os/driver/timer.h
+@@ -0,0 +1,41 @@
++#ifndef TIMER_H
++#define TIMER_H
++#include <stdint.h>
++#include <stdbool.h>
++#include "Device.h"
++#include "main.h"
++
++#define GET_TIMER_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(TimerVTable **)obj)
++#define GET_TIMER(obj) ((Timer *)obj)
++
++// 派生类声明
++typedef struct _Timer Timer;
++typedef struct _TimerFun TimerFun;
++typedef struct _timer_config timer_config;
++
++
++struct _timer_config {
++    TIM_TypeDef * timer_type;
++    uint32_t time_frenqurncy;
++    irq_config irq_conf;
++};
++// 类成员函数结构
++struct _TimerFun {
++    void (*destroy)(Timer* self);
++};
++struct _Timer {
++    Device base;  // 基类作为第一个成员
++    const TimerFun* fun;
++    // TODO: 添加派生类特有的数据成员
++    timer_config *conf;
++};
++
++// 构造函数声明
++Timer* timer_create(timer_config *conf);
++void timer_init(Timer* self, timer_config *conf);
++
++// 析构函数声明
++void timer_deinit(Timer* self);
++bool timer_irq_handler_impl(void *arg);
++
++#endif // TIMER_H
+\ No newline at end of file
+diff --git a/os/driver/usart.c b/os/driver/usart.c
+index 94acba5..326fc85 100644
+--- a/os/driver/usart.c
++++ b/os/driver/usart.c
+@@ -3,8 +3,8 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "main.h"
++#include "../log/log.h"
+ 
+-irq_handler_override(usart_irq_handler_impl);
+ 
+ dev_init_override(usart_dev_init_impl);
+ dev_read_override(usart_dev_read_impl);
+@@ -19,16 +19,19 @@ static const UsartFun usart_fun = {
+     .destroy = usart_destroy,
+ };
+ // 构造函数实现
+-Usart* usart_create() {
+-    Usart* obj = (Usart*)os_malloc(sizeof(Usart));
++Usart* usart_create(usart_config * conf) {
++    if (conf == NULL) {
++        return NULL;
++    }
++    Usart* obj = (Usart*)os_malloc(sizeof(Usart) + conf->buffer_size == 0 ? DEFAULT_RX_BUFFER : conf->buffer_size);
+     if (obj) {
+-        memset(obj, 0, sizeof(Usart));
+-        usart_init(obj);
++        memset(obj, 0, sizeof(Usart) + conf->buffer_size == 0 ? DEFAULT_RX_BUFFER : conf->buffer_size);
++        usart_init(obj, conf);
+     }
+     return obj;
+ }
+ 
+-void usart_init(Usart* self) {
++void usart_init(Usart* self, usart_config * conf) {
+     // 初始化基类部分
+     device_init(&self->base);
+     self->fun = &(usart_fun);
+@@ -38,11 +41,10 @@ void usart_init(Usart* self) {
+     GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
+     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
+     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
+-	def_irq_handler(self) = usart_irq_handler_impl;
+-    GET_DEVICE(self)->irq_num = USART4_IRQ;
+     self->rx_complete = 0;
+     self->rx_index = 0;
+-    self->feedback = false;
++    self->conf = conf;
++    self->rx_size = conf->buffer_size == 0 ? DEFAULT_RX_BUFFER : conf->buffer_size;
+ }
+ 
+ void usart_deinit(Usart* self) {
+@@ -60,75 +62,71 @@ static void usart_destroy(Usart* self) {
+ // dev_init method Semaphore *sem, intc_handler_t handle, void* arg
+ dev_init_override(usart_dev_init_impl) {
+     // TODO: add dev_init method
+-    //Usart *usart = (Usart *)self;
++    Usart *usart = (Usart *)self;
+     //params
+-    self->fun->attach_semaphore(self, sem);
+-    self->semaphore = sem;
+-
+     // 使能UART4时钟 (APB1总线，位19)
+     RCC->APB1ENR |= (1 << 19);
+ // 使能GPIOC时钟 (AHB1总线，位2)
+     RCC->AHB1ENR |= (1 << 2);
+ 
+     // 1. 将PC10和PC11配置为复用功能
+-    GPIOC->MODER &= ~(0xF << (10*2)); // 清除原有的模式位
+-    GPIOC->MODER |=  (0x2 << (10*2)); // 10: Alternate Function mode
+-    GPIOC->MODER |=  (0x2 << (11*2));
++    usart->conf->gpio_type->MODER &= ~(0xF << (10*2)); // 清除原有的模式位
++    usart->conf->gpio_type->MODER |=  (0x2 << (10*2)); // 10: Alternate Function mode
++    usart->conf->gpio_type->MODER |=  (0x2 << (11*2));
+ 
+ // 2. 将PC10（TX）配置为推挽输出
+-    GPIOC->OTYPER &= ~(1 << 10);      // 0: Output push-pull
++    usart->conf->gpio_type->OTYPER &= ~(1 << 10);      // 0: Output push-pull
+ // 3. 设置输出速度为50MHz
+-    GPIOC->OSPEEDR |= (0x2 << (10*2)); // 10: 50MHz
++    usart->conf->gpio_type->OSPEEDR |= (0x2 << (10*2)); // 10: 50MHz
+ // 4. 配置无上拉/下拉
+-    GPIOC->PUPDR &= ~(0x3 << (10*2));
+-    GPIOC->PUPDR &= ~(0x3 << (11*2));
++    usart->conf->gpio_type->PUPDR &= ~(0x3 << (10*2));
++    usart->conf->gpio_type->PUPDR &= ~(0x3 << (11*2));
+ 
+ // 5. 配置复用功能为AF8 (UART4)
+-    GPIOC->AFR[1] &= ~(0xF << ((10-8)*4));
+-    GPIOC->AFR[1] |=  (0x8 << ((10-8)*4)); // AF8 for PC10
+-    GPIOC->AFR[1] &= ~(0xF << ((11-8)*4));
+-    GPIOC->AFR[1] |=  (0x8 << ((11-8)*4)); // AF8 for PC11
++    usart->conf->gpio_type->AFR[1] &= ~(0xF << ((10-8)*4));
++    usart->conf->gpio_type->AFR[1] |=  (0x8 << ((10-8)*4)); // AF8 for PC10
++    usart->conf->gpio_type->AFR[1] &= ~(0xF << ((11-8)*4));
++    usart->conf->gpio_type->AFR[1] |=  (0x8 << ((11-8)*4)); // AF8 for PC11
+ 
+ 
+     // 1. 配置数据位8位 (M位0) 和 无校验 (PCE位0)
+-    UART4->CR1 &= ~(1 << 12); // 清除PCE位: 无校验
+-    UART4->CR1 &= ~(1 << 12); // 重复清除是为了保险, 确保PCE位为0
+-    UART4->CR1 &= ~(1 << 13); // UE bit, 稍后使能
++    usart->conf->usart_type->CR1 &= ~(1 << 12); // 清除PCE位: 无校验
++    usart->conf->usart_type->CR1 &= ~(1 << 12); // 重复清除是为了保险, 确保PCE位为0
++    usart->conf->usart_type->CR1 &= ~(1 << 13); // UE bit, 稍后使能
+ // 注意: M位在CR1的第12位, 但我们刚刚清除了PCE位, 这可能会影响M位。正确做法：
+-    UART4->CR1 &= ~(1 << 12); // PCE=0
+-    UART4->CR1 &= ~(1 << 12); // 确保PCE位清除
++    usart->conf->usart_type->CR1 &= ~(1 << 12); // PCE=0
++    usart->conf->usart_type->CR1 &= ~(1 << 12); // 确保PCE位清除
+ 
+ // 正确设置数据位8位 (M=0)
+-    UART4->CR1 &= ~(1 << 12); // 清除M位 (注意: 如果PCE=1, M位在USART_CR1的第12位, 但这里我们PCE=0, 所以M位配置独立)
++    usart->conf->usart_type->CR1 &= ~(1 << 12); // 清除M位 (注意: 如果PCE=1, M位在USART_CR1的第12位, 但这里我们PCE=0, 所以M位配置独立)
+ // 澄清: 在STM32F4中, CR1寄存器第12位是M位, 第10位是PCE位。
+ // 为了避免混淆，先清除M位和PCE位：
+-    UART4->CR1 &= ~((1 << 12) | (1 << 10)); // M=0, 8位; PCE=0, 无校验
++    usart->conf->usart_type->CR1 &= ~((1 << 12) | (1 << 10)); // M=0, 8位; PCE=0, 无校验
+ 
+ // 2. 配置停止位 (默认为1个停止位，CR2的第13、12位均为0)
+-    UART4->CR2 &= ~(0x3 << 12); // 清除STOP位
++    usart->conf->usart_type->CR2 &= ~(0x3 << 12); // 清除STOP位
+ 
+ // 3. 计算波特率 (假设系统时钟为84MHz, 目标波特率115200)
+ // BRR = 时钟频率 / 目标波特率 (当OVER8=0时)
+-    uint32_t brr_value = 84000000 / 115200;
+-    UART4->BRR = brr_value; // 整数部分直接写入
++    uint32_t brr_value = 84000000 / usart->conf->bound;
++    usart->conf->usart_type->BRR = brr_value; // 整数部分直接写入
+ // 更精确的分数波特率生成公式：
+ // USARTDIV = 84MHz / (115200 * 16) = 45.5729...
+ // DIV_Mantissa = 45, DIV_Fraction = 16 * 0.5729 = 9.166 -> 9
+ // BRR = (45 << 4) | 9 = 729
+-    UART4->BRR = 729; // 对应84MHz时钟下, 115200波特率
+-
++    usart->conf->usart_type->BRR = 729; // 对应84MHz时钟下, 115200波特率
+ // 4. 使能发送器 (TE位=1) 和 接收器 (RE位=1)
+-    UART4->CR1 |= (1 << 3) | (1 << 2); // 设置TE位和RE位
+-
+-// 5. 使能UART4外设 (UE位=1)
+-    UART4->CR1 |= (1 << 13);
+-
+-
+-    // --- 中断配置 (例如使能接收中断) ---
+-    UART4->CR1 |= (1 << 5); // 使能接收中断 (RXNEIE)
+-    // 配置NVIC: 设置中断优先级、使能UART4_IRQn中断
+-    NVIC_SetPriority(UART4_IRQn, 0);
+-    NVIC_EnableIRQ(UART4_IRQn);
++    usart->conf->usart_type->CR1 |= (1 << 3) | (1 << 2); // 设置TE位和RE位
++
++    if (usart->conf->irq_conf.handler != NULL) {
++        // 5. 使能UART4外设 (UE位=1)
++        usart->conf->usart_type->CR1 |= (1 << 13);
++        // --- 中断配置 (例如使能接收中断) ---
++        usart->conf->usart_type->CR1 |= (1 << 5); // 使能接收中断 (RXNEIE)
++        if (!self->fun->attach_irq(self, &usart->conf->irq_conf, sem)) {
++            LOG_ERROR("systick", "attach irq %d error", usart->conf->irq_conf.irq_num);
++        }
++    }
+ 
+ }
+ // dev_read method
+@@ -136,8 +134,8 @@ dev_read_override(usart_dev_read_impl) {
+     // TODO: add dev_read method
+     Usart *usart = (Usart *)self;
+     //params , void *buf, size_t count
+-    while(!(UART4->SR & (1 << 5)));
+-    *(char *)buf = (char)UART4->DR;
++    while(!(usart->conf->usart_type->SR & (1 << 5)));
++    *(char *)buf = (char)usart->conf->usart_type->DR;
+ }
+ // dev_write method
+ dev_write_override(usart_dev_write_impl) {
+@@ -146,34 +144,32 @@ dev_write_override(usart_dev_write_impl) {
+     //params , const void *buf, size_t count
+     // 检查发送数据寄存器是否为空 (TXE标志位)
+     while (count--) {
+-        while (!(UART4->SR & (1 << 7)));
+-        UART4->DR = *(char *) buf++;
++        while (!(usart->conf->usart_type->SR & (1 << 7)));
++        usart->conf->usart_type->DR = *(char *) buf++;
+     }
+ }
+ // dev_ioctl method
+ dev_ioctl_override(usart_dev_ioctl_impl) {
+     // TODO: add dev_ioctl method
+-    Usart *usart = (Usart *)self;
++    //Usart *usart = (Usart *)self;
+     //params , int cmd, void *arg
+     
+ }
+ 
+-
+-
+ // irq_handler method
+-irq_handler_override(usart_irq_handler_impl) {
++bool usart_irq_handler_impl(void *arg) {
+     // TODO: add irq_handler method
+     Usart *usart = (Usart *)arg;
+     //params , void *arg
+     // 检查SR寄存器的RXNE位，表示接收到了新数据
+-    if (UART4->SR & (1 << 5)) {
+-        char received_char = UART4->DR; // 读取数据寄存器，硬件会自动清除RXNE标志
+-        if (usart->feedback) {
+-            while (!(UART4->SR & (1 << 7)));
+-            UART4->DR = received_char;
++    if (usart->conf->usart_type->SR & (1 << 5)) {
++        char received_char = usart->conf->usart_type->DR; // 读取数据寄存器，硬件会自动清除RXNE标志
++        if (usart->conf->feedback) {
++            while (!(usart->conf->usart_type->SR & (1 << 7)));
++            usart->conf->usart_type->DR = received_char;
+         }
+         // 将数据存入缓冲区
+-        if (usart->rx_index < sizeof(usart->rx_buffer) - 1) {
++        if (usart->rx_index < usart->rx_size - 1) {
+             usart->rx_buffer[usart->rx_index++] = received_char;
+             if (received_char == '\n' || received_char == '\r') {
+                 usart->rx_buffer[usart->rx_index++] = '\n';
+@@ -187,3 +183,5 @@ irq_handler_override(usart_irq_handler_impl) {
+     return false;
+ }
+ 
++
++
+diff --git a/os/driver/usart.h b/os/driver/usart.h
+index 5f4815c..b0ec254 100644
+--- a/os/driver/usart.h
++++ b/os/driver/usart.h
+@@ -3,32 +3,46 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include "Device.h"
++#include "stm32f407xx.h"
+ 
+ #define GET_USART(obj) ((Usart *)obj)
+-
++#define DEFAULT_RX_BUFFER (256)
+ // 派生类声明
+ typedef struct _Usart Usart;
+ typedef struct _UsartFun UsartFun;
++typedef struct _usart_config usart_config;
+ // 类成员函数结构
+ struct _UsartFun {
+     void (*destroy)(Usart* self);
+ };
++
++struct _usart_config {
++    GPIO_TypeDef *gpio_type;
++    USART_TypeDef *usart_type;
++    uint32_t bound;
++    bool feedback;
++    uint16_t buffer_size;
++    irq_config irq_conf;
++};
++
+ struct _Usart {
+     Device base;  // 基类作为第一个成员
+     const UsartFun* fun;
+     // TODO: 添加派生类特有的数据成员
+     // 假设的全局变量，用于存储接收到的数据
+-    char rx_buffer[256];
++    usart_config *conf;
+     volatile uint8_t rx_index;
+     volatile uint8_t rx_complete;
+-    bool feedback;
++    uint16_t rx_size;
++    uint8_t rx_buffer[];
++   //bool feedback;
+ };
+ 
+ // 构造函数声明
+-Usart* usart_create();
+-void usart_init(Usart* self);
++Usart* usart_create(usart_config * conf);
++void usart_init(Usart* self, usart_config *conf);
+ 
+ // 析构函数声明
+ void usart_deinit(Usart* self);
+-
++bool usart_irq_handler_impl(void *arg);
+ #endif // USART_H
+\ No newline at end of file
+diff --git a/os/log/log.c b/os/log/log.c
+index 2cddbd5..750a8e2 100644
+--- a/os/log/log.c
++++ b/os/log/log.c
+@@ -5,6 +5,7 @@
+ #include "log.h"
+ #include "../common/ring.h"
+ #include "../scheduler/thread_scheduler.h"
++#include "../common/sys_time.h"
+ 
+ /* ------- 日志条目与环形缓冲区 ------- */
+ 
+@@ -84,7 +85,7 @@ static void log_task(void *p) {
+ }*/
+ 
+ /* 核心输出函数，由宏调用 */
+-void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
++void log_output(log_level_t level, const char * tag, const char *fmt, ...) {
+     if (!LOG_FILTER(level)) {
+         return;
+     }
+@@ -93,9 +94,10 @@ void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
+     }
+ 
+     log_entry_t entry;
+-    entry.timestamp = global_thread_scheduler->current_thread->tid;//os_get_tick();
++    entry.timestamp = getSystime()->systick;// global_thread_scheduler->current_thread->tid;//os_get_tick();
+     entry.level = (uint8_t)level;
+-    entry.module_id = (uint8_t)module;
++    entry.tid = global_thread_scheduler->current_thread->tid;
++    entry.tag = tag;
+ 
+     va_list args;
+     va_start(args, fmt);
+@@ -104,12 +106,12 @@ void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
+ 
+     if (log_buf->fun->push(log_buf, &entry)) {
+         if (log_sem) {
+-            log_sem->fun->give(log_sem);
++            log_sem->fun->give(log_sem, false);
+         }
+     } else {
+         // 缓冲区满，记录丢弃次数（可选，这里省略）
+         if (log_sem) {
+-            log_sem->fun->give(log_sem);
++            log_sem->fun->give(log_sem, false);
+         }
+     }
+ }
+@@ -129,6 +131,6 @@ void log_init(void) {
+ void log_setsem(Semaphore *sem) {
+     log_sem = sem;
+     if (log_buf->count > 0) {
+-        log_sem->fun->give(log_sem);
++        log_sem->fun->give(log_sem, false);
+     }
+ }
+\ No newline at end of file
+diff --git a/os/log/log.h b/os/log/log.h
+index 3636c8e..0ec86af 100644
+--- a/os/log/log.h
++++ b/os/log/log.h
+@@ -31,7 +31,8 @@ typedef enum {
+ typedef struct {
+     uint32_t    timestamp;          // 系统tick
+     uint8_t     level;
+-    uint8_t     module_id;
++    uint16_t tid;
++    const char*     tag;
+     char        text[LOG_MSG_MAX_LEN];
+ } log_entry_t;
+ 
+@@ -45,13 +46,13 @@ void log_init(void);
+  * 通用日志宏，用法：LOG(LOG_LEVEL_INFO, MODULE_UART, "baud: %d\n", 115200)
+  * 注意：fmt 后面会自动换行，无需加 \n
+  */
+-#define LOG(level, module, fmt, ...) \
++#define LOG(level, tag, fmt, ...) \
+     do { \
+-        log_output(level, module, fmt "\r\n", ##__VA_ARGS__); \
++        log_output(level, tag, fmt "\r\n", ##__VA_ARGS__); \
+     } while(0)
+ 
+ /* 便捷级别宏 */
+-#define LOG_DEBUG(module, fmt, ...)   LOG(LOG_LEVEL_DEBUG, module, fmt, ##__VA_ARGS__)
++#define LOG_DEBUG(tag, fmt, ...)   LOG(LOG_LEVEL_DEBUG, tag, fmt, ##__VA_ARGS__)
+ #define LOG_INFO(module, fmt, ...)    LOG(LOG_LEVEL_INFO,  module, fmt, ##__VA_ARGS__)
+ #define LOG_WARN(module, fmt, ...)    LOG(LOG_LEVEL_WARN,  module, fmt, ##__VA_ARGS__)
+ #define LOG_ERROR(module, fmt, ...)   LOG(LOG_LEVEL_ERROR, module, fmt, ##__VA_ARGS__)
+@@ -65,7 +66,7 @@ void log_init(void);
+ #endif
+ 
+ /* 实际调用函数 */
+-void log_output(log_level_t level, module_id_t module, const char *fmt, ...);
++void log_output(log_level_t level, const char *tag, const char *fmt, ...);
+ Ring * log_buffer();
+ void log_setsem(Semaphore *sem);
+ #endif
+diff --git a/os/scheduler/msg_queue.c b/os/scheduler/msg_queue.c
+new file mode 100644
+index 0000000..1f9ee9d
+--- /dev/null
++++ b/os/scheduler/msg_queue.c
+@@ -0,0 +1,82 @@
++#include "msg_queue.h"
++#include <stdio.h>
++#include "../common/linear_pool.h"
++
++static uint8_t msg_queue_recv(Msg_queue* self, void **msg, uint32_t timeout);
++
++static uint8_t msg_queue_send(Msg_queue* self, void **msg, uint32_t timeout);
++
++// 析构函数声明
++static void msg_queue_destroy(Msg_queue* self);
++
++// TODO: 初始化数据成员
++static const Msg_queueFun msg_queue_fun = {
++    .destroy = msg_queue_destroy,
++	.send = msg_queue_send,
++	.recv = msg_queue_recv,
++};
++// 构造函数实现
++Msg_queue* msg_queue_create(uint16_t queue_size) {
++    Msg_queue* obj = (Msg_queue*)os_malloc(sizeof(Msg_queue));
++    if (obj) {
++        memset(obj, 0, sizeof(Msg_queue));
++        msg_queue_init(obj, queue_size);
++    }
++    return obj;
++}
++
++void msg_queue_init(Msg_queue* self, uint16_t queue_size) {
++    self->fun = &(msg_queue_fun);
++    // TODO: 初始化数据成员
++    self->ringbuf = ring_create(queue_size, sizeof(void *));//(LOG_RING_BUF_SIZE, sizeof(log_entry_t)
++    //self->queue_len = queue_size;
++    //self->in = 0;
++    //self->out = 0;
++    self->room_sem = semaphore_create(queue_size);
++    self->data_sem = semaphore_create(0);
++    self->lock = mutex_create();
++}
++
++void msg_queue_deinit(Msg_queue* self) {
++    // TODO: 数据成员申请资源释放
++    if (self->ringbuf) {
++        self->ringbuf->fun->destroy(self->ringbuf);
++    }
++}
++
++// 析构函数实现
++static void msg_queue_destroy(Msg_queue* self) {
++    if (self != NULL) {
++        msg_queue_deinit(self);
++        os_free(self);
++    }
++}
++
++// send method
++//只存储消息指针，不存数据
++static uint8_t msg_queue_send(Msg_queue* self, void **msg, uint32_t timeout) {
++    // 1. 等待空房间（如果队列满，此处会阻塞）
++    self->room_sem->fun->take(self->room_sem);
++    // 2. 获取互斥锁，操作环形缓冲区
++    self->lock->fun->mutex_lock(self->lock, 0);
++    self->ringbuf->fun->pop(self->ringbuf, *msg);
++    self->lock->fun->mutex_unlock(self->lock);
++    // 3. 通知数据可用
++    self->data_sem->fun->give(self->data_sem);
++    return 1;
++}
++
++
++// 只取消息指针，不取数据 recv method
++static uint8_t msg_queue_recv(Msg_queue* self, void **msg, uint32_t timeout) {
++    // 1. 等待数据可用（如果队列空，此处会阻塞）
++    self->data_sem->fun->take(self->data_sem);
++    // 2. 获取互斥锁，操作环形缓冲区取出消息
++    self->lock->fun->mutex_lock(self->lock, 0);
++    self->ringbuf->fun->pop(self->ringbuf, *msg);// 通过输出参数返回消息指针
++    self->lock->fun->mutex_unlock(self->lock);
++    // 3. 释放一个房间（通知发送者队列有空位）
++    self->room_sem->fun->give(self->room_sem);
++    return 1;
++}
++
+diff --git a/os/scheduler/msg_queue.h b/os/scheduler/msg_queue.h
+new file mode 100644
+index 0000000..aa45336
+--- /dev/null
++++ b/os/scheduler/msg_queue.h
+@@ -0,0 +1,46 @@
++#ifndef MSG_QUEUE_H
++#define MSG_QUEUE_H
++#include <stdlib.h>
++#include <stdint.h>
++#include <stdbool.h>
++#include <string.h>
++#include "semaphore.h"
++#include "mutex.h"
++#include "../common/ring.h"
++
++#define GET_MSG_QUEUE(obj) ((Msg_queue *)obj)
++// 类声明
++typedef struct _Msg_queue Msg_queue;
++typedef struct _Msg_queueFun Msg_queueFun;
++// 类成员函数结构
++struct _Msg_queueFun {
++    void (*destroy)(Msg_queue* self);
++	uint8_t (*send)(Msg_queue* self, void **msg, uint32_t timeout);
++
++	uint8_t (*recv)(Msg_queue* self, void **msg, uint32_t timeout);
++
++};
++// 类结构
++struct _Msg_queue {
++    const Msg_queueFun* fun;
++    // TODO: 添加数据成员
++    Ring *ringbuf;
++    //void **start;          // 环形缓冲区起始地址
++    //uint16_t msg_size;
++    //uint16_t queue_len;
++    //uint16_t in;
++    //uint16_t out;
++
++    Mutex *lock;      // 保护结构体成员的互斥量
++    Semaphore *room_sem;    // 计数信号量：初始值 = queue_len（空房间）
++    Semaphore *data_sem;    // 计数信号量：初始值 = 0（已有数据）
++};
++
++// 构造函数声明
++Msg_queue* msg_queue_create(uint16_t queue_size);
++void msg_queue_init(Msg_queue* self, uint16_t queue_size);
++
++// 析构函数声明
++void msg_queue_deinit(Msg_queue* self);
++
++#endif // MSG_QUEUE_H
+\ No newline at end of file
+diff --git a/os/scheduler/mutex.c b/os/scheduler/mutex.c
+new file mode 100644
+index 0000000..fb487ab
+--- /dev/null
++++ b/os/scheduler/mutex.c
+@@ -0,0 +1,173 @@
++#include "mutex.h"
++#include <stdio.h>
++#include "../common/linear_pool.h"
++#include "thread_scheduler.h"
++#include "../log/log.h"
++
++static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms);
++static uint8_t mutex_give(Mutex* self);
++
++// 析构函数声明
++static void mutex_destroy(Mutex* self);
++
++// TODO: 初始化数据成员
++static const MutexFun mutex_fun = {
++    .destroy = mutex_destroy,
++	.mutex_lock = mutex_take,
++	.mutex_unlock = mutex_give,
++};
++// 构造函数实现
++Mutex* mutex_create() {
++    Mutex* obj = (Mutex*)os_malloc(sizeof(Mutex));
++    if (obj) {
++        memset(obj, 0, sizeof(Mutex));
++        mutex_init(obj);
++    }
++    return obj;
++}
++
++void mutex_init(Mutex* self) {
++    self->fun = &(mutex_fun);
++    // TODO: 初始化数据成员
++    self->owner = NULL;
++    self->lock_count = 0;
++    self->owner_original_prio = 0;
++    self->wait_list = queue_create();
++}
++
++void mutex_deinit(Mutex* self) {
++    // TODO: 数据成员申请资源释放
++    if (self->wait_list) {
++        self->wait_list->fun->destroy(self->wait_list);
++    }
++}
++
++// 析构函数实现
++static void mutex_destroy(Mutex* self) {
++    if (self != NULL) {
++        mutex_deinit(self);
++        os_free(self);
++    }
++}
++
++// take method
++static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
++    DISABLE_IRQ;
++    Tcb_t *curr = global_thread_scheduler->current_thread;
++    // 情况1：互斥量空闲，直接获取
++    if (self->owner == NULL) {
++        self->owner = curr;
++        self->lock_count = 1;
++        self->owner_original_prio = curr->priority;  // 记录原优先级
++        ENABLE_IRQ;
++        return 1;
++    }
++    // 情况2：已经持有，递归加锁
++    if (self->owner == curr) {
++        self->lock_count++;
++        ENABLE_IRQ;
++        return 1;
++    }
++
++    // 情况3：互斥量被其他任务持有 -> 优先级继承
++    Tcb_t *owner = self->owner;
++    if (curr->priority > owner->priority) {   // 当前任务优先级更高
++        // 提升持有者优先级到当前任务优先级
++        // 注意：需要重新插入就绪队列（因为优先级变了）
++        //此处需要做特殊判断，若owner任务在执行态，需要从优先级列表中挪到另一个优先级，若处于未就绪态，则只需要改变其priority就可以
++        //因为在任务切换的时候会自动放入就绪状态
++        if (owner->state == TCB_STATER_READY || owner->state == TCB_STATER_RUNNING) {
++            if (global_thread_scheduler->priority_list[owner->priority]->fun->dequeue_node(
++                    global_thread_scheduler->priority_list[owner->priority], GET_NODE(owner)) != NULL) {
++                owner->priority = curr->priority;
++                global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, owner, true);
++            } else {
++                LOG_ERROR("mutex", "need update priority, but not found !!!");
++            }
++        } else {
++            owner->priority = curr->priority;
++        }
++    }
++    // 挂起当前任务，加入等待队列（按优先级排序）
++    curr->state = TCB_STATER_WAITING_MUTEX;
++    //os_insert_task_sorted(&self->wait_list, curr);  // 按优先级插入
++    self->wait_list->fun->enqueue(self->wait_list, GET_NODE(curr));
++    //if (timeout_ms != OS_WAIT_FOREVER) {
++    //    os_set_task_timeout(curr, timeout_ms);
++    //}
++ //   LOG_DEBUG("mutex", "%s wait", curr->name);
++    //curr->need_print = true;
++    ENABLE_IRQ;
++    Trigger_PendSV;   // 切换到其他任务
++    //LOG_DEBUG("mutex", "mutex_take 2");
++    // 被唤醒后，重新获取互斥量所有权
++    // 注意：此时互斥量已由原持有者释放，并可能已经转移给当前任务
++    DISABLE_IRQ;
++ //   LOG_DEBUG("mutex", "wake up %s", curr->name);
++    //被唤醒后第一次的状态应该是TCB_STATER_WAITING_MUTEX
++    if (curr->state == TCB_STATER_RUNNING) {
++        // 成功获得互斥量
++        self->owner = curr;
++        self->lock_count = 1;
++        self->owner_original_prio = curr->priority;  // 覆盖为实际优先级
++        ENABLE_IRQ;
++        LOG_DEBUG("mutex", "wake up %s right", curr->name);
++        return 1;
++    } else {
++        LOG_ERROR("mutex", "lock fail, state %d", curr->state);
++        // 超时或被中断唤醒
++        ENABLE_IRQ;
++        return 0;
++    }
++}
++// give method
++static uint8_t mutex_give(Mutex* self) {
++    DISABLE_IRQ;
++    if (self->owner != global_thread_scheduler->current_thread) {
++        // 非法释放：不是持有者
++        LOG_ERROR("mutex", "Illegal give owner %s current is %s", self->owner->name, global_thread_scheduler->current_thread->name);
++        ENABLE_IRQ;
++        return 0;
++    }
++
++    self->lock_count--;
++    if (self->lock_count > 0) {
++        // 递归锁未完全释放
++        ENABLE_IRQ;
++        return 1;
++    }
++
++    // 恢复所有者原来的优先级（如果曾被提升）
++    Tcb_t *owner = self->owner;
++    if (owner->priority != owner->original_priority) {
++        owner->priority = owner->original_priority;
++        // 重新插入就绪队列
++        //当前任务不需要手动插入队列，只需要调整state就可以，任务切换时会根据当前任务的state决定是都插入就绪队列
++        owner->state = TCB_STATER_READY;
++    }
++
++    // 检查等待队列
++    if (self->wait_list->size == 0) {
++        // 没有等待者，直接清空所有者
++        self->owner = NULL;
++        ENABLE_IRQ;
++        return 1;
++    }
++
++    // 有等待任务：取出等待队列头（优先级最高）
++    Tcb_t *new_owner = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
++    new_owner->state = TCB_STATER_READY;
++    // 直接转移所有权（不经过调度，因为还在临界区）
++    self->owner = new_owner;
++    self->lock_count = 1;
++    self->owner_original_prio = new_owner->priority;
++    // 新任务不是当前任务，需要手动插入插入就绪队列
++    LOG_DEBUG("mutex", "unlock %s", new_owner->name);
++    global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, new_owner, true);
++    // 如果有超时机制，清除该任务的超时定时器
++    //os_clear_task_timeout(new_owner);
++    ENABLE_IRQ;
++    Trigger_PendSV;   // 让新拥有者运行（如果优先级足够高）
++    return 1;
++}
++
+diff --git a/os/scheduler/mutex.h b/os/scheduler/mutex.h
+new file mode 100644
+index 0000000..704846f
+--- /dev/null
++++ b/os/scheduler/mutex.h
+@@ -0,0 +1,39 @@
++#ifndef MUTEX_H
++#define MUTEX_H
++#include <stdlib.h>
++#include <stdint.h>
++#include <stdbool.h>
++#include <string.h>
++#include "tcb_t.h"
++
++#define GET_MUTEX(obj) ((Mutex *)obj)
++// 类声明
++typedef struct _Mutex Mutex;
++typedef struct _MutexFun MutexFun;
++// 类成员函数结构
++struct _MutexFun {
++    void (*destroy)(Mutex* self);
++	uint8_t (*mutex_lock)(Mutex* self, uint32_t timeout_ms);
++	uint8_t (*mutex_unlock)(Mutex* self);
++
++};
++// 类结构
++struct _Mutex {
++    const MutexFun* fun;
++    // TODO: 添加数据成员
++    Tcb_t *owner;       // 当前持有互斥量的任务（NULL 表示空闲）
++    uint8_t lock_count;          // 递归锁计数（同一个任务可多次 take）
++    // 优先级继承相关
++    uint8_t owner_original_prio; // 任务原本的优先级（当继承时记录）
++    // 等待队列
++    Queue *wait_list;   // 因获取不到互斥量而阻塞的任务（按优先级排序）
++};
++
++// 构造函数声明
++Mutex* mutex_create();
++void mutex_init(Mutex* self);
++
++// 析构函数声明
++void mutex_deinit(Mutex* self);
++
++#endif // MUTEX_H
+\ No newline at end of file
+diff --git a/os/scheduler/semaphore.c b/os/scheduler/semaphore.c
+index 9b9ddc2..32f9989 100644
+--- a/os/scheduler/semaphore.c
++++ b/os/scheduler/semaphore.c
+@@ -5,7 +5,7 @@
+ #include "../common/linear_pool.h"
+ 
+ static void semaphore_take(Semaphore* self);
+-static void semaphore_give(Semaphore* self);
++static void semaphore_give(Semaphore* self, bool protected);
+ 
+ // 析构函数声明
+ static void semaphore_destroy(Semaphore* self);
+@@ -31,6 +31,7 @@ void semaphore_init(Semaphore* self, uint8_t count) {
+     // TODO: 初始化数据成员
+     self->count = count;
+     self->wait_list = queue_create();
++    self->sem_event = 0;
+ }
+ 
+ void semaphore_deinit(Semaphore* self) {
+@@ -74,9 +75,10 @@ static void semaphore_take(Semaphore* self) {
+     self->wait_list->fun->enqueue(self->wait_list, GET_NODE(current));
+     ENABLE_IRQ;
+     Trigger_PendSV;
++    return;
+ }
+ // give method
+-static void semaphore_give(Semaphore* self) {
++static void semaphore_give(Semaphore* self, bool protected) {
+     if (NULL == self) {
+         return;
+     }
+@@ -86,10 +88,11 @@ static void semaphore_give(Semaphore* self) {
+         Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
+         task->state = TCB_STATER_READY;
+         // 将任务放回就绪队列（根据优先级插入）
+-        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task);
++        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task, protected);
+     } else {
+         self->count++;
+     }
+     ENABLE_IRQ;
+ }
+ 
++
+diff --git a/os/scheduler/semaphore.h b/os/scheduler/semaphore.h
+index bfffc4c..93790be 100644
+--- a/os/scheduler/semaphore.h
++++ b/os/scheduler/semaphore.h
+@@ -15,7 +15,7 @@ typedef struct _SemaphoreFun SemaphoreFun;
+ struct _SemaphoreFun {
+     void (*destroy)(Semaphore* self);
+ 	void (*take)(Semaphore* self);
+-	void (*give)(Semaphore* self);
++	void (*give)(Semaphore* self, bool protected);
+ 
+ };
+ // 类结构
+@@ -23,7 +23,8 @@ struct _Semaphore {
+     const SemaphoreFun* fun;
+     // TODO: 添加数据成员
+     uint8_t count;                     // 计数值
+-    Queue *wait_list;              // 等待队列头（单向链表或双向）
++    Queue *wait_list;               // 等待队列头（单向链表或双向）
++    uint32_t sem_event;             //信号量携带的状态
+ };
+ 
+ // 构造函数声明
+diff --git a/os/scheduler/tcb_t.c b/os/scheduler/tcb_t.c
+index f599e30..2ca583d 100644
+--- a/os/scheduler/tcb_t.c
++++ b/os/scheduler/tcb_t.c
+@@ -31,10 +31,13 @@ void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, size_t stack_size
+     self->fun = &(tcb_t_fun);
+     // TODO: 初始化数据成员
+     self->priority = entry->priority;
++    self->original_priority = self->priority;
+     self->parent = entry->parent;
+     self->semaphore = semaphore_create(0);
+     GET_NODE(self)->next = NULL;
+     self->name = name;
++    self->stack_left = 0;
++    //self->need_print = false;
+     self->stack_size = stack_size;
+     tcb_t_stack_init(self, entry);
+ }
+@@ -42,10 +45,13 @@ static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry) {
+ // 从栈顶高地址开始
+     uint32_t *top = self->stack_ptr + self->stack_size;
+     // R4-R11 区可以保持填充值（如 0xDEADBEEF），或者清零
+-    for (int i = 0; i < self->stack_size; i++) {
+-        self->stack_ptr[i] = 0xDEADBEEF;  // 填充栈，栈溢出时可以方便排查
++    /*for (int i = 0; i < self->stack_size; i++) {
++        self->stack_ptr[i] = MAGIC_NUM;  // 填充栈，栈溢出时可以方便排查
++    }*/
++    //memset(self->stack_ptr, MAGIC_NUM, sizeof(uint32_t) * self->stack_size);
++    for (size_t i = 0; i < self->stack_size; i++) {
++        self->stack_ptr[i] = MAGIC_NUM;
+     }
+-
+ // 向下移动，先留出自动压栈区
+     top -= 8;
+ // 填充自动压栈区 地址递减
+diff --git a/os/scheduler/tcb_t.h b/os/scheduler/tcb_t.h
+index 27c58a8..c80a801 100644
+--- a/os/scheduler/tcb_t.h
++++ b/os/scheduler/tcb_t.h
+@@ -10,7 +10,7 @@
+ #include "../common/util.h"
+ 
+ 
+-
++#define MAGIC_NUM (0xDEADBEEF)
+ #define GET_TCB_T(obj) ((Tcb_t *)obj)
+ // 类声明
+ typedef struct _Tcb_t Tcb_t;
+@@ -24,6 +24,7 @@ enum thread_state {
+     TCB_STATER_RUNNING,
+     TCB_STATER_BLOCKED,
+     TCB_STATER_DELAYED,
++    TCB_STATER_WAITING_MUTEX,
+     TCB_STATER_TERMINATED
+ };
+ 
+@@ -41,13 +42,15 @@ struct _Tcb_t {
+     void *parent;//base_task
+     const char *name;       //名称
+     uint16_t tid;           //线程id
+-    uint8_t priority;      //优先级
++    uint8_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
++    uint8_t original_priority; //原始优先级，优先级提升后需要恢复原始优先级
+     Tcb_State state;    /* 线程状态 */
+     Semaphore *semaphore;   //信号量
+-    //Tcb_entry entey;        //入口函数
+     uint32_t start_time;    //时间片开始时刻计数
+     uint32_t run_time;    //时间片结束运行计数
++    size_t stack_left;      //栈剩余大小
+     uint32_t delay_ticks;   //剩余等待节拍数
++   // bool need_print;
+     uint32_t *sp;           //sp指针
+     size_t stack_size;      //栈大小
+     uint32_t stack_ptr[];   //栈空间
+diff --git a/os/scheduler/thread_scheduler.c b/os/scheduler/thread_scheduler.c
+index 10af90c..ed6e2d3 100644
+--- a/os/scheduler/thread_scheduler.c
++++ b/os/scheduler/thread_scheduler.c
+@@ -2,13 +2,15 @@
+ #include <stdio.h>
+ #include "main.h"
+ #include "../common/linear_pool.h"
++#include "../log/log.h"
++#include "../common/sys_time.h"
+ 
+-static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
+-static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
+-static uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self);
++static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
++static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
++static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self);
+ 
+ static void thread_scheduler_delay_ticks(Thread_scheduler* self);
+-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb);
++static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected);
+ 
+ static void thread_scheduler_start(Thread_scheduler* self);
+ 
+@@ -41,6 +43,7 @@ Thread_scheduler* thread_scheduler_create() {
+ }
+ 
+ void thread_scheduler_init(Thread_scheduler* self) {
++    LOG_DEBUG("scheduler", "thread_scheduler_init");
+     self->fun = &(thread_scheduler_fun);
+     // TODO: 初始化数据成员
+     self->priority_bitmap = 0;
+@@ -101,7 +104,7 @@ static Tcb_t *thread_scheduler_create_thread(Thread_scheduler* self, const char
+     entry_s->exit = thread_scheduler_thread_exit;
+     Tcb_t *new_thread = tcb_t_create(name, entry_s, entry_s->stack_size);
+     new_thread->tid = self->tid_num++;
+-    thread_scheduler_add_readly_list(self, new_thread);
++    thread_scheduler_add_readly_list(self, new_thread, true);
+     //self->priority_list[entry_s->priority]->fun->enqueue(self->priority_list[entry_s->priority], GET_NODE(new_thread));
+     return new_thread;
+ }
+@@ -111,9 +114,23 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
+     if (NULL == self || self->current_thread == NULL) {
+         return;
+     }
++    if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
++        while (1) {
++            LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
++            //stack out bound
++        }
++    } else {
++#if OS_STACK_DEBUG
++        uint16_t left = 0;
++        while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
++            left++;
++        }
++        self->current_thread->stack_left = left;
++#endif
++    }
+     DISABLE_IRQ;
+     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {
+-        thread_scheduler_add_readly_list(self, self->current_thread);
++        thread_scheduler_add_readly_list(self, self->current_thread, true);
+     } else if (TCB_STATER_TERMINATED == self->current_thread->state) {
+         self->destory_list->fun->enqueue(self->destory_list, GET_NODE(self->current_thread));
+     }
+@@ -130,10 +147,14 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
+     }
+     Tcb_t *next_tcb = GET_TCB_T(
+             self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
+-    self->current_thread->run_time = HAL_GetTick() - self->current_thread->start_time;
++    self->current_thread->run_time += getSystime()->systick - self->current_thread->start_time;
++    //if (self->current_thread->need_print) {
++    //    self->current_thread->need_print = false;
++    //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
++    //}
+     self->current_thread = next_tcb;
+     if (self->current_thread != NULL) {
+-        self->current_thread->start_time = HAL_GetTick();
++        self->current_thread->start_time = getSystime()->systick;
+         self->current_thread->state = TCB_STATER_RUNNING;
+         gloable_current_stack = (uint32_t *)(&self->current_thread->sp);
+     }
+@@ -143,28 +164,21 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
+ 
+ // start method
+ static void thread_scheduler_start(Thread_scheduler* self) {
++    LOG_DEBUG("scheduler", "thread_scheduler_start");
+     if (NULL == self) {
+         return;
+     }
+     uint8_t highest_priority = thread_scheduler_get_highest_priority(self);
+-
+     self->current_thread = GET_TCB_T(self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
+     if (self->current_thread == NULL) {
+         return;
+     }
+-    /*// 设置 PSP 指向第一个任务的栈顶
+-    __set_PSP((uint32_t) self->current_thread->stack_ptr);
+-    // 使用 PSP 作为当前栈指针
+-    __set_CONTROL( 0x02 );   // 特权线程模式，使用 PSP
+-    __ISB();*/
+     __set_PSP( (uint32_t)self->current_thread->sp );
+     // 设置 CONTROL 寄存器，选择使用 PSP
+     __set_CONTROL( __get_CONTROL() | 0x2 );
+-// 执行 ISB 指令确保立即生效
++    // 执行 ISB 指令确保立即生效
+     __ISB();
+-    uint32_t test_psp = __get_PSP();  // 立即读回
+-    // 触发 PendSV 来启动第一个任务
+-    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
++    Trigger_PendSV;
+     // 或者直接使用 svc 指令
+     // 注意：永远不会返回到这里
+     while(1);
+@@ -210,17 +224,22 @@ static void thread_scheduler_delay_ticks(Thread_scheduler* self) {
+                         self->delay_list->tail = GET_NODE(prev);
+                     }
+                 }
+-                thread_scheduler_add_readly_list(self, delay_task);
++                LOG_DEBUG("delay", "delay over, add_readly %s", delay_task->name);
++                thread_scheduler_add_readly_list(self, delay_task, false);
+             }
+         }
+         num++;
+         prev = delay_task;
+         delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
++        //while (delay_task->state != TCB_STATER_WAITING_MUTEX) {
++        //    prev = delay_task;
++        //    delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
++        //}
+     }
+     
+ }
+ // add_readly_list method
+-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb) {
++static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected) {
+     if (NULL == self) {
+         return;
+     }
+@@ -228,13 +247,13 @@ static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb)
+     self->priority_list[tcb->priority]->fun->enqueue(self->priority_list[tcb->priority], GET_NODE(tcb));
+     thread_scheduler_set_priority_ready(self, tcb->priority);
+     // 如果该任务优先级高于当前任务，请求抢占
+-    if (self->current_thread != NULL && tcb->priority > self->current_thread->priority) {
++    if (!protected && self->current_thread != NULL && tcb->priority > self->current_thread->priority) {
+         Trigger_PendSV;
+     }
+ }
+ 
+ // set_priority_ready method
+-static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p) {
++static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p) {
+     if (NULL == self) {
+         return;
+     }
+@@ -245,7 +264,7 @@ static void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t
+     }
+ }
+ // clear_priority_ready method
+-static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p) {
++static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p) {
+     if (NULL == self) {
+         return;
+     }
+@@ -254,7 +273,7 @@ static void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_
+     }
+ }
+ // get_highest_priority method
+-inline static uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self) {
++static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self) {
+     //用于计算一个无符号整数的前导零个数  优先级31 返回值0， 优先级0 返回31
+     return 31 - __builtin_clz(self->priority_bitmap);
+ }
+diff --git a/os/scheduler/thread_scheduler.h b/os/scheduler/thread_scheduler.h
+index bed1f6b..6ad7518 100644
+--- a/os/scheduler/thread_scheduler.h
++++ b/os/scheduler/thread_scheduler.h
+@@ -21,7 +21,7 @@ struct _Thread_schedulerFun {
+ 	void (*start)(Thread_scheduler* self);
+ 
+ 	void (*delay_ticks)(Thread_scheduler* self);
+-	void (*add_readly_list)(Thread_scheduler* self, Tcb_t *tcb);
++	void (*add_readly_list)(Thread_scheduler* self, Tcb_t *tcb, bool protected);
+ 
+ };
+ // 类结构
+diff --git a/os/task/bus_task.c b/os/task/bus_task.c
+deleted file mode 100644
+index 4fd947e..0000000
+--- a/os/task/bus_task.c
++++ /dev/null
+@@ -1,69 +0,0 @@
+-#include "bus_task.h"
+-#include "../common/linear_pool.h"
+-#include <stdio.h>
+-#include <stdlib.h>
+-
+-task_init_override(bus_task_task_init_impl);
+-task_thread_override(bus_task_task_thread_impl);
+-
+-// 析构函数声明
+-static void bus_task_destroy(Bus_task* self);
+-
+-// TODO: 初始化数据成员
+-static const Bus_taskFun bus_task_fun = {
+-    .destroy = bus_task_destroy,
+-};
+-// 构造函数实现
+-Bus_task* bus_task_create() {
+-    Bus_task* obj = (Bus_task*)os_malloc(sizeof(Bus_task));
+-    if (obj) {
+-        memset(obj, 0, sizeof(Bus_task));
+-        bus_task_init(obj);
+-    }
+-    return obj;
+-}
+-
+-void bus_task_init(Bus_task* self) {
+-    // 初始化基类部分
+-    task_init(&self->base);
+-    self->fun = &(bus_task_fun);
+-    // TODO: 初始化派生类特有成员
+-
+-	def_task_init(self) = bus_task_task_init_impl;
+-	def_task_thread(self) = bus_task_task_thread_impl;
+-    self->bus = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_BUS);
+-}
+-
+-void bus_task_deinit(Bus_task* self) {
+-    task_deinit(GET_TASK(self));
+-    // TODO: 数据成员申请资源释放
+-}
+-// 析构函数实现
+-static void bus_task_destroy(Bus_task* self) {
+-    if (self != NULL) {
+-        bus_task_deinit(self);
+-        os_free(self);
+-    }
+-}
+-
+-// task_init method
+-task_init_override(bus_task_task_init_impl) {
+-    // TODO: add task_init method
+-    Bus_task *bus_task = (Bus_task *)self;
+-    //params , void *parent
+-    //params , void *parent
+-    if (!bus_task) {
+-        return;
+-    }
+-    virtual_dev_init(bus_task->bus, self->task_tcb->semaphore);
+-}
+-// task_thread method
+-task_thread_override(bus_task_task_thread_impl) {
+-    // TODO: add task_thread method
+-    Bus_task *bus_task = (Bus_task *)self;
+-    //params , void *arg
+-    while (1) {
+-        self->semaphore->fun->take(self->semaphore);
+-    }
+-}
+-
+diff --git a/os/task/bus_task.h b/os/task/bus_task.h
+deleted file mode 100644
+index d3e921a..0000000
+--- a/os/task/bus_task.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-#ifndef BUS_TASK_H
+-#define BUS_TASK_H
+-#include <stdint.h>
+-#include <stdbool.h>
+-#include "Task.h"
+-
+-#define GET_BUS_TASK_VTABLE(obj) GET_TASK_VTABLE(obj) //(*(Bus_taskVTable **)obj)
+-#define GET_BUS_TASK(obj) ((Bus_task *)obj)
+-
+-// 派生类声明
+-typedef struct _Bus_task Bus_task;
+-typedef struct _Bus_taskFun Bus_taskFun;
+-// 类成员函数结构
+-struct _Bus_taskFun {
+-    void (*destroy)(Bus_task* self);
+-};
+-struct _Bus_task {
+-    Task base;  // 基类作为第一个成员
+-    const Bus_taskFun* fun;
+-    // TODO: 添加派生类特有的数据成员
+-    Device *bus;
+-};
+-
+-// 构造函数声明
+-Bus_task* bus_task_create();
+-void bus_task_init(Bus_task* self);
+-
+-// 析构函数声明
+-void bus_task_deinit(Bus_task* self);
+-
+-#endif // BUS_TASK_H
+\ No newline at end of file
+diff --git a/os/task/idle_task.c b/os/task/idle_task.c
+index 8130c42..e417c5b 100644
+--- a/os/task/idle_task.c
++++ b/os/task/idle_task.c
+@@ -1,5 +1,6 @@
+ #include "idle_task.h"
+ #include "../common/linear_pool.h"
++#include "../log/log.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+@@ -28,10 +29,8 @@ void idle_task_init(Idle_task* self) {
+     task_init(&self->base);
+     self->fun = &(idle_task_fun);
+     // TODO: 初始化派生类特有成员
+-
+ 	def_task_init(self) = idle_task_init_impl;
+ 	def_task_thread(self) = idle_task_thread_impl;
+-    self->idle_total_ticks = 0;
+ }
+ 
+ void idle_task_deinit(Idle_task* self) {
+@@ -48,13 +47,14 @@ static void idle_task_destroy(Idle_task* self) {
+ // init method
+ task_init_override(idle_task_init_impl) {
+     // TODO: add init method
+-    Idle_task *idle_task = (Idle_task *)self;
++    LOG_DEBUG("idle","idle_task init");
++    //Idle_task *idle_task = (Idle_task *)self;
+     //params
+ }
+ // thread method
+ task_thread_override(idle_task_thread_impl) {
+     // TODO: add thread method
+-    Idle_task *idle_task = (Idle_task *)self->parent;
++    //Idle_task *idle_task = (Idle_task *)self->parent;
+     //uint32_t last_idle_start = 0;
+     //params , void *arg
+     while (true) {
+@@ -64,8 +64,8 @@ task_thread_override(idle_task_thread_impl) {
+                 destory_tcb->fun->destroy(destory_tcb);
+             }
+         }
++        //LOG_DEBUG(MODULE_SYSTEM,"idle\n");
+         LOW_POWER;//进入低功耗模式
+-        idle_task->idle_total_ticks += self->run_time;
+     }
+ }
+ 
+diff --git a/os/task/idle_task.h b/os/task/idle_task.h
+index a57ba3d..b2229c8 100644
+--- a/os/task/idle_task.h
++++ b/os/task/idle_task.h
+@@ -18,7 +18,6 @@ struct _Idle_task {
+     Task base;  // 基类作为第一个成员
+     const Idle_taskFun* fun;
+     // TODO: 添加派生类特有的数据成员
+-    uint32_t idle_total_ticks;
+ };
+ 
+ // 构造函数声明
+diff --git a/os/task/log_task.c b/os/task/log_task.c
+index 9977503..80a2595 100644
+--- a/os/task/log_task.c
++++ b/os/task/log_task.c
+@@ -2,7 +2,7 @@
+ #include "../common/linear_pool.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+-#include "../log/log.h"
++
+ 
+ task_init_override(log_task_task_init_impl);
+ task_thread_override(log_task_task_thread_impl);
+@@ -17,11 +17,11 @@ static const Log_taskFun log_task_fun = {
+ 
+ /* 级别字符串 */
+ static const char *level_str[] = {
+-        [LOG_LEVEL_DEBUG] = "DBG",
+-        [LOG_LEVEL_INFO]  = "INF",
+-        [LOG_LEVEL_WARN]  = "WRN",
+-        [LOG_LEVEL_ERROR] = "ERR",
+-        [LOG_LEVEL_FATAL] = "FAT"
++        [LOG_LEVEL_DEBUG] = "D",
++        [LOG_LEVEL_INFO]  = "I",
++        [LOG_LEVEL_WARN]  = "W",
++        [LOG_LEVEL_ERROR] = "E",
++        [LOG_LEVEL_FATAL] = "F"
+ };
+ 
+ // 构造函数实现
+@@ -43,8 +43,7 @@ void log_task_init(Log_task* self) {
+ 	def_task_init(self) = log_task_task_init_impl;
+ 	def_task_thread(self) = log_task_task_thread_impl;
+     self->log_buf = queue_create();
+-    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART);
+-    GET_USART(self->usart)->feedback = true;
++    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
+ }
+ 
+ void log_task_deinit(Log_task* self) {
+@@ -71,6 +70,7 @@ static void log_task_destroy(Log_task* self) {
+ //add task ---> init task
+ task_init_override(log_task_task_init_impl) {
+     // TODO: add task_init method
++    LOG_DEBUG("log","log_task init");
+     Log_task *log_task = (Log_task *)self;
+     //params , void *parent
+     if (!log_task) {
+@@ -88,9 +88,8 @@ task_thread_override(log_task_task_thread_impl) {
+     log_entry_t entry;
+     while (1) {
+         self->semaphore->fun->take(self->semaphore);
+-
+         if (GET_USART(log_task->usart)->rx_complete == 1) {
+-            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
++            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
+             GET_USART(log_task->usart)->rx_complete = 0;
+             //直接输出收到的数据缓存
+ 
+@@ -105,17 +104,17 @@ task_thread_override(log_task_task_thread_impl) {
+         /* 批量处理，直到缓冲区空 */
+         while (log_buf->fun->pop(log_buf, &entry)) {
+             /* 格式化并发送到串口 */
+-            char line[LOG_MSG_MAX_LEN + 32];  // 额外空间给前缀
+-            int len = snprintf(line, sizeof(line),
+-                               "[%08lu][%s][M%d] %s\r\n",
++            int len = snprintf(log_task->line, sizeof(log_task->line),
++                               "%08lu %d %s %s: %s",
+                                entry.timestamp,
++                               entry.tid,
+                                level_str[entry.level],
+-                               entry.module_id,
++                               entry.tag,
+                                entry.text);
+             if (len > 0) {
+                 //serial_send_blocking(line, len);
+                // log_task->usart->fun->transfer(log_task->usart, line, len);
+-                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, line, len);
++                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, log_task->line, len);
+             }
+         }
+         //self->fun->os_sleep(self, 10);
+diff --git a/os/task/log_task.h b/os/task/log_task.h
+index a69a1c8..32c90e6 100644
+--- a/os/task/log_task.h
++++ b/os/task/log_task.h
+@@ -6,6 +6,8 @@
+ #include "../driver/usart.h"
+ #include "String.h"
+ #include "../driver/device_manager.h"
++#include "../log/log.h"
++
+ #define GET_LOG_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Log_taskVTable **)obj)
+ #define GET_LOG_TASK(obj) ((Log_task *)obj)
+ 
+@@ -24,6 +26,7 @@ struct _Log_task {
+     // TODO: 添加派生类特有的数据成员
+     Device *usart;
+     Queue *log_buf;//String
++    char line[LOG_MSG_MAX_LEN + 32];
+ };
+ 
+ // 构造函数声明
+diff --git a/os/task/monitor_task.c b/os/task/monitor_task.c
+index 0577642..86cab53 100644
+--- a/os/task/monitor_task.c
++++ b/os/task/monitor_task.c
+@@ -4,8 +4,10 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "../log/log.h"
++#include "../common/sys_time.h"
++#include "../task/task_manager.h"
++#include "../common/sys_mutex.h"
+ 
+-static void monitor_task_cpu_usage(Monitor_task* self);
+ 
+ task_init_override(monitor_task_task_init_impl);
+ task_thread_override(monitor_task_task_thread_impl);
+@@ -16,7 +18,6 @@ static void monitor_task_destroy(Monitor_task* self);
+ // TODO: 初始化数据成员
+ static const Monitor_taskFun monitor_task_fun = {
+     .destroy = monitor_task_destroy,
+-	.cpu_usage = monitor_task_cpu_usage,
+ };
+ // 构造函数实现
+ Monitor_task* monitor_task_create() {
+@@ -56,6 +57,7 @@ static void monitor_task_destroy(Monitor_task* self) {
+ // task_init method
+ task_init_override(monitor_task_task_init_impl) {
+     // TODO: add task_init method
++    LOG_DEBUG("monitor","monitor_task init");
+     Monitor_task *monitor_task = (Monitor_task *)self;
+     //params 
+     monitor_task->idletask = GET_IDLE_TASK(GET_TASK_MANAGER(parent)->task_tab[TASK_IDLE]);
+@@ -66,24 +68,33 @@ task_thread_override(monitor_task_task_thread_impl) {
+     Monitor_task *monitor_task = (Monitor_task *)self->parent;
+     //params , void *arg
+     while(true) {
++        LOG_DEBUG("monitor", "----------------monitor lock----------------");
++        gloable_mutex->fun->mutex_lock(gloable_mutex, 0);
+         self->fun->os_sleep(self, 3000);
+-        monitor_task_cpu_usage(monitor_task);
+-    }
+-}
+ 
++        uint32_t now_call = getSystime()->systick;//HAL_GetTick();//get_system_tick();
++        uint32_t run_time =  now_call - monitor_task->last_call;
++        monitor_task->last_call = now_call;
++        // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
++        //monitor_task->cpu_usage = 100 - (monitor_task->idletask->idle_total_ticks * 100 / run_time);
++       // monitor_task->idletask->idle_total_ticks = 0;
++        LOG_DEBUG("monitor", "--------------------------------");
++        LOG_DEBUG("monitor", "name      cpu     mem     stack");
++        for (uint8_t i =0; i < gloable_taskManager->task_size; i++) {
++            if (gloable_taskManager->task_tab[i]->task_tcb) {
++                LOG_DEBUG("monitor", "%-10s %-4d    %-4d   %-4d",
++                          gloable_taskManager->task_tab[i]->task_tcb->name,
++                          (gloable_taskManager->task_tab[i]->task_tcb->run_time * 100)/ run_time,
++                          linear_pool_get()->size,
++                          gloable_taskManager->task_tab[i]->task_tcb->stack_left);
++                gloable_taskManager->task_tab[i]->task_tcb->run_time = 0;
++            }
++        }
++        LOG_DEBUG("monitor", "--------------------------------");
++        LOG_DEBUG("monitor", "----------------monitor unlock----------------");
++        gloable_mutex->fun->mutex_unlock(gloable_mutex);
+ 
+-// cpu_usage method
+-static void monitor_task_cpu_usage(Monitor_task* self) {
+-    if (NULL == self) {
+-        return;
+     }
+-
+-    uint32_t now_call = HAL_GetTick();//get_system_tick();
+-    uint32_t run_time =  now_call - self->last_call;
+-    self->last_call = now_call;
+-    // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
+-    self->cpu_usage = 100 - (self->idletask->idle_total_ticks * 100 / run_time);
+-    self->idletask->idle_total_ticks = 0;
+-    LOG(LOG_LEVEL_DEBUG, MODULE_SYSTEM,"cpu_usage : %d\n", self->cpu_usage);
+ }
+ 
++
+diff --git a/os/task/monitor_task.h b/os/task/monitor_task.h
+index 7662125..ef10200 100644
+--- a/os/task/monitor_task.h
++++ b/os/task/monitor_task.h
+@@ -14,7 +14,6 @@ typedef struct _Monitor_taskFun Monitor_taskFun;
+ // 类成员函数结构
+ struct _Monitor_taskFun {
+     void (*destroy)(Monitor_task* self);
+-	void (*cpu_usage)(Monitor_task* self);
+ 
+ };
+ struct _Monitor_task {
+diff --git a/os/task/os_cb_task.c b/os/task/os_cb_task.c
+new file mode 100644
+index 0000000..8a8d05f
+--- /dev/null
++++ b/os/task/os_cb_task.c
+@@ -0,0 +1,92 @@
++#include "os_cb_task.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include "../common/linear_pool.h"
++#include "../log/log.h"
++
++
++task_init_override(os_cb_task_task_init_impl);
++task_thread_override(os_cb_task_task_thread_impl);
++
++// 析构函数声明
++static void os_cb_task_destroy(Os_cb_task* self);
++
++// TODO: 初始化数据成员
++static const Os_cb_taskFun os_cb_task_fun = {
++    .destroy = os_cb_task_destroy,
++};
++static Os_cb_task *gloable_os_callback;
++// 构造函数实现
++Os_cb_task* os_cb_task_create() {
++    Os_cb_task* obj = (Os_cb_task*)os_malloc(sizeof(Os_cb_task));
++    if (obj) {
++        memset(obj, 0, sizeof(Os_cb_task));
++        os_cb_task_init(obj);
++    }
++    gloable_os_callback = obj;
++    return obj;
++}
++
++void os_cb_task_init(Os_cb_task* self) {
++    // 初始化基类部分
++    task_init(&self->base);
++    self->fun = &(os_cb_task_fun);
++    // TODO: 初始化派生类特有成员
++
++	def_task_init(self) = os_cb_task_task_init_impl;
++	def_task_thread(self) = os_cb_task_task_thread_impl;
++    self->cb_event = 0;
++    self->callback_list = queue_create();
++    self->exti = GET_EXTI(gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_EXTI));
++}
++
++void os_cb_task_deinit(Os_cb_task* self) {
++    task_deinit(GET_TASK(self));
++    // TODO: 数据成员申请资源释放
++    if (self->callback_list) {
++        self->callback_list->fun->destroy(self->callback_list);
++    }
++}
++// 析构函数实现
++static void os_cb_task_destroy(Os_cb_task* self) {
++    if (self != NULL) {
++        os_cb_task_deinit(self);
++        os_free(self);
++    }
++}
++// register_exti_cb method
++void register_callback(os_callback *callback) {
++    if (!gloable_os_callback) {
++        LOG_ERROR("os_cb_task", "gloable_os_callback is null");
++        return;
++    }
++    gloable_os_callback->callback_list->fun->enqueue(gloable_os_callback->callback_list, GET_NODE(callback));
++
++}
++
++// task_init method
++task_init_override(os_cb_task_task_init_impl) {
++    // TODO: add task_init method
++    Os_cb_task *os_cb_task = (Os_cb_task *)self;
++    //params , void *parent
++    virtual_dev_init(GET_DEVICE(os_cb_task->exti), self->task_tcb->semaphore);
++}
++// task_thread method
++task_thread_override(os_cb_task_task_thread_impl) {
++    // TODO: add task_thread method
++    Os_cb_task *os_cb_task = (Os_cb_task *)self->parent;
++
++    //params , void *arg
++    while (true) {
++        self->semaphore->fun->take(self->semaphore);
++        os_cb_task->cb_event = self->semaphore->sem_event;
++        LOG_DEBUG("os_cb_task", "----- os callback ----- event %d", os_cb_task->cb_event);
++        os_callback *cb = (os_callback*)os_cb_task->callback_list->head;
++        while (cb != NULL && cb->cb_event == os_cb_task->cb_event) {
++            LOG_DEBUG("os_cb_task", "do cb_handler");
++            ((os_callback*)os_cb_task->callback_list->head)->cb_handler(os_cb_task->cb_event, cb->arg);
++            cb = (os_callback *)GET_NODE(cb)->next;
++        }
++    }
++}
++
+diff --git a/os/task/os_cb_task.h b/os/task/os_cb_task.h
+new file mode 100644
+index 0000000..59f051d
+--- /dev/null
++++ b/os/task/os_cb_task.h
+@@ -0,0 +1,64 @@
++#ifndef OS_CB_TASK_H
++#define OS_CB_TASK_H
++#include <stdint.h>
++#include <stdbool.h>
++#include "Task.h"
++#include "../driver/exti.h"
++
++#define GET_OS_CB_TASK_VTABLE(obj) GET_TASK_VTABLE(obj) //(*(Os_cb_taskVTable **)obj)
++#define GET_OS_CB_TASK(obj) ((Os_cb_task *)obj)
++
++// 派生类声明
++typedef struct _Os_cb_task Os_cb_task;
++typedef struct _Os_cb_taskFun Os_cb_taskFun;
++typedef enum _os_cb_event os_cb_event;
++typedef struct _os_callback os_callback;
++typedef void (*callback_handler)(os_cb_event event, void *arg);
++
++// 类成员函数结构
++struct _Os_cb_taskFun {
++    void (*destroy)(Os_cb_task* self);
++};
++
++enum _os_cb_event {
++    OS_EVENT_EXTI0 = 0xe0,
++    OS_EVENT_EXTI1,
++    OS_EVENT_EXTI2,
++    OS_EVENT_EXTI3,
++    OS_EVENT_EXTI4,
++    OS_EVENT_EXTI5,
++    OS_EVENT_EXTI6,
++    OS_EVENT_EXTI7,
++    OS_EVENT_EXTI8,
++    OS_EVENT_EXTI9,
++    OS_EVENT_EXTI10,
++    OS_EVENT_EXTI11,
++    OS_EVENT_EXTI12,
++    OS_EVENT_EXTI13,
++    OS_EVENT_EXTI14,
++    OS_EVENT_EXTI15,
++};
++struct _os_callback {
++    Node base;
++    os_cb_event cb_event;
++    void *arg;
++    callback_handler cb_handler;
++};
++struct _Os_cb_task {
++    Task base;  // 基类作为第一个成员
++    const Os_cb_taskFun* fun;
++    // TODO: 添加派生类特有的数据成员
++    os_cb_event cb_event;
++    Exti *exti;
++    Queue *callback_list;// exit_callback 队列
++};
++
++// 构造函数声明
++Os_cb_task* os_cb_task_create();
++void os_cb_task_init(Os_cb_task* self);
++
++// 析构函数声明
++void os_cb_task_deinit(Os_cb_task* self);
++void register_callback(os_callback *callback);
++
++#endif // OS_CB_TASK_H
+\ No newline at end of file
+diff --git a/os/task/systick_task.c b/os/task/systick_task.c
+index 0d39e0b..021dd9a 100644
+--- a/os/task/systick_task.c
++++ b/os/task/systick_task.c
+@@ -2,6 +2,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "../common/linear_pool.h"
++#include "../log/log.h"
+ 
+ task_init_override(systick_task_task_init_impl);
+ 
+@@ -49,6 +50,7 @@ static void systick_task_destroy(Systick_task* self) {
+ // task_init method
+ task_init_override(systick_task_task_init_impl) {
+     // TODO: add task_init method
++    LOG_DEBUG("systick","systick_task init");
+     Systick_task *systick_task = (Systick_task *)self;
+     //params , void *parent
+     virtual_dev_init(systick_task->systick, NULL);
+diff --git a/os/task/task.c b/os/task/task.c
+index 3f6e9e7..a3073c9 100644
+--- a/os/task/task.c
++++ b/os/task/task.c
+@@ -24,7 +24,7 @@ Task* Task_create() {
+ 
+ void task_init(Task* self) {
+     if (self->vtable == NULL) {
+-        self->vtable = (TaskVTable *) malloc(sizeof(TaskVTable));
++        self->vtable = (TaskVTable *) os_malloc(sizeof(TaskVTable));
+         memset(self->vtable , 0, sizeof(TaskVTable));
+     }
+     self->fun = &(Task_fun);
+diff --git a/os/task/task.h b/os/task/task.h
+index b3759a1..3160a1a 100644
+--- a/os/task/task.h
++++ b/os/task/task.h
+@@ -31,7 +31,7 @@ typedef struct _TaskFun TaskFun;
+ typedef struct _TaskVTable TaskVTable;
+ 
+ // 虚函数表结构
+-typedef struct _TaskVTable {
++struct _TaskVTable {
+     // TODO : 添加其他虚函数
+ 
+ 	void (*task_init)(Task* self, void *parent);
+diff --git a/os/task/task_manager.c b/os/task/task_manager.c
+index 0576e5c..87c2faa 100644
+--- a/os/task/task_manager.c
++++ b/os/task/task_manager.c
+@@ -4,8 +4,8 @@
+ #include "idle_task.h"
+ #include "monitor_task.h"
+ #include "log_task.h"
+-#include "bus_task.h"
+-
++#include "os_cb_task.h"
++#include "../test/time_task.h"
+ #include "../test/task_test1.h"
+ #include "../common/linear_pool.h"
+ 
+@@ -19,14 +19,15 @@ static const Task_managerFun task_manager_fun = {
+     .destroy = task_manager_destroy,
+ 	.boot_init = task_manager_boot_init,
+ };
+-
++Task_manager * gloable_taskManager;
+ static const Task_list task_lists[] = {
+         {.tag = TASK_SYSTICK, .name = "systick", .priority = 1, .stack_size = 0, .task_create = (Task_create) systick_task_create},
+-        {.tag = TASK_BUS, .name = "bus", .priority = 2, .stack_size = 32, .task_create = (Task_create) bus_task_create},
++        {.tag = TASK_OS_CALLBACK, .name = "os_cb", .priority = 5, .stack_size = 192, .task_create = (Task_create) os_cb_task_create},
+         {.tag = TASK_IDLE, .name = "idle", .priority = 0, .stack_size = 32, .task_create = (Task_create) idle_task_create},
+-        {.tag = TASK_MONITOR, .name = "monitor", .priority = 0, .stack_size = 32, .task_create = (Task_create) monitor_task_create},
+-        {.tag = TASK_LOG, .name = "log", .priority = 0, .stack_size = 128, .task_create = (Task_create) log_task_create},
++        {.tag = TASK_MONITOR, .name = "monitor", .priority = 0, .stack_size = 192, .task_create = (Task_create) monitor_task_create},
++        {.tag = TASK_LOG, .name = "log", .priority = 0, .stack_size = 192, .task_create = (Task_create) log_task_create},
+         {.tag = TASK_TEST1, .name = "test1", .priority = 1, .stack_size = DEFAULT_STACK_SIZE, .task_create = (Task_create) task_test1_create},
++        {.tag = TASK_TIME, .name = "time", .priority = 1, .stack_size = 192, .task_create = (Task_create) time_task_create},
+ 
+ };
+ // 构造函数实现
+@@ -40,6 +41,7 @@ Task_manager* task_manager_create() {
+ }
+ 
+ void task_manager_init(Task_manager* self) {
++    LOG_DEBUG("task_manager","task_manager_init");
+     self->fun = &(task_manager_fun);
+     // TODO: 初始化数据成员
+     self->task_list = task_lists;
+@@ -66,18 +68,22 @@ static void task_manager_destroy(Task_manager* self) {
+ 
+ // tasks_init method
+ static void task_manager_boot_init(Task_manager* self) {
++    LOG_DEBUG("task_manager", "task_manager boot_init");
+     if (NULL == self) {
+         return;
+     }
+     uint16_t task_num = 0;
+     while (task_num < self->task_size) {
+         self->task_tab[(self->task_list + task_num)->tag] = (self->task_list + task_num)->task_create();
++        LOG_DEBUG("task_manager", "create thread [%s]", (self->task_list + task_num)->name);
+         self->task_tab[(self->task_list + task_num)->tag]->fun->add_task(
+                 self->task_tab[(self->task_list + task_num)->tag],
+                 (self->task_list + task_num)->name,
+                 (self->task_list + task_num)->priority,
+                 (self->task_list + task_num)->stack_size);
+-        virtual_task_init(self->task_tab[(self->task_list + task_num)->tag], self);
++        if (def_task_init(self->task_tab[(self->task_list + task_num)->tag])) {
++            virtual_task_init(self->task_tab[(self->task_list + task_num)->tag], self);
++        }
+         task_num++;
+     }
+ }
+diff --git a/os/task/task_manager.h b/os/task/task_manager.h
+index a1c90c5..ef3b0bf 100644
+--- a/os/task/task_manager.h
++++ b/os/task/task_manager.h
+@@ -22,11 +22,12 @@ struct _Task_managerFun {
+ 
+ enum _Task_Tag {
+     TASK_SYSTICK = 0,
+-    TASK_BUS,
+     TASK_IDLE,
++    TASK_OS_CALLBACK,
+     TASK_MONITOR,
+     TASK_LOG,
+     TASK_TEST1,
++    TASK_TIME,
+ };
+ struct _Task_list {
+     const Task_tag tag;
+@@ -51,5 +52,5 @@ void task_manager_init(Task_manager* self);
+ 
+ // 析构函数声明
+ void task_manager_deinit(Task_manager* self);
+-
++extern Task_manager * gloable_taskManager;
+ #endif // TASK_MANAGER_H
+\ No newline at end of file
+diff --git a/os/test/task_test1.c b/os/test/task_test1.c
+index ffad2c1..a1ea29b 100644
+--- a/os/test/task_test1.c
++++ b/os/test/task_test1.c
+@@ -3,12 +3,14 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include "../log/log.h"
++#include "../common/sys_mutex.h"
+ 
+ task_init_override(task_test1_init_impl);
+ task_thread_override(task_test1_thread_impl);
+ 
+ // 析构函数声明
+ static void task_test1_destroy(Task_test1* self);
++static void task_test1_callback_handler(os_cb_event event, void *arg);
+ 
+ // TODO: 初始化数据成员
+ static const Task_test1Fun task_test1_fun = {
+@@ -31,6 +33,16 @@ void task_test1_init(Task_test1* self, const char *name, uint8_t priority) {
+     // TODO: 初始化派生类特有成员
+ 	def_task_init(self) = task_test1_init_impl;
+ 	def_task_thread(self) = task_test1_thread_impl;
++    //self->exti = GET_EXTI(gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_EXTI));
++
++    self->callback.cb_handler = task_test1_callback_handler;
++    self->callback.cb_event = OS_EVENT_EXTI1;//0000 0010
++    self->callback.arg = self;
++    self->callback.base.next = NULL;
++   // self->exti->fun->register_exti_cb(self->exti, &self->callback);
++    self->start_mutex = false;
++    self->locked = false;
++    register_callback(&self->callback);
+ }
+ 
+ void task_test1_deinit(Task_test1* self) {
+@@ -48,24 +60,46 @@ static void task_test1_destroy(Task_test1* self) {
+ // init method
+ task_init_override(task_test1_init_impl) {
+     // TODO: add init method
++    LOG_DEBUG("test1", "task_test1 init");
+     Task_test1 *task_test1 = (Task_test1 *)self;
+     //params 
+-    
++    //virtual_dev_init(GET_DEVICE(task_test1->exti), NULL);
+ }
+ // thread method
+ task_thread_override(task_test1_thread_impl) {
+     // TODO: add thread method
+-    Task_test1 *task_test1 = (Task_test1 *)self;
++    Task_test1 *task_test1 = (Task_test1 *)self->parent;
+     //params , void *arg
++    uint8_t dd = 0;
+     while (true) {
+-        for(uint32_t i = 0; i < 100; i++) {
+-            for(uint32_t j = 0; j < 100; j++) {
+-                uint32_t testdeb = 0;
+-                testdeb+=90;
++        for (uint32_t i = 0; i < 1000; i++) {
++            for(uint32_t j = 0; j < 1000; j++) {
++                dd++;
+             }
+         }
+-        self->fun->os_sleep(self, 5000);
+-        LOG(LOG_LEVEL_DEBUG, MODULE_SYSTEM,"idle_task\n");
++        self->fun->os_sleep(self, 300);
++        if (task_test1->start_mutex) {
++            task_test1->start_mutex = false;
++            if (!task_test1->locked) {
++                LOG_DEBUG("test1", "start_mutex lock -----------------");
++                if (gloable_mutex->fun->mutex_lock(gloable_mutex, 0)) {
++                    task_test1->locked = true;
++                } else {
++                    LOG_DEBUG("test1", "start_mutex lock fail-----------------");
++                }
++            } else {
++                LOG_DEBUG("test1", "start_mutex unlock -----------------");
++                if (gloable_mutex->fun->mutex_unlock(gloable_mutex)) {
++                    task_test1->locked = false;
++                }
++            }
++        }
++        LOG_DEBUG("test1", "task_test1");
+     }
+ }
+ 
++static void task_test1_callback_handler(os_cb_event event, void *arg) {
++    Task_test1 *task_test1 = (Task_test1 *)arg;
++    LOG_DEBUG("test1", "-------- exti %d task %s --------", event, GET_TASK(task_test1)->task_tcb->name);
++    task_test1->start_mutex = true;
++}
+diff --git a/os/test/task_test1.h b/os/test/task_test1.h
+index 75d116a..d2f20dc 100644
+--- a/os/test/task_test1.h
++++ b/os/test/task_test1.h
+@@ -3,6 +3,8 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include "../task/task.h"
++#include "../driver/exti.h"
++#include "../task/os_cb_task.h"
+ 
+ #define GET_TASK_TEST1_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Task_test1VTable **)obj)
+ #define GET_TASK_TEST1(obj) ((Task_test1 *)obj)
+@@ -18,6 +20,10 @@ struct _Task_test1 {
+     Task base;  // 基类作为第一个成员
+     const Task_test1Fun* fun;
+     // TODO: 添加派生类特有的数据成员
++    //Exti *exti;
++    os_callback callback;
++    bool start_mutex;
++    bool locked;
+ };
+ 
+ // 构造函数声明
+diff --git a/os/test/time_task.c b/os/test/time_task.c
+new file mode 100644
+index 0000000..13eef33
+--- /dev/null
++++ b/os/test/time_task.c
+@@ -0,0 +1,72 @@
++#include "time_task.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include "../common/linear_pool.h"
++#include "../log/log.h"
++
++task_init_override(time_task_task_init_impl);
++task_thread_override(time_task_task_thread_impl);
++
++// 析构函数声明
++static void time_task_destroy(Time_task* self);
++
++// TODO: 初始化数据成员
++static const Time_taskFun time_task_fun = {
++    .destroy = time_task_destroy,
++};
++// 构造函数实现
++Time_task* time_task_create() {
++    Time_task* obj = (Time_task*)os_malloc(sizeof(Time_task));
++    if (obj) {
++        memset(obj, 0, sizeof(Time_task));
++        time_task_init(obj);
++    }
++    return obj;
++}
++
++void time_task_init(Time_task* self) {
++    // 初始化基类部分
++    task_init(&self->base);
++    self->fun = &(time_task_fun);
++    // TODO: 初始化派生类特有成员
++
++	def_task_init(self) = time_task_task_init_impl;
++	def_task_thread(self) = time_task_task_thread_impl;
++    self->timer = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_TIME2);
++}
++
++void time_task_deinit(Time_task* self) {
++    task_deinit(GET_TASK(self));
++    // TODO: 数据成员申请资源释放
++}
++// 析构函数实现
++static void time_task_destroy(Time_task* self) {
++    if (self != NULL) {
++        time_task_deinit(self);
++        os_free(self);
++    }
++}
++
++// task_init method
++task_init_override(time_task_task_init_impl) {
++    // TODO: add task_init method
++    Time_task *time_task = (Time_task *)self;
++    //params , void *parent
++    //params , void *parent
++    if (!time_task) {
++        return;
++    }
++    virtual_dev_init(time_task->timer, self->task_tcb->semaphore);
++}
++// task_thread method
++task_thread_override(time_task_task_thread_impl) {
++    // TODO: add task_thread method
++    //Time_task *time_task = (Time_task *)self;
++    //params , void *arg
++    while (true) {
++        self->semaphore->fun->take(self->semaphore);
++        LOG_DEBUG("time_task", "----- timer on -----");
++
++    }
++}
++
+diff --git a/os/test/time_task.h b/os/test/time_task.h
+new file mode 100644
+index 0000000..223ce6c
+--- /dev/null
++++ b/os/test/time_task.h
+@@ -0,0 +1,32 @@
++#ifndef TIME_TASK_H
++#define TIME_TASK_H
++#include <stdint.h>
++#include <stdbool.h>
++#include "../task/task.h"
++#include "../driver/timer.h"
++
++#define GET_TIME_TASK_VTABLE(obj) GET_TASK_VTABLE(obj) //(*(Time_taskVTable **)obj)
++#define GET_TIME_TASK(obj) ((Time_task *)obj)
++
++// 派生类声明
++typedef struct _Time_task Time_task;
++typedef struct _Time_taskFun Time_taskFun;
++// 类成员函数结构
++struct _Time_taskFun {
++    void (*destroy)(Time_task* self);
++};
++struct _Time_task {
++    Task base;  // 基类作为第一个成员
++    const Time_taskFun* fun;
++    // TODO: 添加派生类特有的数据成员
++    Device *timer;
++};
++
++// 构造函数声明
++Time_task* time_task_create();
++void time_task_init(Time_task* self);
++
++// 析构函数声明
++void time_task_deinit(Time_task* self);
++
++#endif // TIME_TASK_H
+\ No newline at end of file
+diff --git a/stm32f4_discovery.resc b/stm32f4_discovery.resc
+index 18173ec..068595d 100644
+--- a/stm32f4_discovery.resc
++++ b/stm32f4_discovery.resc
+@@ -32,4 +32,8 @@ macro reset
+ """
+ 
+ runMacro $reset
++sleep 15
++sysbus.gpioPortA OnGPIO 1 true      # 模拟电平变高
++sleep 0.01                     # 让高电平维持一个很短的时间
++sysbus.gpioPortA OnGPIO 1 false   # 模拟电平变低，产生下降沿触发中断
+ 

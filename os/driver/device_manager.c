@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include "usart.h"
 #include "systick.h"
-#include "bus.h"
 #include "../common/linear_pool.h"
+#include "../log/log.h"
+#include "device_config.h"
+#include "exti.h"
 
 static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag);
 
@@ -17,9 +19,11 @@ static const Device_managerFun device_manager_fun = {
 };
 
 static const Device_list dev_lists[] = {
-        {.tag = DEVICE_SYSTICK, .name = "sys_tick", .device_create = (Device_create) systick_create},
-        {.tag = DEVICE_BUS, .name = "bus", .device_create = (Device_create) bus_create},
-        {.tag = DEVICE_USART, .name = "usart", .device_create = (Device_create) usart_create},
+        {.tag = DEVICE_SYSTICK, .name = "sys_tick", .config = &sys_tick_conf, .device_create = (Device_create) systick_create},
+        {.tag = DEVICE_USART4, .name = "usart4", .config = &usart4_conf, .device_create = (Device_create) usart_create},
+        {.tag = DEVICE_USART3, .name = "usart3", .config = &usart3_conf, .device_create = (Device_create) usart_create},
+        {.tag = DEVICE_TIME2, .name = "timer2", .config = &time2_conf, .device_create = (Device_create) timer_create},
+        {.tag = DEVICE_EXTI, .name = "exti", .config = &exti_conf, .device_create = (Device_create) exti_create},
 };
 Device_manager *gloable_deviceManager = NULL;
 // 构造函数实现
@@ -33,6 +37,7 @@ Device_manager* device_manager_create() {
 }
 
 void device_manager_init(Device_manager* self) {
+    LOG_DEBUG("device_manager", "device_manager_init");
     self->fun = &(device_manager_fun);
     // TODO: 初始化数据成员
     self->devicelist = dev_lists;
@@ -66,7 +71,7 @@ static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag) {
         return NULL;
     }
     if (self->dev_tab[tag] == NULL) {
-        self->dev_tab[tag] = (self->devicelist + tag)->device_create();
+        self->dev_tab[tag] = (self->devicelist + tag)->device_create((self->devicelist + tag)->config);
     }
     return self->dev_tab[tag];
 }

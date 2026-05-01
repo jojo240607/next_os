@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../task/task.h"
+#include "../driver/exti.h"
+#include "../task/os_cb_task.h"
 
 #define GET_TASK_TEST1_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Task_test1VTable **)obj)
 #define GET_TASK_TEST1(obj) ((Task_test1 *)obj)
@@ -18,6 +20,10 @@ struct _Task_test1 {
     Task base;  // 基类作为第一个成员
     const Task_test1Fun* fun;
     // TODO: 添加派生类特有的数据成员
+    //Exti *exti;
+    os_callback callback;
+    bool start_mutex;
+    bool locked;
 };
 
 // 构造函数声明

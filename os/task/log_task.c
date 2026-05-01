@@ -2,7 +2,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "../log/log.h"
+
 
 task_init_override(log_task_task_init_impl);
 task_thread_override(log_task_task_thread_impl);
@@ -17,11 +17,11 @@ static const Log_taskFun log_task_fun = {
 
 /* 级别字符串 */
 static const char *level_str[] = {
-        [LOG_LEVEL_DEBUG] = "DBG",
-        [LOG_LEVEL_INFO]  = "INF",
-        [LOG_LEVEL_WARN]  = "WRN",
-        [LOG_LEVEL_ERROR] = "ERR",
-        [LOG_LEVEL_FATAL] = "FAT"
+        [LOG_LEVEL_DEBUG] = "D",
+        [LOG_LEVEL_INFO]  = "I",
+        [LOG_LEVEL_WARN]  = "W",
+        [LOG_LEVEL_ERROR] = "E",
+        [LOG_LEVEL_FATAL] = "F"
 };
 
 // 构造函数实现
@@ -43,8 +43,7 @@ void log_task_init(Log_task* self) {
 	def_task_init(self) = log_task_task_init_impl;
 	def_task_thread(self) = log_task_task_thread_impl;
     self->log_buf = queue_create();
-    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART);
-    GET_USART(self->usart)->feedback = true;
+    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
 }
 
 void log_task_deinit(Log_task* self) {
@@ -71,6 +70,7 @@ static void log_task_destroy(Log_task* self) {
 //add task ---> init task
 task_init_override(log_task_task_init_impl) {
     // TODO: add task_init method
+    LOG_DEBUG("log","log_task init");
     Log_task *log_task = (Log_task *)self;
     //params , void *parent
     if (!log_task) {
@@ -88,9 +88,8 @@ task_thread_override(log_task_task_thread_impl) {
     log_entry_t entry;
     while (1) {
         self->semaphore->fun->take(self->semaphore);
-
         if (GET_USART(log_task->usart)->rx_complete == 1) {
-            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
+            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
             GET_USART(log_task->usart)->rx_complete = 0;
             //直接输出收到的数据缓存
 
@@ -105,17 +104,17 @@ task_thread_override(log_task_task_thread_impl) {
         /* 批量处理，直到缓冲区空 */
         while (log_buf->fun->pop(log_buf, &entry)) {
             /* 格式化并发送到串口 */
-            char line[LOG_MSG_MAX_LEN + 32];  // 额外空间给前缀
-            int len = snprintf(line, sizeof(line),
-                               "[%08lu][%s][M%d] %s\r\n",
+            int len = snprintf(log_task->line, sizeof(log_task->line),
+                               "%08lu %d %s %s: %s",
                                entry.timestamp,
+                               entry.tid,
                                level_str[entry.level],
-                               entry.module_id,
+                               entry.tag,
                                entry.text);
             if (len > 0) {
                 //serial_send_blocking(line, len);
                // log_task->usart->fun->transfer(log_task->usart, line, len);
-                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, line, len);
+                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, log_task->line, len);
             }
         }
         //self->fun->os_sleep(self, 10);

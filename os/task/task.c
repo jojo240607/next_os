@@ -24,7 +24,7 @@ Task* Task_create() {
 
 void task_init(Task* self) {
     if (self->vtable == NULL) {
-        self->vtable = (TaskVTable *) malloc(sizeof(TaskVTable));
+        self->vtable = (TaskVTable *) os_malloc(sizeof(TaskVTable));
         memset(self->vtable , 0, sizeof(TaskVTable));
     }
     self->fun = &(Task_fun);

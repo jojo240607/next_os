@@ -16,6 +16,8 @@ struct _QueueFun {
 	void (*enqueue)(Queue* self, Node *data);
 	Node * (*dequeue)(Queue* self);
 
+	Node * (*dequeue_node)(Queue* self, Node *node);
+
 };
 // 类结构
 struct _Queue {

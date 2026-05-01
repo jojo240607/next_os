@@ -6,7 +6,7 @@ override void dev_init();
 override void dev_read(void *buf, size_t count);
 override void dev_write(const void *buf, size_t count);
 override void dev_ioctl(int cmd, void *arg);
-override void irq_handler(void *arg);
+
  */
 
 #include <stdlib.h>
@@ -33,34 +33,32 @@ override void irq_handler(void *arg);
 #define def_dev_ioctl(obj) (GET_DEVICE_VTABLE(obj)->dev_ioctl)
 #define virtual_dev_ioctl(obj, ...) def_dev_ioctl(obj)(obj, ##__VA_ARGS__)
 
-#define irq_handler_override(func_name) static bool func_name(void *arg)
-#define def_irq_handler(obj) (GET_DEVICE_VTABLE(obj)->irq_handler)
-#define virtual_irq_handler(obj, ...) def_irq_handler(obj)(obj, ##__VA_ARGS__)
-
 #define GET_DEVICE(obj) ((Device *)obj)
 // 类声明
 typedef struct _Device Device;
 typedef struct _DeviceFun DeviceFun;
 typedef struct _DeviceVTable DeviceVTable;
-
+typedef struct _irq_config irq_config;
 // 虚函数表结构
-typedef struct _DeviceVTable {
+struct _DeviceVTable {
     // TODO : 添加其他虚函数
-
 	void (*dev_init)(Device* self, Semaphore *sem);
 	void (*dev_read)(Device* self, void *buf, size_t count);
 	void (*dev_write)(Device* self, const void *buf, size_t count);
 	void (*dev_ioctl)(Device* self, int cmd, void *arg);
-	bool (*irq_handler)(void *arg);
 };
+
+struct _irq_config {
+    intc_irq_num irq_num;
+    intc_handler_t handler;
+    uint32_t priority;
+};
+
 // 类成员函数结构
 struct _DeviceFun {
     void (*destroy)(Device* self);
-	void (*attach_semaphore)(Device* self, Semaphore *sem);
-
-	void (*redirect_semaphore)(Device* self, Semaphore *sem);
-
 	bool (*transfer)(Device* self, const void *data, size_t count);
+    bool (*attach_irq)(Device* self, irq_config *conf, Semaphore * sem);
 
 };
 // 类结构
@@ -69,8 +67,6 @@ struct _Device {
     const DeviceFun* fun;
     // TODO: 添加数据成员
     Semaphore * semaphore;
-    intc_irq_num irq_num;
-    //void (*irq_handler)(Real_time_task* self);
 };
 
 // 构造函数声明

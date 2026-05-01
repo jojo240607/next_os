@@ -1,5 +1,6 @@
 #include "idle_task.h"
 #include "../common/linear_pool.h"
+#include "../log/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -28,10 +29,8 @@ void idle_task_init(Idle_task* self) {
     task_init(&self->base);
     self->fun = &(idle_task_fun);
     // TODO: 初始化派生类特有成员
-
 	def_task_init(self) = idle_task_init_impl;
 	def_task_thread(self) = idle_task_thread_impl;
-    self->idle_total_ticks = 0;
 }
 
 void idle_task_deinit(Idle_task* self) {
@@ -48,13 +47,14 @@ static void idle_task_destroy(Idle_task* self) {
 // init method
 task_init_override(idle_task_init_impl) {
     // TODO: add init method
-    Idle_task *idle_task = (Idle_task *)self;
+    LOG_DEBUG("idle","idle_task init");
+    //Idle_task *idle_task = (Idle_task *)self;
     //params
 }
 // thread method
 task_thread_override(idle_task_thread_impl) {
     // TODO: add thread method
-    Idle_task *idle_task = (Idle_task *)self->parent;
+    //Idle_task *idle_task = (Idle_task *)self->parent;
     //uint32_t last_idle_start = 0;
     //params , void *arg
     while (true) {
@@ -64,8 +64,8 @@ task_thread_override(idle_task_thread_impl) {
                 destory_tcb->fun->destroy(destory_tcb);
             }
         }
+        //LOG_DEBUG(MODULE_SYSTEM,"idle\n");
         LOW_POWER;//进入低功耗模式
-        idle_task->idle_total_ticks += self->run_time;
     }
 }
 

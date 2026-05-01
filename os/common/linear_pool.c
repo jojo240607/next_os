@@ -5,7 +5,7 @@ static void noram_error();
 
 static linear_allocator_t gloable_alloc = {0};
 
-linear_allocator_t *linear_pool_create() {
+linear_allocator_t *linear_pool_get() {
     return &gloable_alloc;
 }
 // 初始化：buffer 可以是静态数组或 malloc 的动态内存

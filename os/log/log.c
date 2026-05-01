@@ -5,6 +5,7 @@
 #include "log.h"
 #include "../common/ring.h"
 #include "../scheduler/thread_scheduler.h"
+#include "../common/sys_time.h"
 
 /* ------- 日志条目与环形缓冲区 ------- */
 
@@ -84,7 +85,7 @@ static void log_task(void *p) {
 }*/
 
 /* 核心输出函数，由宏调用 */
-void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
+void log_output(log_level_t level, const char * tag, const char *fmt, ...) {
     if (!LOG_FILTER(level)) {
         return;
     }
@@ -93,9 +94,10 @@ void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
     }
 
     log_entry_t entry;
-    entry.timestamp = global_thread_scheduler->current_thread->tid;//os_get_tick();
+    entry.timestamp = getSystime()->systick;// global_thread_scheduler->current_thread->tid;//os_get_tick();
     entry.level = (uint8_t)level;
-    entry.module_id = (uint8_t)module;
+    entry.tid = global_thread_scheduler->current_thread->tid;
+    entry.tag = tag;
 
     va_list args;
     va_start(args, fmt);
@@ -104,12 +106,12 @@ void log_output(log_level_t level, module_id_t module, const char *fmt, ...) {
 
     if (log_buf->fun->push(log_buf, &entry)) {
         if (log_sem) {
-            log_sem->fun->give(log_sem);
+            log_sem->fun->give(log_sem, false);
         }
     } else {
         // 缓冲区满，记录丢弃次数（可选，这里省略）
         if (log_sem) {
-            log_sem->fun->give(log_sem);
+            log_sem->fun->give(log_sem, false);
         }
     }
 }
@@ -129,6 +131,6 @@ void log_init(void) {
 void log_setsem(Semaphore *sem) {
     log_sem = sem;
     if (log_buf->count > 0) {
-        log_sem->fun->give(log_sem);
+        log_sem->fun->give(log_sem, false);
     }
 }

@@ -31,10 +31,13 @@ void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, size_t stack_size
     self->fun = &(tcb_t_fun);
     // TODO: 初始化数据成员
     self->priority = entry->priority;
+    self->original_priority = self->priority;
     self->parent = entry->parent;
     self->semaphore = semaphore_create(0);
     GET_NODE(self)->next = NULL;
     self->name = name;
+    self->stack_left = 0;
+    //self->need_print = false;
     self->stack_size = stack_size;
     tcb_t_stack_init(self, entry);
 }
@@ -42,10 +45,13 @@ static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry) {
 // 从栈顶高地址开始
     uint32_t *top = self->stack_ptr + self->stack_size;
     // R4-R11 区可以保持填充值（如 0xDEADBEEF），或者清零
-    for (int i = 0; i < self->stack_size; i++) {
-        self->stack_ptr[i] = 0xDEADBEEF;  // 填充栈，栈溢出时可以方便排查
+    /*for (int i = 0; i < self->stack_size; i++) {
+        self->stack_ptr[i] = MAGIC_NUM;  // 填充栈，栈溢出时可以方便排查
+    }*/
+    //memset(self->stack_ptr, MAGIC_NUM, sizeof(uint32_t) * self->stack_size);
+    for (size_t i = 0; i < self->stack_size; i++) {
+        self->stack_ptr[i] = MAGIC_NUM;
     }
-
 // 向下移动，先留出自动压栈区
     top -= 8;
 // 填充自动压栈区 地址递减

@@ -21,7 +21,7 @@ struct _Thread_schedulerFun {
 	void (*start)(Thread_scheduler* self);
 
 	void (*delay_ticks)(Thread_scheduler* self);
-	void (*add_readly_list)(Thread_scheduler* self, Tcb_t *tcb);
+	void (*add_readly_list)(Thread_scheduler* self, Tcb_t *tcb, bool protected);
 
 };
 // 类结构

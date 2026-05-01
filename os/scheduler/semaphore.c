@@ -5,7 +5,7 @@
 #include "../common/linear_pool.h"
 
 static void semaphore_take(Semaphore* self);
-static void semaphore_give(Semaphore* self);
+static void semaphore_give(Semaphore* self, bool protected);
 
 // 析构函数声明
 static void semaphore_destroy(Semaphore* self);
@@ -31,6 +31,7 @@ void semaphore_init(Semaphore* self, uint8_t count) {
     // TODO: 初始化数据成员
     self->count = count;
     self->wait_list = queue_create();
+    self->sem_event = 0;
 }
 
 void semaphore_deinit(Semaphore* self) {
@@ -74,9 +75,10 @@ static void semaphore_take(Semaphore* self) {
     self->wait_list->fun->enqueue(self->wait_list, GET_NODE(current));
     ENABLE_IRQ;
     Trigger_PendSV;
+    return;
 }
 // give method
-static void semaphore_give(Semaphore* self) {
+static void semaphore_give(Semaphore* self, bool protected) {
     if (NULL == self) {
         return;
     }
@@ -86,10 +88,11 @@ static void semaphore_give(Semaphore* self) {
         Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         task->state = TCB_STATER_READY;
         // 将任务放回就绪队列（根据优先级插入）
-        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task);
+        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task, protected);
     } else {
         self->count++;
     }
     ENABLE_IRQ;
 }
+
 

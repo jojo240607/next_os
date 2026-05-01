@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../log/log.h"
+#include "../common/sys_time.h"
+#include "../task/task_manager.h"
+#include "../common/sys_mutex.h"
 
-static void monitor_task_cpu_usage(Monitor_task* self);
 
 task_init_override(monitor_task_task_init_impl);
 task_thread_override(monitor_task_task_thread_impl);
@@ -16,7 +18,6 @@ static void monitor_task_destroy(Monitor_task* self);
 // TODO: 初始化数据成员
 static const Monitor_taskFun monitor_task_fun = {
     .destroy = monitor_task_destroy,
-	.cpu_usage = monitor_task_cpu_usage,
 };
 // 构造函数实现
 Monitor_task* monitor_task_create() {
@@ -56,6 +57,7 @@ static void monitor_task_destroy(Monitor_task* self) {
 // task_init method
 task_init_override(monitor_task_task_init_impl) {
     // TODO: add task_init method
+    LOG_DEBUG("monitor","monitor_task init");
     Monitor_task *monitor_task = (Monitor_task *)self;
     //params 
     monitor_task->idletask = GET_IDLE_TASK(GET_TASK_MANAGER(parent)->task_tab[TASK_IDLE]);
@@ -66,24 +68,33 @@ task_thread_override(monitor_task_task_thread_impl) {
     Monitor_task *monitor_task = (Monitor_task *)self->parent;
     //params , void *arg
     while(true) {
+        LOG_DEBUG("monitor", "----------------monitor lock----------------");
+        gloable_mutex->fun->mutex_lock(gloable_mutex, 0);
         self->fun->os_sleep(self, 3000);
-        monitor_task_cpu_usage(monitor_task);
+
+        uint32_t now_call = getSystime()->systick;//HAL_GetTick();//get_system_tick();
+        uint32_t run_time =  now_call - monitor_task->last_call;
+        monitor_task->last_call = now_call;
+        // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
+        //monitor_task->cpu_usage = 100 - (monitor_task->idletask->idle_total_ticks * 100 / run_time);
+       // monitor_task->idletask->idle_total_ticks = 0;
+        LOG_DEBUG("monitor", "--------------------------------");
+        LOG_DEBUG("monitor", "name      cpu     mem     stack");
+        for (uint8_t i =0; i < gloable_taskManager->task_size; i++) {
+            if (gloable_taskManager->task_tab[i]->task_tcb) {
+                LOG_DEBUG("monitor", "%-10s %-4d    %-4d   %-4d",
+                          gloable_taskManager->task_tab[i]->task_tcb->name,
+                          (gloable_taskManager->task_tab[i]->task_tcb->run_time * 100)/ run_time,
+                          linear_pool_get()->size,
+                          gloable_taskManager->task_tab[i]->task_tcb->stack_left);
+                gloable_taskManager->task_tab[i]->task_tcb->run_time = 0;
+            }
+        }
+        LOG_DEBUG("monitor", "--------------------------------");
+        LOG_DEBUG("monitor", "----------------monitor unlock----------------");
+        gloable_mutex->fun->mutex_unlock(gloable_mutex);
+
     }
 }
 
-
-// cpu_usage method
-static void monitor_task_cpu_usage(Monitor_task* self) {
-    if (NULL == self) {
-        return;
-    }
-
-    uint32_t now_call = HAL_GetTick();//get_system_tick();
-    uint32_t run_time =  now_call - self->last_call;
-    self->last_call = now_call;
-    // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
-    self->cpu_usage = 100 - (self->idletask->idle_total_ticks * 100 / run_time);
-    self->idletask->idle_total_ticks = 0;
-    LOG(LOG_LEVEL_DEBUG, MODULE_SYSTEM,"cpu_usage : %d\n", self->cpu_usage);
-}
 
