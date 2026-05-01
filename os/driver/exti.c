@@ -57,7 +57,19 @@ dev_init_override(exti_dev_init_impl) {
     // TODO: add dev_init method
 
     Exti *exti = (Exti *)self;
-    //params 
+    //params
+    self->semaphore = sem;
+    exti->exit_irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+    exti->exit_irq_conf.handler = exti_irq_handler_impl;
+    exti->exit_irq_conf.semaphore = sem;
+    exti->exit_irq_conf.arg = self;
+    //exti->exit_irq_conf.irq_num = new_irq_num;
+
+    if (pinmux_request_group(exti->conf->pin_conf, exti->conf->pin_size, &exti->exit_irq_conf) == PINMUX_ERROR) {
+        LOG_ERROR("exti", "pinmux error");
+    }
+
+/*
     // 1. 使能SYSCFG时钟。配置IO映射时，必须使能此时钟（挂载在APB2总线上）
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     // 2. 使能GPIOA和GPIOB的时钟
@@ -106,7 +118,7 @@ dev_init_override(exti_dev_init_impl) {
         // 清除最低位的 1
         exti_line &= exti_line - 1;
     }
-
+*/
 }
 
 // irq_handler method

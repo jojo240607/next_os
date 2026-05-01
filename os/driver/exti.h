@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "Device.h"
 #include "stm32f407xx.h"
+#include "pinmux.h"
 
 #define GET_EXTI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(ExtiVTable **)obj)
 #define GET_EXTI(obj) ((Exti *)obj)
@@ -20,9 +21,10 @@ struct _ExtiFun {
 };
 
 struct _exti_config {
-    GPIO_TypeDef *gpio_type;
-    uint16_t exti_line;
-    irq_config irq_conf;
+    //uint16_t exti_line;
+    //irq_config irq_conf;
+    uint8_t pin_size;
+    pin_config_t pin_conf[];
 };
 struct _Exti {
     Device base;  // 基类作为第一个成员

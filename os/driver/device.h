@@ -50,7 +50,9 @@ struct _DeviceVTable {
 
 struct _irq_config {
     intc_irq_num irq_num;
+    void *arg;
     intc_handler_t handler;
+    Semaphore * semaphore;
     uint32_t priority;
 };
 

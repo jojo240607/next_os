@@ -3,6 +3,7 @@
 #include "../log/log.h"
 #include "sys_time.h"
 #include "sys_mutex.h"
+#include "../driver/pinmux.h"
 
 void all_object_init() {
 
@@ -11,4 +12,5 @@ void all_object_init() {
     LOG_DEBUG("obj_init", "all_object_init");
     systime_init();
     sys_mutex_init();
+    pinmux_init();
 }

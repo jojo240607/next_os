@@ -39,6 +39,23 @@ const timer_config time2_conf = {
 };
 
 const exti_config exti_conf = {
-        .gpio_type = GPIOA,
-        .exti_line = 0x0022,//0000 0000 0010 0010   1和6线
+        //.gpio_type = GPIOA,
+        //.exti_line = 0x0022,//0000 0000 0010 0010   1和6线
+        .pin_size = 2,
+        .pin_conf = {{.port = PORT_A,
+                      .irq_mode = PIN_IRQ_MODE_FALLING,
+                      .pin = 1,
+                      .mode = PIN_MODE_INPUT,
+                      .ospeed = PIN_OSPEED_HIGH,
+                      .otype = PIN_OTYPE_OD,
+                      .pupd = PIN_PUPD_PULLUP,
+                      .af = 0},
+                     {.port = PORT_B,
+                       .irq_mode = PIN_IRQ_MODE_FALLING,
+                       .pin = 6,
+                       .mode = PIN_MODE_INPUT,
+                       .ospeed = PIN_OSPEED_HIGH,
+                       .otype = PIN_OTYPE_OD,
+                       .pupd = PIN_PUPD_PULLUP,
+                       .af = 0}}
 };
