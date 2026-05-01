@@ -21,7 +21,7 @@ static const Device_managerFun device_manager_fun = {
 static const Device_list dev_lists[] = {
         {.tag = DEVICE_SYSTICK, .name = "sys_tick", .config = &sys_tick_conf, .device_create = (Device_create) systick_create},
         {.tag = DEVICE_USART4, .name = "usart4", .config = &usart4_conf, .device_create = (Device_create) usart_create},
-        {.tag = DEVICE_USART3, .name = "usart3", .config = &usart3_conf, .device_create = (Device_create) usart_create},
+        {.tag = DEVICE_USART1, .name = "usart1", .config = &usart1_conf, .device_create = (Device_create) usart_create},
         {.tag = DEVICE_TIME2, .name = "timer2", .config = &time2_conf, .device_create = (Device_create) timer_create},
         {.tag = DEVICE_EXTI, .name = "exti", .config = &exti_conf, .device_create = (Device_create) exti_create},
 };

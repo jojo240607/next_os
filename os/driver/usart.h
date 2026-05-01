@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "Device.h"
 #include "stm32f407xx.h"
+#include "pinmux.h"
 
 #define GET_USART(obj) ((Usart *)obj)
 #define DEFAULT_RX_BUFFER (256)
@@ -15,14 +16,25 @@ typedef struct _usart_config usart_config;
 struct _UsartFun {
     void (*destroy)(Usart* self);
 };
-
+/* UART 编号 */
+typedef enum {
+    UART_1 = 0,
+    UART_2,
+    UART_3,
+    UART_4,
+    UART_5,
+    UART_6,
+    UART_MAX
+} uart_id_t;
 struct _usart_config {
-    GPIO_TypeDef *gpio_type;
-    USART_TypeDef *usart_type;
+    //GPIO_TypeDef *gpio_type;
+    uart_id_t usart_id;
     uint32_t bound;
     bool feedback;
     uint16_t buffer_size;
     irq_config irq_conf;
+    uint8_t pin_size;
+    pin_config_t pin_conf[];
 };
 
 struct _Usart {

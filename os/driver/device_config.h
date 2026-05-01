@@ -14,7 +14,7 @@
 
 extern const systick_conf sys_tick_conf;
 extern const usart_config usart4_conf;
-extern const usart_config usart3_conf;
+extern const usart_config usart1_conf;
 extern const timer_config time2_conf;
 extern const exti_config exti_conf;
 

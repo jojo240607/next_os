@@ -23,7 +23,7 @@ struct _Device_managerFun {
 enum _Dev_Tag {
     DEVICE_SYSTICK = 0,
     DEVICE_USART4,
-    DEVICE_USART3,
+    DEVICE_USART1,
     DEVICE_TIME2,
     DEVICE_EXTI,
     DEVICE_MAX
