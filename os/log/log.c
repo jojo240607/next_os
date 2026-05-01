@@ -106,12 +106,12 @@ void log_output(log_level_t level, const char * tag, const char *fmt, ...) {
 
     if (log_buf->fun->push(log_buf, &entry)) {
         if (log_sem) {
-            log_sem->fun->give(log_sem, false);
+            log_sem->fun->give(log_sem);
         }
     } else {
         // 缓冲区满，记录丢弃次数（可选，这里省略）
         if (log_sem) {
-            log_sem->fun->give(log_sem, false);
+            log_sem->fun->give(log_sem);
         }
     }
 }
@@ -131,6 +131,6 @@ void log_init(void) {
 void log_setsem(Semaphore *sem) {
     log_sem = sem;
     if (log_buf->count > 0) {
-        log_sem->fun->give(log_sem, false);
+        log_sem->fun->give(log_sem);
     }
 }

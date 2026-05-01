@@ -119,7 +119,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
-    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_3);
+  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_2);
+  NVIC_SetPriority(PendSV_IRQn, 0xff);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x03, 0x03));
+  NVIC_SetPriority(SysTick_IRQn, 0xff);
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   all_object_init();

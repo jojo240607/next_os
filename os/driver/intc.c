@@ -198,7 +198,7 @@ static void intc_dispatch(Intc* self, intc_irq_num irq_num) {
                 if (irq->bottom_sem) {
                     // 假设你的信号量有 semaphore_give_from_isr 函数
                     // 并根据返回值决定是否需要请求调度
-                    irq->bottom_sem->fun->give(irq->bottom_sem, true);
+                    irq->bottom_sem->fun->give(irq->bottom_sem);
                 }
             }
             break;

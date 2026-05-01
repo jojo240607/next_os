@@ -5,7 +5,7 @@
 #include "../common/linear_pool.h"
 
 static void semaphore_take(Semaphore* self);
-static void semaphore_give(Semaphore* self, bool protected);
+static void semaphore_give(Semaphore* self);
 
 // 析构函数声明
 static void semaphore_destroy(Semaphore* self);
@@ -78,7 +78,7 @@ static void semaphore_take(Semaphore* self) {
     return;
 }
 // give method
-static void semaphore_give(Semaphore* self, bool protected) {
+static void semaphore_give(Semaphore* self) {
     if (NULL == self) {
         return;
     }
@@ -88,7 +88,7 @@ static void semaphore_give(Semaphore* self, bool protected) {
         Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         task->state = TCB_STATER_READY;
         // 将任务放回就绪队列（根据优先级插入）
-        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task, protected);
+        global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, task, false);
     } else {
         self->count++;
     }

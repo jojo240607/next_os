@@ -15,7 +15,7 @@ typedef struct _SemaphoreFun SemaphoreFun;
 struct _SemaphoreFun {
     void (*destroy)(Semaphore* self);
 	void (*take)(Semaphore* self);
-	void (*give)(Semaphore* self, bool protected);
+	void (*give)(Semaphore* self);
 
 };
 // 类结构
