@@ -58,14 +58,34 @@ dev_init_override(exti_dev_init_impl) {
 
     Exti *exti = (Exti *)self;
     //params
+    if (pinmux_request_group(exti->conf->pin_conf, exti->conf->pin_size, &self->irq_conf) == PINMUX_ERROR) {
+        LOG_ERROR("exti", "pinmux error");
+        return;
+    }
     self->irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
     self->irq_conf.handler = exti_irq_handler_impl;
     self->irq_conf.semaphore = sem;
     self->irq_conf.arg = self;
-    //exti->exit_irq_conf.irq_num = new_irq_num;
 
-    if (pinmux_request_group(exti->conf->pin_conf, exti->conf->pin_size, &self->irq_conf) == PINMUX_ERROR) {
-        LOG_ERROR("exti", "pinmux error");
+    for (uint8_t num = 0; num < exti->conf->pin_size; num++) {
+        // NVIC 配置取决于 pin，STM32F4 中 EXTI0..4 有独立 IRQ 号，EXTI5_9、EXTI10_15 分别共享
+        // 这里仅举例使能 EXTI1 (IRQn=23)
+        // 若你的系统已封装 NVIC 接口，直接调用。下面为最简寄存器形式（Cortex-M4）：
+        //NVIC_EnableIRQ(EXTI1_IRQn);  // 需要根据 pin 决定 IRQn
+        intc_irq_num new_irq_num;
+        if (exti->conf->pin_conf[num].pin < 5) {
+            new_irq_num = EXTI0_IRQ + exti->conf->pin_conf[num].pin;
+        } else if (exti->conf->pin_conf[num].pin < 10) {
+            new_irq_num = EXTI5_9_IRQ;
+        } else {
+            new_irq_num = EXTI10_15_IRQ;
+        }
+        self->irq_conf.irq_num = new_irq_num;
+        if (self->irq_conf.handler != NULL) {
+            if (!self->fun->attach_irq(self, &self->irq_conf)) {
+                LOG_ERROR("exti", "attach irq %d error", self->irq_conf.irq_num);
+            }
+        }
     }
 
 /*

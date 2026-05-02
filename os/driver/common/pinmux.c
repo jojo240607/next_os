@@ -193,27 +193,6 @@ static void hal_exti_set_trigger(uint8_t pin, exti_mode irq_mode) {
 /* 使能 EXTI 中断（NVIC） */
 static void hal_exti_enable_irq(uint8_t pin, const irq_config *irq_cfg) {
     xEXTI->IMR |= (1U << pin);
-    // NVIC 配置取决于 pin，STM32F4 中 EXTI0..4 有独立 IRQ 号，EXTI5_9、EXTI10_15 分别共享
-    // 这里仅举例使能 EXTI1 (IRQn=23)
-    // 若你的系统已封装 NVIC 接口，直接调用。下面为最简寄存器形式（Cortex-M4）：
-    //NVIC_EnableIRQ(EXTI1_IRQn);  // 需要根据 pin 决定 IRQn
-    intc_irq_num new_irq_num;
-    if (pin < 5) {
-        new_irq_num = EXTI0_IRQ + pin;
-    } else if (pin < 10) {
-        new_irq_num = EXTI5_9_IRQ;
-    } else {
-        new_irq_num = EXTI10_15_IRQ;
-    }
-
-    if (gloable_intc->fun->register_handler(gloable_intc, new_irq_num, irq_cfg->handler, irq_cfg->arg)) {
-        //self->semaphore = sem;
-        gloable_intc->fun->attach_semaphore(gloable_intc, new_irq_num, irq_cfg->semaphore);
-        gloable_intc->fun->set_priority(gloable_intc, new_irq_num, irq_cfg->priority);
-    } else {
-        LOG_ERROR("pinmux", "attach irq %d error", new_irq_num);
-    }
-
 }
 
 /* 将配置写入硬件 */

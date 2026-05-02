@@ -21,7 +21,7 @@ static const IntcFun intc_fun = {
 	.attach_semaphore = intc_attach_semaphore,
 	.set_priority = intc_set_priority,
 };
-static const IRQn_Type irq_num_to_vt[] = {
+static const IRQn_Type IRQx[] = {
     SysTick_IRQn,
     USART1_IRQn,
     USART2_IRQn,
@@ -76,7 +76,7 @@ static const IRQn_Type irq_num_to_vt[] = {
         TIM1_UP_TIM10_IRQ,
         TIM1_TRG_COM_TIM11_IRQ,
         TIM1_CC_IRQ,
-    TIM2_IRQn,
+        TIM2_IRQn,
         TIM3_IRQ,
         TIM4_IRQ,
         TIM5_IRQ,
@@ -174,8 +174,8 @@ static void intc_set_priority(Intc* self, intc_irq_num irq_num, uint32_t priorit
         return;
     }
 
-    NVIC_SetPriority(irq_num_to_vt[irq_num], priority);
-    NVIC_EnableIRQ(irq_num_to_vt[irq_num]);
+    NVIC_SetPriority(IRQx[irq_num], priority);
+    NVIC_EnableIRQ(IRQx[irq_num]);
 
 }
 // dispatch method

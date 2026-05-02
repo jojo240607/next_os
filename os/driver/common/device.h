@@ -68,7 +68,6 @@ struct _Device {
     DeviceVTable* vtable;
     const DeviceFun* fun;
     // TODO: 添加数据成员
-   // Semaphore * semaphore;
     irq_config irq_conf;
 };
 

@@ -155,8 +155,7 @@ bool timer_irq_handler_impl(void *arg) {
     Timer *timer = (Timer *)arg;
     //params , void *arg
     // 检查更新中断标志 (UIF)
-    if (TIMx[timer->conf->timer_id]->SR & TIM_SR_UIF)
-    {
+    if (TIMx[timer->conf->timer_id]->SR & TIM_SR_UIF) {
         // 清除中断标志 (写 0 无效，需要写 0 的方式是清对应位)
         TIMx[timer->conf->timer_id]->SR &= ~TIM_SR_UIF;
         // 这里放置你需要每 500ms 执行的代码
