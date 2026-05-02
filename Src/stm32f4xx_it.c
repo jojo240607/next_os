@@ -21,7 +21,7 @@
 #include "main.h"
 #include "stm32f4xx_it.h"
 #include "../os/scheduler/thread_scheduler.h"
-#include "../os/driver/intc.h"
+#include "../os/driver/common/intc.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */

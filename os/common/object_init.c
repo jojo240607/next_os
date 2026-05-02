@@ -3,7 +3,7 @@
 #include "../log/log.h"
 #include "sys_time.h"
 #include "sys_mutex.h"
-#include "../driver/pinmux.h"
+#include "../driver/common/pinmux.h"
 
 void all_object_init() {
 

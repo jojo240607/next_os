@@ -58,14 +58,13 @@ dev_init_override(exti_dev_init_impl) {
 
     Exti *exti = (Exti *)self;
     //params
-    self->semaphore = sem;
-    exti->exit_irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-    exti->exit_irq_conf.handler = exti_irq_handler_impl;
-    exti->exit_irq_conf.semaphore = sem;
-    exti->exit_irq_conf.arg = self;
+    self->irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+    self->irq_conf.handler = exti_irq_handler_impl;
+    self->irq_conf.semaphore = sem;
+    self->irq_conf.arg = self;
     //exti->exit_irq_conf.irq_num = new_irq_num;
 
-    if (pinmux_request_group(exti->conf->pin_conf, exti->conf->pin_size, &exti->exit_irq_conf) == PINMUX_ERROR) {
+    if (pinmux_request_group(exti->conf->pin_conf, exti->conf->pin_size, &self->irq_conf) == PINMUX_ERROR) {
         LOG_ERROR("exti", "pinmux error");
     }
 
@@ -132,7 +131,7 @@ bool exti_irq_handler_impl(void *arg) {
         // 最低位 1 的索引（0~15）
         uint32_t bit = __builtin_ctz(EXTI->PR);
         //printf("Need to process bit %d\n", bit);
-        GET_DEVICE(exti)->semaphore->sem_event = OS_EVENT_EXTI0 + bit;
+        GET_DEVICE(exti)->irq_conf.semaphore->sem_event = OS_EVENT_EXTI0 + bit;
         //  清除中断标志位（写1清零）
         EXTI->PR |= (1 << bit);
     }

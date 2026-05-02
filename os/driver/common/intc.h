@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "../scheduler/semaphore.h"
+#include "../../scheduler/semaphore.h"
 
 #define INTC_MAX_IRQ 82
 #define GET_INTC(obj) ((Intc *)obj)
@@ -66,21 +66,21 @@ enum _Intc_Irq {
     //SPI3_IRQ,
     //SDIO_IRQ,
     //FSMC_IRQ,
-    //TIM1_BRK_TIM9_IRQ,
-    //TIM1_UP_TIM10_IRQ,
-    //TIM1_TRG_COM_TIM11_IRQ,
-    //TIM1_CC_IRQ,
+    TIM1_BRK_TIM9_IRQ,
+    TIM1_UP_TIM10_IRQ,
+    TIM1_TRG_COM_TIM11_IRQ,
+    TIM1_CC_IRQ,
     TIM2_IRQ,
-    //TIM3_IRQ,
-    //TIM4_IRQ,
-    //TIM5_IRQ,
-    //TIM6_DAC_IRQ,
-    //TIM7_IRQ,
-    //TIM8_BRK_TIM12_IRQ,
-    //TIM8_UP_TIM13_IRQ,
-    //TIM8_TRG_COM_TIM14_IRQ,
-    //TIM8_CC_IRQ,
-    //RTC_ALARM_IRQ,
+    TIM3_IRQ,
+    TIM4_IRQ,
+    TIM5_IRQ,
+    TIM6_DAC_IRQ,
+    TIM7_IRQ,
+    TIM8_BRK_TIM12_IRQ,
+    TIM8_UP_TIM13_IRQ,
+    TIM8_TRG_COM_TIM14_IRQ,
+    TIM8_CC_IRQ,
+    RTC_ALARM_IRQ,
     MAX_IRQ
 };
 

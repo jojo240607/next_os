@@ -2,9 +2,9 @@
 #define USART_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "Device.h"
+#include "common/device.h"
 #include "stm32f407xx.h"
-#include "pinmux.h"
+#include "common/pinmux.h"
 
 #define GET_USART(obj) ((Usart *)obj)
 #define DEFAULT_RX_BUFFER (256)
@@ -32,9 +32,8 @@ struct _usart_config {
     uint32_t bound;
     bool feedback;
     uint16_t buffer_size;
-    irq_config irq_conf;
-    uint8_t pin_size;
-    pin_config_t pin_conf[];
+    pin_config_t tx_conf;
+    pin_config_t rx_conf;
 };
 
 struct _Usart {
@@ -47,7 +46,6 @@ struct _Usart {
     volatile uint8_t rx_complete;
     uint16_t rx_size;
     uint8_t rx_buffer[];
-   //bool feedback;
 };
 
 // 构造函数声明

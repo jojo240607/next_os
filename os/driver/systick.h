@@ -2,7 +2,7 @@
 #define SYSTICK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "Device.h"
+#include "common/device.h"
 #include "../common/sys_time.h"
 
 #define GET_SYSTICK_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(SystickVTable **)obj)
@@ -19,7 +19,7 @@ struct _SystickFun {
 
 struct _systick_config {
     uint32_t systick_frequency;
-    irq_config irq_conf;
+    //irq_config irq_conf;
 };
 struct _Systick {
     Device base;  // 基类作为第一个成员

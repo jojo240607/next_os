@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "device.h"
+#include "common/device.h"
 #include "../common/util.h"
 
 #define GET_DEVICE_MANAGER(obj) ((Device_manager *)obj)

@@ -32,9 +32,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME}
-        os/driver/pinmux.c
-        os/driver/pinmux.h)
+add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -66,11 +64,11 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/task/log_task.c
         os/task/systick_task.c
         os/task/os_cb_task.c
-        os/driver/device.c
+        os/driver/common/device.c
         os/driver/device_config.c
-        os/driver/pinmux.c
+        os/driver/common/pinmux.c
         os/driver/usart.c
-        os/driver/intc.c
+        os/driver/common/intc.c
         os/driver/systick.c
         os/driver/timer.c
         os/driver/exti.c

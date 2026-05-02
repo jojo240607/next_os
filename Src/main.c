@@ -23,7 +23,7 @@
 #include "../os/scheduler/thread_scheduler.h"
 #include "../os/task/task_manager.h"
 #include "../os/driver/device_manager.h"
-#include "../os/driver/intc.h"
+#include "../os/driver/common/intc.h"
 #include "../os/common/object_init.h"
 
 /* Private includes ----------------------------------------------------------*/

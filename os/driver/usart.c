@@ -73,53 +73,46 @@ dev_init_override(usart_dev_init_impl) {
     Usart *usart = (Usart *)self;
     //params
 
-// 使能GPIOC时钟 (AHB1总线，位2)
-
-/*
- * RCC->AHB1ENR |= (1 << 2);
-    // 1. 将PC10和PC11配置为复用功能
-    usart->conf->gpio_type->MODER &= ~(0xF << (10*2)); // 清除原有的模式位
-    usart->conf->gpio_type->MODER |=  (0x2 << (10*2)); // 10: Alternate Function mode
-    usart->conf->gpio_type->MODER |=  (0x2 << (11*2));
-
-// 2. 将PC10（TX）配置为推挽输出
-    usart->conf->gpio_type->OTYPER &= ~(1 << 10);      // 0: Output push-pull
-// 3. 设置输出速度为50MHz
-    usart->conf->gpio_type->OSPEEDR |= (0x2 << (10*2)); // 10: 50MHz
-// 4. 配置无上拉/下拉
-    usart->conf->gpio_type->PUPDR &= ~(0x3 << (10*2));
-    usart->conf->gpio_type->PUPDR &= ~(0x3 << (11*2));
-
-// 5. 配置复用功能为AF8 (UART4)
-    usart->conf->gpio_type->AFR[1] &= ~(0xF << ((10-8)*4));
-    usart->conf->gpio_type->AFR[1] |=  (0x8 << ((10-8)*4)); // AF8 for PC10
-    usart->conf->gpio_type->AFR[1] &= ~(0xF << ((11-8)*4));
-    usart->conf->gpio_type->AFR[1] |=  (0x8 << ((11-8)*4)); // AF8 for PC11
-*/
-    if (pinmux_request_group(usart->conf->pin_conf, usart->conf->pin_size, NULL) == PINMUX_ERROR) {
-        LOG_ERROR("usart", "pinmux error");
+    if (pinmux_request(&usart->conf->tx_conf, NULL) == PINMUX_ERROR) {
+        LOG_ERROR("usart", "tx pinmux error");
     }
+
+    if (pinmux_request(&usart->conf->rx_conf, NULL) == PINMUX_ERROR) {
+        LOG_ERROR("usart", "rx pinmux error");
+    }
+
     // 使能UART4时钟 (APB1总线，位19)
     //RCC->APB1ENR |= (1 << 19);
     switch (usart->conf->usart_id) {
         case UART_1:
             RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+            self->irq_conf.irq_num = USART1_IRQ;
             break;
         case UART_2:
             RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+            self->irq_conf.irq_num = USART2_IRQ;
             break;
         case UART_3:
             RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+            self->irq_conf.irq_num = USART3_IRQ;
         case UART_4:
             RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+            self->irq_conf.irq_num = USART4_IRQ;
         case UART_5:
             RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
+            self->irq_conf.irq_num = USART5_IRQ;
         case UART_6:
             RCC->APB2ENR |= RCC_APB2ENR_USART6EN;
+            self->irq_conf.irq_num = USART6_IRQ;
             break;
         default:
             break;
     }
+    self->irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+    self->irq_conf.handler = usart_irq_handler_impl;
+    self->irq_conf.semaphore = sem;
+    self->irq_conf.arg = self;
+
     // 1. 配置数据位8位 (M位0) 和 无校验 (PCE位0)
     USARTx[usart->conf->usart_id]->CR1 &= ~(1 << 12); // 清除PCE位: 无校验
     USARTx[usart->conf->usart_id]->CR1 &= ~(1 << 12); // 重复清除是为了保险, 确保PCE位为0
@@ -149,13 +142,13 @@ dev_init_override(usart_dev_init_impl) {
 // 4. 使能发送器 (TE位=1) 和 接收器 (RE位=1)
     USARTx[usart->conf->usart_id]->CR1 |= (1 << 3) | (1 << 2); // 设置TE位和RE位
 
-    if (usart->conf->irq_conf.handler != NULL) {
+    if (self->irq_conf.handler != NULL) {
         // 5. 使能UART4外设 (UE位=1)
         USARTx[usart->conf->usart_id]->CR1 |= (1 << 13);
         // --- 中断配置 (例如使能接收中断) ---
         USARTx[usart->conf->usart_id]->CR1 |= (1 << 5); // 使能接收中断 (RXNEIE)
-        if (!self->fun->attach_irq(self, &usart->conf->irq_conf, sem)) {
-            LOG_ERROR("systick", "attach irq %d error", usart->conf->irq_conf.irq_num);
+        if (!self->fun->attach_irq(self, &self->irq_conf)) {
+            LOG_ERROR("systick", "attach irq %d error", self->irq_conf.irq_num);
         }
     }
 

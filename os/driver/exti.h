@@ -2,9 +2,9 @@
 #define EXTI_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "Device.h"
+#include "common/device.h"
 #include "stm32f407xx.h"
-#include "pinmux.h"
+#include "common/pinmux.h"
 
 #define GET_EXTI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(ExtiVTable **)obj)
 #define GET_EXTI(obj) ((Exti *)obj)
@@ -21,8 +21,6 @@ struct _ExtiFun {
 };
 
 struct _exti_config {
-    //uint16_t exti_line;
-    //irq_config irq_conf;
     uint8_t pin_size;
     pin_config_t pin_conf[];
 };
@@ -31,8 +29,6 @@ struct _Exti {
     const ExtiFun* fun;
     // TODO: 添加派生类特有的数据成员
     exti_config *conf;
-    irq_config exit_irq_conf;
-
 };
 
 // 构造函数声明

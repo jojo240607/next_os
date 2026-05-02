@@ -60,7 +60,7 @@ struct _irq_config {
 struct _DeviceFun {
     void (*destroy)(Device* self);
 	bool (*transfer)(Device* self, const void *data, size_t count);
-    bool (*attach_irq)(Device* self, irq_config *conf, Semaphore * sem);
+    bool (*attach_irq)(Device* self, irq_config *conf);
 
 };
 // 类结构
@@ -68,7 +68,8 @@ struct _Device {
     DeviceVTable* vtable;
     const DeviceFun* fun;
     // TODO: 添加数据成员
-    Semaphore * semaphore;
+   // Semaphore * semaphore;
+    irq_config irq_conf;
 };
 
 // 构造函数声明

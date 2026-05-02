@@ -53,10 +53,13 @@ static void systick_destroy(Systick* self) {
 dev_init_override(systick_dev_init_impl) {
     Systick *systick = (Systick *)self;
     // TODO: add dev_init method
-    if (systick->conf->irq_conf.handler != NULL) {
-        if (!self->fun->attach_irq(self, &systick->conf->irq_conf, sem)) {
-            LOG_ERROR("systick", "attach SYSTIC_IRQ error");
-        }
+    self->irq_conf.irq_num = SYSTIC_IRQ;
+    self->irq_conf.priority = NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x03, 0x03);
+    self->irq_conf.handler = systick_irq_handler_impl;
+    self->irq_conf.semaphore = sem;
+    self->irq_conf.arg = self;
+    if (!self->fun->attach_irq(self, &self->irq_conf)) {
+        LOG_ERROR("systick", "attach SYSTIC_IRQ error");
     }
     //params 
     // 1. 设置重装载值，产生1ms中断

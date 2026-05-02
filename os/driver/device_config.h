@@ -10,7 +10,7 @@
 #include "usart.h"
 #include "timer.h"
 #include "exti.h"
-#include "pinmux.h"
+#include "common/pinmux.h"
 
 extern const systick_conf sys_tick_conf;
 extern const usart_config usart4_conf;

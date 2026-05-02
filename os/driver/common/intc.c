@@ -1,8 +1,8 @@
 #include "intc.h"
 #include <stdio.h>
-#include "../common/util.h"
-#include "../common/linear_pool.h"
-#include "../log/log.h"
+#include "../../common/util.h"
+#include "../../common/linear_pool.h"
+#include "../../log/log.h"
 
 static bool intc_register(Intc* self, intc_irq_num irq_num, intc_handler_t handler, void *arg);
 static void intc_unregister(Intc* self, intc_irq_num irq_num);
@@ -72,21 +72,21 @@ static const IRQn_Type irq_num_to_vt[] = {
         //SPI3_IRQ,
         //SDIO_IRQ,
         //FSMC_IRQ,
-        //TIM1_BRK_TIM9_IRQ,
-        //TIM1_UP_TIM10_IRQ,
-        //TIM1_TRG_COM_TIM11_IRQ,
-        //TIM1_CC_IRQ,
+        TIM1_BRK_TIM9_IRQ,
+        TIM1_UP_TIM10_IRQ,
+        TIM1_TRG_COM_TIM11_IRQ,
+        TIM1_CC_IRQ,
     TIM2_IRQn,
-        //TIM3_IRQ,
-        //TIM4_IRQ,
-        //TIM5_IRQ,
-        //TIM6_DAC_IRQ,
-        //TIM7_IRQ,
-        //TIM8_BRK_TIM12_IRQ,
-        //TIM8_UP_TIM13_IRQ,
-        //TIM8_TRG_COM_TIM14_IRQ,
-        //TIM8_CC_IRQ,
-        //RTC_ALARM_IRQ,
+        TIM3_IRQ,
+        TIM4_IRQ,
+        TIM5_IRQ,
+        TIM6_DAC_IRQ,
+        TIM7_IRQ,
+        TIM8_BRK_TIM12_IRQ,
+        TIM8_UP_TIM13_IRQ,
+        TIM8_TRG_COM_TIM14_IRQ,
+        TIM8_CC_IRQ,
+        RTC_ALARM_IRQ,
 };
 // 构造函数实现
 Intc* intc_create() {

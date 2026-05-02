@@ -1,7 +1,7 @@
 #include "pinmux.h"
 #include "stm32f407xx.h"
 #include "device.h"
-#include "../log/log.h"
+#include "../../log/log.h"
 #include <stddef.h>
 
 /* ---------- 寄存器定义（仅需用到的部分） ---------- */
