@@ -261,3 +261,30 @@ uint32_t rtc_read_backup(uint8_t index)
     return xRTC->BKPR[index];
 }
 
+// 备份 SRAM 操作
+int rtc_write_backup_sram(uint8_t *data, uint16_t len)
+{
+    if (len > 4096) return -1;
+
+    // 使能备份域写访问（已在 rtc_init 中完成，这里是安全检查）
+    xPWR->CR |= xPWR_CR_DBP;
+
+    // 备份 SRAM 直接通过指针访问
+    uint8_t *p_sram = (uint8_t *)BACKUP_SRAM_BASE;
+    for (uint16_t i = 0; i < len; i++) {
+        p_sram[i] = data[i];
+    }
+    return 0;
+}
+
+int rtc_read_backup_sram(uint8_t *buffer, uint16_t len)
+{
+    if (len > 4096) return -1;
+
+    uint8_t *p_sram = (uint8_t *)BACKUP_SRAM_BASE;
+    for (uint16_t i = 0; i < len; i++) {
+        buffer[i] = p_sram[i];
+    }
+    return 0;
+}
+

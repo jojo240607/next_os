@@ -38,6 +38,7 @@ typedef struct {
 
 /* ---------- 备份域控制寄存器 (RCC_BDCR) ---------- */
 #define xRCC_BDCR_BASE  0x40023870UL
+#define BACKUP_SRAM_BASE  0x40024000UL  // 备份域 SRAM 的基地址
 typedef struct {
     volatile uint32_t BDCR;
 } xRCC_BDCR_TypeDef;
@@ -184,5 +185,9 @@ int rtc_enter_init_mode(void);
 void rtc_exit_init_mode(void);
 void rtc_wait_sync(void);
 void rtc_lock(void);
+
+/* 备份 SRAM 内存操作 */
+int  rtc_write_backup_sram(uint8_t *data, uint16_t len);
+int  rtc_read_backup_sram(uint8_t *buffer, uint16_t len);
 
 #endif //STM32F4DISCOVERY_HAL_RTC_H
