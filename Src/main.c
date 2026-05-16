@@ -21,9 +21,6 @@
 #include "main.h"
 #include "usb_host.h"
 #include "../os/scheduler/thread_scheduler.h"
-#include "../os/task/task_manager.h"
-#include "../os/driver/device_manager.h"
-#include "../os/driver/common/intc.h"
 #include "../os/common/object_init.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -59,11 +56,11 @@ SPI_HandleTypeDef hspi1;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_I2S3_Init(void);
-static void MX_SPI1_Init(void);
-void MX_USB_HOST_Process(void);
+//static void MX_GPIO_Init(void);
+//static void MX_I2C1_Init(void);
+//static void MX_I2S3_Init(void);
+//static void MX_SPI1_Init(void);
+//void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
 
@@ -90,46 +87,16 @@ void thread_idle(Tcb_t *self, void *arg) {
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_I2S3_Init();
-  MX_SPI1_Init();
+  //HAL_Init();
+  //SystemClock_Config();
+  //MX_GPIO_Init();
+  //MX_I2C1_Init();
+  //MX_I2S3_Init();
+  //MX_SPI1_Init();
   //MX_USB_HOST_Init();
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
-  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_2);
-  NVIC_SetPriority(PendSV_IRQn, 0xff);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x03, 0x03));
-  NVIC_SetPriority(SysTick_IRQn, 0xff);
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   all_object_init();
-  gloable_intc = intc_create();
-  global_thread_scheduler = thread_scheduler_create();
-  gloable_deviceManager = device_manager_create();
-  gloable_taskManager = task_manager_create();
-  gloable_taskManager->fun->boot_init(gloable_taskManager);
+
   //Entry_t entry_s = {.parent = NULL,
   //                   .entry_fun = thread_1,
   //                   .arg = NULL};
@@ -143,7 +110,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    MX_USB_HOST_Process();
+   // MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
   }

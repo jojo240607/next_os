@@ -20,6 +20,7 @@ struct _Systick_task {
     const Systick_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Device *systick;
+    Device *fpu;
 };
 
 // 构造函数声明

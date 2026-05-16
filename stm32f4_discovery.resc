@@ -4,7 +4,7 @@
 using sysbus
 $name?="STM32F4_Discovery"
 mach create $name
-machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+machine LoadPlatformDescription @stm32f4_discovery-kit.repl
 
 cpu PerformanceInMips 125
 # 添加这一行：启动 GDB 服务器
@@ -32,7 +32,20 @@ macro reset
 """
 
 runMacro $reset
-sleep 15
+### SPI
+machine LoadPlatformDescriptionFromString "dummySpi: Mocks.DummySPISlave @ spi1"
+logLevel 0 spi1.dummySpi
+
+### I2C
+
+machine LoadPlatformDescriptionFromString "dummy_i2c: Mocks.DummyI2CSlave @ i2c1 0x50"
+logLevel 0 i2c1.dummy_i2c
+
+
+###ADC1
+adc1 FeedSample 0xFF 0
+
+sleep 10
 sysbus.gpioPortA OnGPIO 1 true      # 模拟电平变高
 sleep 0.01                     # 让高电平维持一个很短的时间
 sysbus.gpioPortA OnGPIO 1 false   # 模拟电平变低，产生下降沿触发中断

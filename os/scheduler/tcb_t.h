@@ -5,9 +5,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include "../common/node.h"
-#include "main.h"
 #include "semaphore.h"
 #include "../common/util.h"
+#include "../driver/hal/hal_fpu.h"
 
 
 #define MAGIC_NUM (0xDEADBEEF)
@@ -15,18 +15,17 @@
 // 类声明
 typedef struct _Tcb_t Tcb_t;
 typedef struct _Tcb_tFun Tcb_tFun;
-typedef enum thread_state Tcb_State;
 typedef struct _Thread_entry_t Entry_t;
 typedef void (*Tcb_entry)(Tcb_t *self, void *arg);
 
-enum thread_state {
+typedef enum : uint8_t {
     TCB_STATER_READY = 0x10,
     TCB_STATER_RUNNING,
     TCB_STATER_BLOCKED,
     TCB_STATER_DELAYED,
     TCB_STATER_WAITING_MUTEX,
     TCB_STATER_TERMINATED
-};
+} Tcb_State;
 
 // 类成员函数结构
 struct _Tcb_tFun {
@@ -50,6 +49,7 @@ struct _Tcb_t {
     uint32_t run_time;    //时间片结束运行计数
     size_t stack_left;      //栈剩余大小
     uint32_t delay_ticks;   //剩余等待节拍数
+    fpu_context_t fpu_ctx;
    // bool need_print;
     uint32_t *sp;           //sp指针
     size_t stack_size;      //栈大小

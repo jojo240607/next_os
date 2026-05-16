@@ -64,14 +64,43 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/task/log_task.c
         os/task/systick_task.c
         os/task/os_cb_task.c
+        os/driver/hal/hal_usart.c
+        os/driver/hal/hal_wdg.c
+        os/driver/hal/hal_timer.c
+        os/driver/hal/hal_spi.c
+        os/driver/hal/hal_i2c.c
+        os/driver/hal/hal_adc.c
+        os/driver/hal/hal_gpio.c
+        os/driver/hal/hal_sdio.c
+        os/driver/hal/hal_exti.c
+        os/driver/hal/hal_dma.c
+        os/driver/hal/hal_can.c
+        os/driver/hal/hal_rtc.c
+        os/driver/hal/hal_i2s.c
+        os/driver/hal/hal_fsmc.c
+        os/driver/hal/hal_fpu.c
         os/driver/common/device.c
         os/driver/device_config.c
         os/driver/common/pinmux.c
+        os/driver/common/dma.c
+        os/driver/common/nvic.c
+        os/driver/common/rcc.c
+        os/driver/common/gpio.c
         os/driver/usart.c
-        os/driver/common/intc.c
+        os/driver/adc.c
+        os/driver/spi.c
+        os/driver/i2c.c
+        os/driver/can.c
+        os/driver/sdio.c
         os/driver/systick.c
         os/driver/timer.c
         os/driver/exti.c
+        os/driver/wdg.c
+        os/driver/rtc.c
+        os/driver/pwm.c
+        os/driver/i2s.c
+        os/driver/fsmc.c
+        os/driver/fpu.c
         os/driver/device_manager.c
         os/test/task_test1.c
         os/test/time_task.c

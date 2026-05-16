@@ -12,23 +12,32 @@
 typedef struct _Device_manager Device_manager;
 typedef struct _Device_managerFun Device_managerFun;
 typedef struct _Device_list Device_list;
-typedef enum _Dev_Tag Dev_tag;
+
 typedef Device * (*Device_create)(const void *config);
 // 类成员函数结构
-struct _Device_managerFun {
-    void (*destroy)(Device_manager* self);
-	Device* (*dev_open)(Device_manager* self, Dev_tag tag);
 
-};
-enum _Dev_Tag {
+typedef enum : uint8_t {
     DEVICE_SYSTICK = 0,
     DEVICE_USART4,
     DEVICE_USART1,
     DEVICE_TIME2,
     DEVICE_EXTI,
+    DEVICE_ADC1,
+    DEVICE_SPI1,
+    DEVICE_I2C1,
+    DEVICE_WDG,
+    DEVICE_CAN,
+    DEVICE_PWM1,
+    DEVICE_I2S2,
+    DEVICE_FPU,
     DEVICE_MAX
-};
+} Dev_tag;
 
+struct _Device_managerFun {
+    void (*destroy)(Device_manager* self);
+    Device* (*dev_open)(Device_manager* self, Dev_tag tag);
+
+};
 struct _Device_list {
     const Dev_tag tag;
     const char *name;

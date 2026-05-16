@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "common/device.h"
-#include "stm32f407xx.h"
 #include "common/pinmux.h"
 
 #define GET_EXTI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(ExtiVTable **)obj)
@@ -19,21 +18,26 @@ typedef struct _exti_config exti_config;
 struct _ExtiFun {
     void (*destroy)(Exti* self);
 };
-
+/* ADC 通道描述符 */
+typedef struct {
+    gpio_port_t port;
+    uint8_t     pin;
+    exti_mode   exti_mode;
+} exti_pin_cfg_t;
 struct _exti_config {
     uint8_t pin_size;
-    pin_config_t pin_conf[];
+    const exti_pin_cfg_t * const pin_conf[];
 };
 struct _Exti {
     Device base;  // 基类作为第一个成员
     const ExtiFun* fun;
     // TODO: 添加派生类特有的数据成员
-    exti_config *conf;
+    const exti_config *conf;
 };
 
 // 构造函数声明
-Exti* exti_create(exti_config *conf);
-void exti_init(Exti* self, exti_config *conf);
+Exti* exti_create(const exti_config *conf);
+void exti_init(Exti* self, const exti_config *conf);
 
 // 析构函数声明
 void exti_deinit(Exti* self);

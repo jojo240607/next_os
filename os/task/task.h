@@ -10,7 +10,7 @@
 #include <string.h>
 #include "../scheduler/tcb_t.h"
 #include "../scheduler/thread_scheduler.h"
-#include "../driver/common/intc.h"
+#include "../driver/common/nvic.h"
 #include "../driver/device_manager.h"
 
 

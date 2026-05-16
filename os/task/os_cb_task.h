@@ -11,16 +11,15 @@
 // 派生类声明
 typedef struct _Os_cb_task Os_cb_task;
 typedef struct _Os_cb_taskFun Os_cb_taskFun;
-typedef enum _os_cb_event os_cb_event;
+
 typedef struct _os_callback os_callback;
-typedef void (*callback_handler)(os_cb_event event, void *arg);
 
 // 类成员函数结构
 struct _Os_cb_taskFun {
     void (*destroy)(Os_cb_task* self);
 };
 
-enum _os_cb_event {
+typedef enum : uint8_t {
     OS_EVENT_EXTI0 = 0xe0,
     OS_EVENT_EXTI1,
     OS_EVENT_EXTI2,
@@ -37,7 +36,10 @@ enum _os_cb_event {
     OS_EVENT_EXTI13,
     OS_EVENT_EXTI14,
     OS_EVENT_EXTI15,
-};
+} os_cb_event;
+
+typedef void (*callback_handler)(os_cb_event event, void *arg);
+
 struct _os_callback {
     Node base;
     os_cb_event cb_event;

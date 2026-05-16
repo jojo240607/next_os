@@ -6,6 +6,13 @@
 #include "../log/log.h"
 #include "device_config.h"
 #include "exti.h"
+#include "adc.h"
+#include "spi.h"
+#include "wdg.h"
+#include "can.h"
+#include "pwm.h"
+#include "i2s.h"
+#include "fpu.h"
 
 static Device* device_manager_dev_open(Device_manager* self, Dev_tag tag);
 
@@ -24,6 +31,14 @@ static const Device_list dev_lists[] = {
         {.tag = DEVICE_USART1, .name = "usart1", .config = &usart1_conf, .device_create = (Device_create) usart_create},
         {.tag = DEVICE_TIME2, .name = "timer2", .config = &time2_conf, .device_create = (Device_create) timer_create},
         {.tag = DEVICE_EXTI, .name = "exti", .config = &exti_conf, .device_create = (Device_create) exti_create},
+        {.tag = DEVICE_ADC1, .name = "adc1", .config = &adc1_conf, .device_create = (Device_create) adc_create},
+        {.tag = DEVICE_SPI1, .name = "spi1", .config = &spi1_conf, .device_create = (Device_create) spi_create},
+        {.tag = DEVICE_I2C1, .name = "i2c1", .config = &i2c1_conf, .device_create = (Device_create) i2c_create},
+        {.tag = DEVICE_WDG, .name = "wdg", .config = &iwdg_conf, .device_create = (Device_create) wdg_create},
+        {.tag = DEVICE_CAN, .name = "can1", .config = &can1_conf, .device_create = (Device_create) can_create},
+        {.tag = DEVICE_PWM1, .name = "pwm1", .config = &pwm1_conf, .device_create = (Device_create) pwm_create},
+        {.tag = DEVICE_I2S2, .name = "i2s2", .config = &i2s2_conf, .device_create = (Device_create) i2s_create},
+        {.tag = DEVICE_FPU, .name = "fpu", .config = &fpu_conf, .device_create = (Device_create) fpu_create},
 };
 Device_manager *gloable_deviceManager = NULL;
 // 构造函数实现

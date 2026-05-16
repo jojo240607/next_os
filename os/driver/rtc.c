@@ -1,0 +1,145 @@
+#include "rtc.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "../common/linear_pool.h"
+
+dev_ioctl_override(rtc_dev_ioctl_impl);
+
+// 析构函数声明
+static void rtc_destroy(Rtc* self);
+static bool rtc_irq_handler_impl(void *arg);
+
+// TODO: 初始化数据成员
+static const RtcFun rtc_fun = {
+    .destroy = rtc_destroy,
+};
+// 构造函数实现
+Rtc* rtc_create(const rtc_config_t *conf) {
+    Rtc* obj = (Rtc*)os_malloc(sizeof(Rtc));
+    if (obj) {
+        memset(obj, 0, sizeof(Rtc));
+        rtc_init(obj, conf);
+    }
+    return obj;
+}
+
+void rtc_init(Rtc* self, const rtc_config_t *conf) {
+    // 初始化基类部分
+    device_init(&self->base);
+    self->fun = &(rtc_fun);
+    // TODO: 初始化派生类特有成员
+    self->conf = conf;
+	def_dev_ioctl(self) = rtc_dev_ioctl_impl;
+}
+
+void rtc_deinit(Rtc* self) {
+    device_deinit(GET_DEVICE(self));
+    // TODO: 数据成员申请资源释放
+}
+// 析构函数实现
+static void rtc_destroy(Rtc* self) {
+    if (self != NULL) {
+        rtc_deinit(self);
+        os_free(self);
+    }
+}
+
+// dev_ioctl method
+dev_ioctl_override(rtc_dev_ioctl_impl) {
+    // TODO: add dev_ioctl method
+    Rtc *rtc = (Rtc *)self;
+    //params , int cmd, void *arg
+    if (!rtc->conf) {
+        return;
+    }
+
+    // 1. 使能备份域访问
+    if (rtc_enable_backup_domain() != 0) return;
+
+    // 2. 选择 RTC 时钟源
+    if (rtc_select_clock_source(rtc->conf->clk_src) != 0) return;
+
+    // 3. 解锁 RTC 寄存器
+    rtc_unlock();
+
+    // 4. 进入初始化模式
+    if (rtc_enter_init_mode() != 0) return;
+
+    // 5. 配置预分频器 (产生 1Hz ck_spre)
+    xRTC->PRER = ((rtc->conf->async_prediv & 0x7F) << 16) |
+                ((rtc->conf->sync_prediv & 0x7FFF) << 0);
+
+    // 6. 配置小时格式
+    if (rtc->conf->hour_format == RTC_FORMAT_24H) {
+        xRTC->CR &= ~(1 << 6);  // FMT=0
+    } else {
+        xRTC->CR |= (1 << 6);   // FMT=1
+    }
+
+    // 7. 退出初始化模式
+    rtc_exit_init_mode();
+
+    // 8. 等待同步
+    rtc_wait_sync();
+
+    // 9. 中断配置
+    if (rtc->conf->it_enable) {
+        //rtc_callback = cfg->callback;
+        uint32_t cr = xRTC->CR;
+        if (rtc->conf->it_enable & RTC_IT_ALARM_A) {
+            cr |= xRTC_CR_ALRAIE;
+        }
+        if (rtc->conf->it_enable & RTC_IT_ALARM_B) {
+            cr |= xRTC_CR_ALRBIE;
+        }
+        if (rtc->conf->it_enable & RTC_IT_WAKEUP) {
+            cr |= xRTC_CR_WUTIE;
+        }
+        if (rtc->conf->it_enable & RTC_IT_TIMESTAMP) {
+            cr |= xRTC_CR_TSIE;
+        }
+        xRTC->CR = cr;
+        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+        self->irq_conf.handler = rtc_irq_handler_impl;
+        self->irq_conf.irq_num = RTC_ALARM_IRQ;
+        self->fun->attach_irq(self, &self->irq_conf);
+
+        self->irq_conf.irq_num = RTC_WKUP_IRQ;
+        self->fun->attach_irq(self, &self->irq_conf);
+
+    }
+
+    rtc_lock();
+}
+
+static bool rtc_irq_handler_impl(void *arg) {
+    uint32_t isr = xRTC->ISR;
+    uint32_t cr  = xRTC->CR;
+
+    // 闹钟 A
+    if ((isr & xRTC_ISR_ALRAF) && (cr & xRTC_CR_ALRAIE)) {
+        xRTC->ISR &= ~xRTC_ISR_ALRAF;   // 清除标志
+       // if (rtc_callback) rtc_callback(RTC_EVT_ALARM_A);
+    }
+    // 闹钟 B
+    if ((isr & xRTC_ISR_ALRBF) && (cr & xRTC_CR_ALRBIE)) {
+        xRTC->ISR &= ~xRTC_ISR_ALRBF;
+        //if (rtc_callback) rtc_callback(RTC_EVT_ALARM_B);
+    }
+    // 唤醒定时器
+    if ((isr & xRTC_ISR_WUTF) && (cr & xRTC_CR_WUTIE)) {
+        xRTC->ISR &= ~xRTC_ISR_WUTF;
+        //if (rtc_callback) rtc_callback(RTC_EVT_WAKEUP);
+    }
+    // 时间戳
+    if ((isr & xRTC_ISR_TSF) && (cr & xRTC_CR_TSIE)) {
+        xRTC->ISR &= ~xRTC_ISR_TSF;
+        //if (rtc_callback) rtc_callback(RTC_EVT_TIMESTAMP);
+    }
+    // 篡改
+    if ((isr & xRTC_ISR_TAMP1F)) {
+        xRTC->ISR &= ~xRTC_ISR_TAMP1F;
+        //if (rtc_callback) rtc_callback(RTC_EVT_TAMPER);
+    }
+}
+

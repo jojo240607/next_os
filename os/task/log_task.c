@@ -88,19 +88,6 @@ task_thread_override(log_task_task_thread_impl) {
     log_entry_t entry;
     while (1) {
         self->semaphore->fun->take(self->semaphore);
-        if (GET_USART(log_task->usart)->rx_complete == 1) {
-            GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "\r\n", 2);
-            GET_USART(log_task->usart)->rx_complete = 0;
-            //直接输出收到的数据缓存
-
-            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "recv---> ", 9);
-            //GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart,
-            //                                                 GET_USART(log_task->usart)->rx_buffer +
-            //                                                 GET_USART(log_task->usart)->rx_index,
-            //                                                 strlen(GET_USART(log_task->usart)->rx_buffer +
-            //                                                        GET_USART(log_task->usart)->rx_index));
-
-        }
         /* 批量处理，直到缓冲区空 */
         while (log_buf->fun->pop(log_buf, &entry)) {
             /* 格式化并发送到串口 */
@@ -112,23 +99,9 @@ task_thread_override(log_task_task_thread_impl) {
                                entry.tag,
                                entry.text);
             if (len > 0) {
-                //serial_send_blocking(line, len);
-               // log_task->usart->fun->transfer(log_task->usart, line, len);
-                GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, log_task->line, len);
+                GET_USART(log_task->usart)->fun->send_it(GET_USART(log_task->usart), (const uint8_t *)log_task->line, len);
             }
         }
-        //self->fun->os_sleep(self, 10);
     }
-    /*
-    while (true) {
-        //String *str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
-        //while (str) {
-        //    virtual_dev_write(GET_DEVICE(log_task->usart), str->str, strlen(str->str));
-        //    str = GET_STRING(log_task->log_buf->fun->dequeue(log_task->log_buf));
-        //}
-        self->fun->os_sleep(self, 10);
-        GET_OBJ_VTAB(Device, log_task->usart)->dev_write(log_task->usart, "hello world\n", 13);
-    }
-     */
 }
 

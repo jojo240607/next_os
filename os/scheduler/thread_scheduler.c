@@ -114,6 +114,7 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     if (NULL == self || self->current_thread == NULL) {
         return;
     }
+    hal_fpu_save_context(&self->current_thread->fpu_ctx);
     if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
         while (1) {
             LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
@@ -148,11 +149,14 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     Tcb_t *next_tcb = GET_TCB_T(
             self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
     self->current_thread->run_time += getSystime()->systick - self->current_thread->start_time;
+
+
     //if (self->current_thread->need_print) {
     //    self->current_thread->need_print = false;
     //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
     //}
     self->current_thread = next_tcb;
+    hal_fpu_restore_context(&self->current_thread->fpu_ctx);
     if (self->current_thread != NULL) {
         self->current_thread->start_time = getSystime()->systick;
         self->current_thread->state = TCB_STATER_RUNNING;

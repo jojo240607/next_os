@@ -13,7 +13,7 @@ override void dev_ioctl(int cmd, void *arg);
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "intc.h"
+#include "nvic.h"
 
 #define GET_DEVICE_VTABLE(obj) (*(DeviceVTable **)obj)
 
@@ -49,9 +49,9 @@ struct _DeviceVTable {
 };
 
 struct _irq_config {
-    intc_irq_num irq_num;
+    nvic_irq_num irq_num;
     void *arg;
-    intc_handler_t handler;
+    nvic_handler_t handler;
     Semaphore * semaphore;
     uint32_t priority;
 };
@@ -61,6 +61,8 @@ struct _DeviceFun {
     void (*destroy)(Device* self);
 	bool (*transfer)(Device* self, const void *data, size_t count);
     bool (*attach_irq)(Device* self, irq_config *conf);
+
+	uint32_t (*encode_pripority)(Device* self, uint32_t peer_pripority, uint32_t sub_pripority);
 
 };
 // 类结构

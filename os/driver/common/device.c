@@ -2,6 +2,8 @@
 #include "../../common/linear_pool.h"
 #include <stdio.h>
 
+static uint32_t device_encode_pripority(Device* self, uint32_t peer_pripority, uint32_t sub_pripority);
+
 static bool device_attach_irq(Device* self, irq_config *conf);
 
 static bool device_transfer(Device* self, const void *data, size_t count);
@@ -14,6 +16,7 @@ static const DeviceFun device_fun = {
     .destroy = device_destroy,
 	.transfer = device_transfer,
 	.attach_irq = device_attach_irq,
+	.encode_pripority = device_encode_pripority,
 };
 // 构造函数实现
 Device* device_create() {
@@ -58,9 +61,9 @@ static bool device_attach_irq(Device* self, irq_config *conf) {
         return false;
     }
 
-    if (gloable_intc->fun->register_handler(gloable_intc, conf->irq_num, conf->handler, self)) {
-        gloable_intc->fun->attach_semaphore(gloable_intc, conf->irq_num, self->irq_conf.semaphore);
-        gloable_intc->fun->set_priority(gloable_intc, conf->irq_num, conf->priority);
+    if (gloable_nvic->fun->register_handler(gloable_nvic, conf->irq_num, conf->handler, self)) {
+        gloable_nvic->fun->attach_semaphore(gloable_nvic, conf->irq_num, self->irq_conf.semaphore);
+        gloable_nvic->fun->set_priority(gloable_nvic, conf->irq_num, conf->priority);
         return true;
     }
 
@@ -80,4 +83,10 @@ static bool device_transfer(Device* self, const void *data, size_t count) {
 }
 
 
+
+
+// encode_pripority method
+static uint32_t device_encode_pripority(Device* self, uint32_t peer_pripority, uint32_t sub_pripority) {
+    return gloable_nvic->fun->encode_priority(gloable_nvic, peer_pripority, sub_pripority);
+}
 

@@ -11,7 +11,6 @@
 typedef struct _Task_manager Task_manager;
 typedef struct _Task_managerFun Task_managerFun;
 typedef struct _Task_list Task_list;
-typedef enum _Task_Tag Task_tag;
 typedef Task* (*Task_create)();
 // 类成员函数结构
 struct _Task_managerFun {
@@ -20,7 +19,7 @@ struct _Task_managerFun {
 
 };
 
-enum _Task_Tag {
+typedef enum : uint8_t  {
     TASK_SYSTICK = 0,
     TASK_IDLE,
     TASK_OS_CALLBACK,
@@ -28,7 +27,7 @@ enum _Task_Tag {
     TASK_LOG,
     TASK_TEST1,
     TASK_TIME,
-};
+} Task_tag;
 struct _Task_list {
     const Task_tag tag;
     const char *name;

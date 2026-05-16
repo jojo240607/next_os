@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include "../task/task.h"
 #include "../driver/timer.h"
+#include "../driver/adc.h"
+#include "../driver/spi.h"
+#include "../driver/i2c.h"
+#include "../driver/wdg.h"
+#include "../driver/pwm.h"
+
 
 #define GET_TIME_TASK_VTABLE(obj) GET_TASK_VTABLE(obj) //(*(Time_taskVTable **)obj)
 #define GET_TIME_TASK(obj) ((Time_task *)obj)
@@ -20,6 +26,11 @@ struct _Time_task {
     const Time_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Device *timer;
+    Device *adc;
+    Device *spi;
+    Device *i2c;
+    Device *wdg;
+    Device *pwm;
 };
 
 // 构造函数声明

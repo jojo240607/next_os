@@ -11,7 +11,7 @@
 #include "../scheduler/semaphore.h"
 
 /* 日志级别 */
-typedef enum {
+typedef enum : uint8_t {
     LOG_LEVEL_DEBUG = 0,
     LOG_LEVEL_INFO,
     LOG_LEVEL_WARN,
@@ -20,7 +20,7 @@ typedef enum {
 } log_level_t;
 
 /* 模块ID，可扩展 */
-typedef enum {
+typedef enum : uint8_t {
     MODULE_SYSTEM = 0,
     MODULE_UART,
     MODULE_TASK,

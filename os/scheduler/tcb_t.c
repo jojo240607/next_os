@@ -19,9 +19,9 @@ Tcb_t* tcb_t_create(const char *name, Entry_t *entry, size_t stack_size) {
     if (stack_size > DEFAULT_STACK_SIZE) {
         stack_size = DEFAULT_STACK_SIZE;
     }
-    Tcb_t* obj = (Tcb_t*)os_malloc(sizeof(Tcb_t) + stack_size * sizeof(uint32_t));
+    Tcb_t* obj = (Tcb_t*)os_ccm_malloc(sizeof(Tcb_t) + stack_size * sizeof(uint32_t));
     if (obj) {
-        memset(obj, 0, sizeof(Tcb_t) + stack_size);
+        memset(obj, 0, sizeof(Tcb_t) + stack_size * sizeof(uint32_t));
         tcb_t_init(obj, name, entry, stack_size);
     }
     return obj;

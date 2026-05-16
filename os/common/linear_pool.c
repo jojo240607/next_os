@@ -3,7 +3,8 @@
 
 static void noram_error();
 
-static linear_allocator_t gloable_alloc = {0};
+static linear_allocator_t gloable_alloc = {0};  //普通对象内存池
+static linear_allocator_t gloable_ccm_alloc = {0};//ccm内存池
 
 linear_allocator_t *linear_pool_get() {
     return &gloable_alloc;
@@ -14,6 +15,13 @@ static void linear_allocator_init(linear_allocator_t *alloc) {
     alloc->start = (uint8_t*)buffer;
     alloc->next = alloc->start;
     alloc->size = DEFAULT_OBJBUF_SIZE;
+}
+
+static void linear_ccm_allocator_init(linear_allocator_t *alloc) {
+    CCMRAM static uint8_t buffer[DEFAULT_CCMRAM_SIZE];
+    alloc->start = (uint8_t*)buffer;
+    alloc->next = alloc->start;
+    alloc->size = DEFAULT_CCMRAM_SIZE;
 }
 
 // 分配一块内存（不对齐，简单版）
@@ -42,9 +50,14 @@ static void noram_error() {
 }
 void os_pool_init() {
     linear_allocator_init(&gloable_alloc);
+    linear_ccm_allocator_init(&gloable_ccm_alloc);
 }
 void *os_malloc(size_t num_bytes) {
     return linear_alloc(&gloable_alloc, num_bytes);
+}
+
+void *os_ccm_malloc(size_t num_bytes) {
+    return linear_alloc(&gloable_ccm_alloc, num_bytes);
 }
 
 void os_free (void *p) {
