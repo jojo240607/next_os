@@ -1,4 +1,5 @@
 #include "rcc.h"
+#include "cmsis_gcc.h"
 
 /* ---------- 寄存器定义 ---------- */
 typedef struct {
@@ -47,9 +48,9 @@ static uint32_t _apb2_clk= 16000000;
 /* ---------- 辅助：等待 HSE 就绪 ---------- */
 static bool wait_hse_ready(void)
 {
-    uint32_t timeout = 1000000;
+    //uint32_t timeout = 1000000;
     while (!(xRCC->CR & xRCC_CR_HSERDY)) {
-        if (--timeout == 0) return false;
+      //  if (--timeout == 0) return false;
     }
     return true;
 }
@@ -57,11 +58,11 @@ static bool wait_hse_ready(void)
 /* ---------- 辅助：等待 PLL 就绪 ---------- */
 static bool wait_pll_ready(void)
 {
-    uint32_t timeout = 1000000;
+    //uint32_t timeout = 1000000;
     while (!(xRCC->CR & xRCC_CR_PLLRDY)) {
-        if (--timeout == 0) {
-            return false;
-        }
+      //  if (--timeout == 0) {
+          //  return false;
+      //  }
     }
     return true;
 }
@@ -86,9 +87,16 @@ bool rcc_sysclk_init(const rcc_sysclk_config_t *cfg)
 
     /* 2. 配置 PLL (如果使用) */
     if (cfg->sysclk_src == RCC_CLK_PLL) {
+        // 1. 检查当前系统时钟源是否是PLL
+        //if ((xRCC->CFGR & 0x0C) == 0x08) {  // SWS = 10 = PLL
+        //    // 2. 切换到HSI（系统时钟默认源，可靠）
+        //    xRCC->CFGR &= ~0x03;             // SW = 00 (选择HSI)
+        //    // 3. 等待HSI成为系统时钟
+        //    while ((xRCC->CFGR & 0x0C) != 0x00); // SWS = 00 = HSI
+        //}
         // 关闭 PLL 并等待
-        xRCC->CR &= ~xRCC_CR_PLLON;
-        while (xRCC->CR & xRCC_CR_PLLRDY);
+      //  xRCC->CR &= ~xRCC_CR_PLLON;
+      //  while (xRCC->CR & xRCC_CR_PLLRDY);
 
         // 配置 PLL 参数
         uint32_t pllcfgr = 0;
@@ -120,32 +128,31 @@ bool rcc_sysclk_init(const rcc_sysclk_config_t *cfg)
     }
 
     /* 3. 配置总线分频 (先不分频以便切换系统时钟时稳定) */
+    /* 3. 构造完整的 CFGR 值 (SW + 分频系数) 并一次性写入 */
     uint32_t cfgr = 0;
-    cfgr |= cfg->ahb_div  << 4;
-    cfgr |= cfg->apb1_div << 10;
-    cfgr |= cfg->apb2_div << 13;
-    xRCC->CFGR = cfgr;
 
-    /* 4. 切换系统时钟 */
-    cfgr = xRCC->CFGR & ~(0x03 << 0);   // 清 SW 位
+    /* 设置 SW */
     switch (cfg->sysclk_src) {
-        case RCC_CLK_HSI:
-            cfgr |= 0x00;
-            break;
-        case RCC_CLK_HSE:
-            cfgr |= 0x01;
-            break;
-        case RCC_CLK_PLL:
-            cfgr |= 0x02;
-            break;
+        case RCC_CLK_HSI: cfgr |= 0x00; break;
+        case RCC_CLK_HSE: cfgr |= 0x01; break;
+        case RCC_CLK_PLL: cfgr |= 0x02; break;
     }
-    xRCC->CFGR = cfgr;
 
-    // 等待系统时钟切换完成
-    uint32_t sws_target = (cfg->sysclk_src == RCC_CLK_HSI) ? (0x00 << 2) :
-                          (cfg->sysclk_src == RCC_CLK_HSE) ? (0x01 << 2) :
-                          (0x02 << 2);
+    /* 设置总线分频 */
+    cfgr |= (cfg->ahb_div  & 0x0F) << 4;
+    cfgr |= (cfg->apb1_div & 0x07) << 10;
+    cfgr |= (cfg->apb2_div & 0x07) << 13;
+
+    /* 一次性写入 CFGR */
+    xRCC->CFGR = cfgr;
+    __DSB();
+
+/* 等待切换完成 */
+    uint32_t sws_target = (cfgr & 0x03) << 2;
     while ((xRCC->CFGR & (0x03 << 2)) != sws_target);
+
+/* 3. 等待切换完成 */
+    //while ((xRCC->CFGR & 0x0C) != sws_target);
 
     /* 5. 如果之前使用了 HSI 且不再需要，可关闭 HSI 以省电（可选） */
 

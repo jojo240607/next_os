@@ -15,9 +15,10 @@ rcc_sysclk_config_t clk_cfg = {
 const rcc_sysclk_config_t clk_conf = {
         .sysclk_src  = RCC_CLK_PLL,
         .pll_src     = RCC_PLLSRC_HSE,
-        .hse_freq    = 8000000,
-        .hsi_freq    = 16000000,
         .hse_bypass  = false,         // 无源晶振
+        .hse_freq    = 8000000,       //8M
+        .hsi_freq    = 16000000,      //16M
+
         .pll_m = 8,                   // 8MHz / 8 = 1MHz
         .pll_n = 336,                 // 1MHz * 336 = 336MHz (VCO)
         .pll_p = 2,                   // 336MHz / 2 = 168MHz (系统时钟)
