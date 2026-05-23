@@ -110,6 +110,6 @@ task_thread_override(task_test1_thread_impl) {
 
 static void task_test1_callback_handler(os_cb_event event, void *arg) {
     Task_test1 *task_test1 = (Task_test1 *)arg;
-    LOG_DEBUG("test1", "-------- exti %d task %s --------", event, GET_TASK(task_test1)->task_tcb->name);
+    //LOG_DEBUG("test1", "-------- exti %d task %s --------", event, GET_TASK(task_test1)->task_tcb->name);
     task_test1->start_mutex = true;
 }

@@ -34,7 +34,7 @@
 #define GET_OBJ_VTAB(type, obj) (*(type##VTable **)obj)
 
 #define DEFAULT_OBJBUF_SIZE (1024 * 10)     //10k 对象池
-#define DEFAULT_CCMRAM_SIZE (1024 * 6)     //6k ccm内存池 给任务栈使用
+#define DEFAULT_CCMRAM_SIZE (1024 * 8)     //6k ccm内存池 给任务栈使用
 #define DEFAULT_STACK_SIZE (11)              //2 ^ 11 = 2048   默认任务栈大小
 #define SYSTEM_TICKS_PER_SEC (1000)         //1000hz / 时间片默认切换周期1ms
 

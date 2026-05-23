@@ -114,19 +114,19 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
         return;
     }
     //hal_fpu_save_context(&self->current_thread->fpu_ctx);
+#if OS_STACK_DEBUG
+    uint16_t left = 0;
+    while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
+        left++;
+    }
+    self->current_thread->stack_left = left * sizeof(uint32_t);
+#endif
     if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
         while (1) {
+            LOW_POWER;
             LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
             //stack out bound
         }
-    } else {
-#if OS_STACK_DEBUG
-        uint16_t left = 0;
-        while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
-            left++;
-        }
-        self->current_thread->stack_left = left * sizeof(uint32_t);
-#endif
     }
 //    DISABLE_IRQ;
     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {

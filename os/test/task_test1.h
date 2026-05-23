@@ -22,7 +22,7 @@ struct _Task_test1 {
     // TODO: 添加派生类特有的数据成员
     //Exti *exti;
     os_callback callback;
-    bool start_mutex;
+    volatile bool start_mutex;
     bool locked;
 };
 

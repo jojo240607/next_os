@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "thread_scheduler.h"
 #include "../common/linear_pool.h"
+#include "../driver/svc.h"
 
 static void tcb_t_os_sleep(Tcb_t* self, uint32_t ms);
 
@@ -121,6 +122,7 @@ static void tcb_t_os_sleep(Tcb_t* self, uint32_t ms) {
     // 按 delay_ticks 升序插入
     arch_irq_unlock(key);
     // 触发调度，切换到下一个就绪任务
-    Trigger_PendSV;
+    //Trigger_PendSV;
+    start_pendsv_user();
 }
 

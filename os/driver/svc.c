@@ -29,5 +29,6 @@ int system_svc_init(void) {
 
 static uint32_t trigger_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
     Trigger_PendSV;
+    return 0;
 }
 

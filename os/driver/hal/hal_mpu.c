@@ -206,6 +206,8 @@ void mpu_switch_task_stack(uint32_t stack_base, mpu_region_size_t size) {
    =================================================================== */
 void MemManage_Handler(void)
 {
+    uint32_t fault_pc;
+    __asm volatile("MRS %0, PSP\n" : "=r"(fault_pc)); // 如果使用 PSP
     uint32_t mmfar  = xSCB->MMFAR;
     uint32_t cfsr   = xSCB->CFSR;
     uint8_t mmfsr   = (cfsr >> 0) & 0xFF;
