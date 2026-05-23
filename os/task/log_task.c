@@ -87,7 +87,7 @@ task_thread_override(log_task_task_thread_impl) {
     Ring *log_buf = log_buffer();
     log_entry_t entry;
     while (1) {
-        self->semaphore->fun->take_user(self->semaphore);
+        self->semaphore->fun->take(self->semaphore);
         /* 批量处理，直到缓冲区空 */
         while (log_buf->fun->pop(log_buf, &entry)) {
             /* 格式化并发送到串口 */

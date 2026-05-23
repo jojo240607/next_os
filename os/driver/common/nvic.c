@@ -15,12 +15,18 @@ static void nvic_dispatch(Nvic* self, nvic_irq_num irq_num);
 /* NVIC 初始化：设置优先级分组 + 批量配置中断 */
 static const nvic_config_t nvic_cfg = {
         .priority_group = SCB_PRIORITY_GROUP_4,  // 4位抢占，0位子优先级
-        .num_irqs       = 1,
-        .irq_configs    = &(const nvic_irq_config_t) {
+        .num_irqs       = 2,
+        .irq_configs    = {&(const nvic_irq_config_t) {
                             .irq = xPendSV_IRQn,
-                            .preempt_priority = IRQ_PREEMPT_PRIORITY_LOWEST,  //0011
+                            .preempt_priority = IRQ_PREEMPT_PRIORITY_LOWEST,
                             .sub_priority = 0,      //0011
-                            .enable = true}
+                            .enable = false},
+                           &(const nvic_irq_config_t) {
+                                   .irq = xSVCall_IRQn,
+                                   .preempt_priority = IRQ_PREEMPT_PRIORITY_SYSCALL,
+                                   .sub_priority = 0,
+                                   .enable = false}
+        }
 };
 
 // 析构函数声明
@@ -286,13 +292,7 @@ void NMI_Handler(void)
     }
 }
 
-void HardFault_Handler(void)
-{
-    while (1)
-    {
 
-    }
-}
 
 void BusFault_Handler(void)
 {

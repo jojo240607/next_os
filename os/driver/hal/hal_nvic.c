@@ -43,9 +43,9 @@ int hal_nvic_init(const nvic_config_t *cfg)
     hal_nvic_set_priority_group(cfg->priority_group);
 
     /* 2. 批量配置中断 */
-    if (cfg->irq_configs && cfg->num_irqs > 0) {
+    if (*cfg->irq_configs && cfg->num_irqs > 0) {
         for (uint32_t i = 0; i < cfg->num_irqs; i++) {
-            const nvic_irq_config_t *irq_cfg = &cfg->irq_configs[i];
+            const nvic_irq_config_t *irq_cfg = cfg->irq_configs[i];
             hal_nvic_set_priority(irq_cfg->irq,
                               irq_cfg->preempt_priority,
                               irq_cfg->sub_priority);

@@ -78,7 +78,7 @@ task_thread_override(os_cb_task_task_thread_impl) {
 
     //params , void *arg
     while (true) {
-        self->semaphore->fun->take_user(self->semaphore);
+        self->semaphore->fun->take(self->semaphore);
         os_cb_task->cb_event = self->semaphore->sem_event;
         LOG_DEBUG("os_cb_task", "----- os callback ----- event %d", os_cb_task->cb_event);
         os_callback *cb = (os_callback*)os_cb_task->callback_list->head;

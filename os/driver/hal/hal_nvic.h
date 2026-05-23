@@ -146,7 +146,7 @@ typedef struct {
 typedef struct {
     scb_priority_group_t   priority_group;     // 全局优先级分组
     uint32_t                num_irqs;           // 配置的中断数量
-    const nvic_irq_config_t *irq_configs;       // 中断配置数组指针
+    const nvic_irq_config_t *irq_configs[];       // 中断配置数组指针
 } nvic_config_t;
 
 /* ========== API ========== */

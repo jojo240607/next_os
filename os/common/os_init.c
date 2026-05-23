@@ -101,13 +101,12 @@ void os_init() {
     sys_mutex_init();
     pinmux_init();
     dma_init();
-
-    gloable_nvic = nvic_create();
     global_thread_scheduler = thread_scheduler_create();
     gloable_deviceManager = device_manager_create();
     gloable_taskManager = task_manager_create();
+    gloable_nvic = nvic_create();
     gloable_taskManager->fun->boot_init(gloable_taskManager);
-    system_mpu_setup();
+    //system_mpu_setup();
     system_svc_init();
     global_thread_scheduler->fun->start(global_thread_scheduler);
 }

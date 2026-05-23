@@ -96,7 +96,7 @@ void log_output(log_level_t level, const char * tag, const char *fmt, ...) {
     log_entry_t entry;
     entry.timestamp = getSystime()->systick;// global_thread_scheduler->current_thread->tid;//os_get_tick();
     entry.level = (uint8_t)level;
-    entry.tid = global_thread_scheduler->current_thread->tid;
+    entry.tid = global_thread_scheduler == NULL ? 0 : global_thread_scheduler->current_thread->tid;
     entry.tag = tag;
 
     va_list args;

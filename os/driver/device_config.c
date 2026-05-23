@@ -70,7 +70,7 @@ const usart_config usart4_conf = {
                 .uart_rx = PC11_REQ_UART4_RX,
         },
         .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
-        .dma_cfg =  &(const uart_dma_config_t) {
+        .dma_cfg = NULL /*&(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
                     .dma_request    = DMA1_REQ_UART4_TX,
                     .direction      = DMA_DIR_M2P,
@@ -95,7 +95,7 @@ const usart_config usart4_conf = {
                     .fifo_mode      = DMA_FIFO_DIRECT,
                     .it_enable      = 0,                 // 直接读取缓冲区则无需中断
                 },
-        },
+        }*/,
 };
 
 const exti_config exti_conf = {
@@ -118,7 +118,7 @@ const adc_config adc1_conf = {
         .resolution  = ADC_RES_12BIT,
         .align       = ADC_ALIGN_RIGHT,
         .continuous  = true,            // 单次, 连续转换模式 (若不使用 DMA 请慎用)
-        .dma_cfg = &(const dma_stream_config_t) {
+        .dma_cfg = NULL/*&(const dma_stream_config_t) {
                 .dma_request    = DMA2_REQ_ADC1_ST0,
                 .direction      = DMA_DIR_P2M,        // 外设到存储器
                 .priority       = xDMA_PRIORITY_HIGH,
@@ -129,7 +129,7 @@ const adc_config adc1_conf = {
                 .mode           = DMA_MODE_CIRCULAR,   // 循环扫描
                 .fifo_mode      = DMA_FIFO_DIRECT,
                 .it_enable      = xDMA_IT_TC,          // 可选，一轮完成中断
-            },
+            }*/,
         .num_channels = 2,
         .channels    = {
                 &(const adc_channel_cfg_t) {
@@ -159,7 +159,7 @@ const spi_config_t spi1_conf = {
                 .nss_pin  = PA4_REQ_SPI1_NSS   // 硬件 NSS 或软件管理
         },
         .it_enable = xSPI_IT_TXE | xSPI_IT_RXNE,
-        .dma_cfg =&(const spi_dma_config_t){
+        .dma_cfg = NULL/*&(const spi_dma_config_t){
             .tx_dma = &(const dma_stream_config_t) {
                  .dma_request = DMA2_REQ_SPI1_TX_ST3,
                  .direction = DMA_DIR_M2P,
@@ -184,7 +184,7 @@ const spi_config_t spi1_conf = {
                  .fifo_mode = DMA_FIFO_DIRECT,
                  .it_enable = xDMA_IT_TC,
             },
-        }
+        }*/
 };
 
 const i2c_config_t i2c1_conf = {

@@ -21,13 +21,13 @@ static const Task_managerFun task_manager_fun = {
 };
 Task_manager * gloable_taskManager;
 static const Task_list task_lists[] = {
-        {.id = TASK_SYSTICK, .name = "systick", .task_priority = 1, .stack_size = MPU_SIZE_0B, .task_create = (Task_create) systick_task_create},
         {.id = TASK_OS_CALLBACK, .name = "os_cb", .task_priority = 5, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) os_cb_task_create},
         {.id = TASK_IDLE, .name = "idle", .task_priority = 0, .stack_size = MPU_SIZE_128B, .task_create = (Task_create) idle_task_create},
         {.id = TASK_MONITOR, .name = "monitor", .task_priority = 0, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) monitor_task_create},
         {.id = TASK_LOG, .name = "log", .task_priority = 0, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) log_task_create},
         {.id = TASK_TEST1, .name = "test1", .task_priority = 1, .stack_size = MPU_SIZE_2K, .task_create = (Task_create) task_test1_create},
         {.id = TASK_TIME, .name = "time", .task_priority = 1, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) time_task_create},
+        {.id = TASK_SYSTICK, .name = "systick", .task_priority = 1, .stack_size = MPU_SIZE_0B, .task_create = (Task_create) systick_task_create},
 
 };
 // 构造函数实现

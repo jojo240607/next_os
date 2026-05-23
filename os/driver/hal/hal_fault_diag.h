@@ -27,6 +27,17 @@ typedef enum {
     FP_EXCEPTION_UNDERFLOW= (1 << 3),   // 下溢
     FP_EXCEPTION_INEXACT  = (1 << 4),   // 不精确
 } fp_exception_t;
+/* 故障栈帧结构体 (Cortex-M4 进入异常时自动压栈的顺序) */
+typedef struct {
+    uint32_t r0;
+    uint32_t r1;
+    uint32_t r2;
+    uint32_t r3;
+    uint32_t r12;
+    uint32_t lr;         // 被压入栈的原始 LR
+    uint32_t pc;         // 故障指令地址
+    uint32_t xpsr;
+} ExceptionStackFrame;
 
 /* ───────── 故障详情结构体 ───────── */
 typedef struct {
@@ -58,6 +69,7 @@ typedef struct {
     /* 浮点状态 */
     fp_exception_t fp_exceptions;   // FPSCR 异常标志组合
     bool fp_disabled;               // FPU 未使能 (与 ufsr_nocp 关联)
+
 } fault_info_t;
 
 

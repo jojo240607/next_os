@@ -8,7 +8,7 @@
 /* ---------- 引脚状态管理 ---------- */
 typedef struct {
     bool         allocated;
-    pin_config_t config;
+    const pin_config_t *config;
 } pin_state_t;
 
 static pin_state_t pin_states[PORT_MAX][PIN_MAX];
@@ -81,7 +81,7 @@ int pinmux_request(const pin_config_t *cfg)
 
     if (state->allocated) {
         /* 已经分配，检查配置是否一致 */
-        const pin_config_t *old = &state->config;
+        const pin_config_t *old = state->config;
         if (old->mode   != cfg->mode   ||
             old->otype  != cfg->otype  ||
             old->ospeed != cfg->ospeed ||
@@ -97,7 +97,7 @@ int pinmux_request(const pin_config_t *cfg)
     /* 分配新引脚 */
     apply_config(cfg);
     state->allocated = true;
-    state->config = *cfg;
+    state->config = cfg;
     return PINMUX_SUCCESS;
 }
 

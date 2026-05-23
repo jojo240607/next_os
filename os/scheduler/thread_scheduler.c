@@ -180,13 +180,15 @@ static void thread_scheduler_start(Thread_scheduler* self) {
     if (self->current_thread == NULL) {
         return;
     }
+    hal_nvic_enable_irq(xPendSV_IRQn);
+    hal_nvic_enable_irq(xSVCall_IRQn);
     __set_PSP( (uint32_t)self->current_thread->sp );
     // 设置 CONTROL 寄存器，选择使用 PSP
     __set_CONTROL( __get_CONTROL() | CONTROL_THREAD_PSP_PRIV ); // 线程模式 + 进程堆栈(PSP) + 非特权级 (nPRIV=1, SPSEL=1)
     // 执行 ISB 指令确保立即生效
     __ISB();
-    //Trigger_PendSV;
-    start_pendsv_user();
+    Trigger_PendSV;
+    //start_pendsv_user();
     // 或者直接使用 svc 指令
     // 注意：永远不会返回到这里
     while(1) {
