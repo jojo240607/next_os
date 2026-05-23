@@ -29,18 +29,18 @@ static void hal_adc_start_calibration(xADC_TypeDef *adc)
     while (adc->CR2 & (1 << 2));
 }
 // 构造函数实现
-Adc* adc_create(const adc_config *conf) {
+Adc* adc_create(const adc_config *conf, const dev_pripority_t *priority) {
     Adc* obj = (Adc*)os_malloc(sizeof(Adc));
     if (obj) {
         memset(obj, 0, sizeof(Adc));
-        adc_init(obj, conf);
+        adc_init(obj, conf, priority);
     }
     return obj;
 }
 
-void adc_init(Adc* self, const adc_config *conf) {
+void adc_init(Adc* self, const adc_config *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(adc_fun);
     // TODO: 初始化派生类特有成员
 	def_dev_init(self) = adc_dev_init_impl;
@@ -156,7 +156,6 @@ dev_init_override(adc_dev_init_impl) {
         /* DDS (CR2 bit9) 通常不用设置（每次转换完发出请求） */
 
         if (adc->conf->dma_cfg->it_enable) {
-            self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);
             self->irq_conf.handler = adc_txdma_irq_handler_impl;
             self->irq_conf.semaphore = sem;
             self->irq_conf.arg = self;

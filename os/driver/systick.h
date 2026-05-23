@@ -23,7 +23,7 @@ struct _SystickFun {
 
 /* SysTick 配置描述符 */
 typedef struct {
-    uint32_t    frequency_hz;   // 内核时钟频率 (HCLK)，用于计算重装载值
+    //uint32_t    frequency_hz;   // 内核时钟频率 (HCLK)，用于计算重装载值
     uint32_t    interval_us;    // 中断间隔 (微秒)，仅在启用中断时有效
     bool        one_shot;       // 是否单次触发 (true=单次, false=周期)
     void        (*callback)(void); // 中断回调函数 (若为 NULL 则仅产生中断但不处理)
@@ -37,8 +37,8 @@ struct _Systick {
 };
 
 // 构造函数声明
-Systick* systick_create(const systick_config_t *conf);
-void systick_init(Systick* self, const systick_config_t *conf);
+Systick* systick_create(const systick_config_t *conf, const dev_pripority_t *priority);
+void systick_init(Systick* self, const systick_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void systick_deinit(Systick* self);

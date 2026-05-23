@@ -62,11 +62,11 @@ static bool ring_push(Ring* self, const void *data) {
     }
 
     char *byte_buffer = (char *)self->buffer;
-    DISABLE_IRQ;
+    uint32_t key = arch_irq_lock();
     memcpy(byte_buffer + self->tail * self->elem_size, data, self->elem_size);
     self->tail = (self->tail + 1) % self->capacity;
     self->count++;
-    ENABLE_IRQ;
+    arch_irq_unlock(key);
     return true;
 }
 // pop method

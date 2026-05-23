@@ -12,7 +12,7 @@ machine StartGdbServer 3333 true
 
 $bin?=@cmake-build-debug/stm32f4discovery.elf
 
-showAnalyzer sysbus.uart4
+showAnalyzer sysbus.usart1
 
 ### Set random board UNIQUE ID ###
 
@@ -45,8 +45,8 @@ logLevel 0 i2c1.dummy_i2c
 ###ADC1
 adc1 FeedSample 0xFF 0
 
-sleep 10
-sysbus.gpioPortA OnGPIO 1 true      # 模拟电平变高
-sleep 0.01                     # 让高电平维持一个很短的时间
-sysbus.gpioPortA OnGPIO 1 false   # 模拟电平变低，产生下降沿触发中断
+#sleep 10
+#sysbus.gpioPortA OnGPIO 1 true      # 模拟电平变高
+#sleep 0.01                     # 让高电平维持一个很短的时间
+#sysbus.gpioPortA OnGPIO 1 false   # 模拟电平变低，产生下降沿触发中断
 

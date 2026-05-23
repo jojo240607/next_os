@@ -22,7 +22,7 @@ struct _Monitor_task {
     // TODO: 添加派生类特有的数据成员
     Idle_task *idletask;
     uint32_t last_call;
-    uint8_t cpu_usage;
+    //uint8_t cpu_usage;
 };
 
 // 构造函数声明

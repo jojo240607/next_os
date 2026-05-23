@@ -17,40 +17,12 @@ typedef struct _usart_config usart_config;
 struct _UsartFun {
     void (*destroy)(Usart* self);
 	void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
-
 	void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
 
 };
 
 
-/* 字长 */
-typedef enum : uint8_t {
-    UART_WORDLEN_8  = 0x00,
-    UART_WORDLEN_9  = 0x01,
-} uart_word_len_t;
 
-
-/* 停止位 */
-typedef enum : uint8_t {
-    UART_STOP_1     = 0x00,
-    UART_STOP_0_5   = 0x01,
-    UART_STOP_2     = 0x02,
-    UART_STOP_1_5   = 0x03,
-} uart_stop_t;
-/* 校验 */
-typedef enum : uint8_t {
-    UART_PARITY_NONE  = 0x00,
-    UART_PARITY_EVEN  = 0x02,
-    UART_PARITY_ODD   = 0x03,
-} uart_parity_t;
-
-typedef enum : uint8_t {
-    /* 中断使能选项 */
-    xUART_IT_NONE = 0,
-    xUART_IT_TXE =  (1 << 0),   // 发送数据寄存器空中断
-    xUART_IT_RXNE = (1 << 1),   // 接收数据寄存器非空中断
-    xUART_IT_TC =   (1 << 2),   // 发送完成中断 (TC)
-} uart_it_t;
 /* UART DMA 配置描述符 */
 typedef struct {
     const dma_stream_config_t *tx_dma;
@@ -68,15 +40,18 @@ typedef struct {
     bool           tx_active;
     bool           rx_active;
 } uart_xfer_t;
-
+/* USART 引脚描述 */
+typedef struct {
+    pin_af uart_tx;
+    pin_af uart_rx;
+} uart_pins_t;
 struct _usart_config {
     uart_id_t id;
     uint32_t    baudrate;
     uart_word_len_t     word_len;
     uart_stop_t     stop_bits;
     uart_parity_t     parity;
-    const pin_config_t *tx_conf;
-    const pin_config_t *rx_conf;
+    uart_pins_t pins;
     uart_it_t it_enable;
     /* DMA 可选 */
     const uart_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
@@ -93,8 +68,8 @@ struct _Usart {
 };
 
 // 构造函数声明
-Usart* usart_create(const usart_config * conf);
-void usart_init(Usart* self, const usart_config *conf);
+Usart* usart_create(const usart_config * conf, const dev_pripority_t *priority);
+void usart_init(Usart* self, const usart_config *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void usart_deinit(Usart* self);

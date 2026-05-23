@@ -14,18 +14,18 @@ static const RtcFun rtc_fun = {
     .destroy = rtc_destroy,
 };
 // 构造函数实现
-Rtc* rtc_create(const rtc_config_t *conf) {
+Rtc* rtc_create(const rtc_config_t *conf, const dev_pripority_t *priority) {
     Rtc* obj = (Rtc*)os_malloc(sizeof(Rtc));
     if (obj) {
         memset(obj, 0, sizeof(Rtc));
-        rtc_init(obj, conf);
+        rtc_init(obj, conf, priority);
     }
     return obj;
 }
 
-void rtc_init(Rtc* self, const rtc_config_t *conf) {
+void rtc_init(Rtc* self, const rtc_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(rtc_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
@@ -99,7 +99,7 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
             cr |= xRTC_CR_TSIE;
         }
         xRTC->CR = cr;
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+       // self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
         self->irq_conf.handler = rtc_irq_handler_impl;
         self->irq_conf.irq_num = RTC_ALARM_IRQ;
         self->fun->attach_irq(self, &self->irq_conf);

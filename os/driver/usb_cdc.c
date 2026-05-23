@@ -18,18 +18,18 @@ static const Usb_cdcFun usb_cdc_fun = {
 
 
 // 构造函数实现
-Usb_cdc* usb_cdc_create(const usb_cdc_config_t *conf) {
+Usb_cdc* usb_cdc_create(const usb_cdc_config_t *conf, const dev_pripority_t *priority) {
     Usb_cdc* obj = (Usb_cdc*)os_malloc(sizeof(Usb_cdc));
     if (obj) {
         memset(obj, 0, sizeof(Usb_cdc));
-        usb_cdc_init(obj, conf);
+        usb_cdc_init(obj, conf, priority);
     }
     return obj;
 }
 
-void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf) {
+void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(usb_cdc_fun);
     // TODO: 初始化派生类特有成员
 
@@ -37,7 +37,7 @@ void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf) {
     self->conf = conf;
     self->usb_cdc_xfer.tx_len = 0;
     self->usb_cdc_xfer.rx_len = 0;
-    self->usb_cdc_xfer.rx_rd_idx = 0;
+   // self->usb_cdc_xfer.rx_rd_idx = 0;
     self->usb_cdc_xfer.rx_wr_idx = 0;
     self->usb_cdc_xfer.usb_rx_sem = semaphore_create(0);
     self->usb_cdc_xfer.usb_tx_sem = semaphore_create(0);
@@ -122,7 +122,7 @@ dev_init_override(usb_cdc_dev_init_impl) {
     /* 9. NVIC */
     //nvic_set_priority(OTG_FS_IRQn, 0, 0);
     //nvic_enable_irq(OTG_FS_IRQn);
-    self->irq_conf.priority = self->fun->encode_pripority(self, 0x00, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+    //self->irq_conf.priority = self->fun->encode_pripority(self, 0x00, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
     self->irq_conf.handler = usb_cdc_irq_handler_impl;
     self->irq_conf.semaphore = sem;
     self->irq_conf.arg = self;

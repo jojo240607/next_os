@@ -1,11 +1,12 @@
 #include "semaphore.h"
 #include <stdio.h>
-#include "main.h"
 #include "thread_scheduler.h"
 #include "../common/linear_pool.h"
+#include "../driver/svc.h"
 
 static void semaphore_take(Semaphore* self);
 static void semaphore_give(Semaphore* self);
+static void semaphore_take_user(Semaphore* self);
 
 // 析构函数声明
 static void semaphore_destroy(Semaphore* self);
@@ -15,6 +16,7 @@ static const SemaphoreFun semaphore_fun = {
     .destroy = semaphore_destroy,
 	.take = semaphore_take,
 	.give = semaphore_give,
+    .take_user = semaphore_take_user,
 };
 // 构造函数实现
 Semaphore* semaphore_create(uint8_t count) {
@@ -60,10 +62,10 @@ static void semaphore_take(Semaphore* self) {
         return;
     }
 
-    DISABLE_IRQ;               // 进入临界区
+    uint32_t key = arch_irq_lock();               // 进入临界区
     if (self->count > 0) {
         self->count--;
-        ENABLE_IRQ;            // 快速路径，不阻塞
+        arch_irq_unlock(key);            // 快速路径，不阻塞
         return;
     }
 
@@ -73,7 +75,7 @@ static void semaphore_take(Semaphore* self) {
     // 将当前任务插入信号量的等待队列尾部
     //insert_into_wait_list(&sem->wait_list, current);
     self->wait_list->fun->enqueue(self->wait_list, GET_NODE(current));
-    ENABLE_IRQ;
+    arch_irq_unlock(key);
     Trigger_PendSV;
     return;
 }
@@ -82,7 +84,7 @@ static void semaphore_give(Semaphore* self) {
     if (NULL == self) {
         return;
     }
-    DISABLE_IRQ;
+    uint32_t key = arch_irq_lock();
     if (self->wait_list->size > 0) {
         // 有任务在等待：取出队首任务
         Tcb_t *task = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
@@ -92,7 +94,34 @@ static void semaphore_give(Semaphore* self) {
     } else {
         self->count++;
     }
-    ENABLE_IRQ;
+    arch_irq_unlock(key);
 }
+
+
+// take method
+static void semaphore_take_user(Semaphore* self) {
+    if (NULL == self) {
+        return;
+    }
+
+    uint32_t key = arch_irq_lock();               // 进入临界区
+    if (self->count > 0) {
+        self->count--;
+        arch_irq_unlock(key);            // 快速路径，不阻塞
+        return;
+    }
+
+    // 需要阻塞当前任务
+    Tcb_t *current = global_thread_scheduler->current_thread;//pxCurrentTCB;
+    current->state = TCB_STATER_BLOCKED;
+    // 将当前任务插入信号量的等待队列尾部
+    //insert_into_wait_list(&sem->wait_list, current);
+    self->wait_list->fun->enqueue(self->wait_list, GET_NODE(current));
+    arch_irq_unlock(key);
+    start_pendsv_user();
+
+    return;
+}
+
 
 

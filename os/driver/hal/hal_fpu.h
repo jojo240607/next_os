@@ -7,6 +7,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "stddef.h"
+#include "hal_scb.h"
 
 /* ───────── FPU 硬件访问宏 (协处理器访问指令) ───────── */
 /* CPACR 寄存器 (位于 SCB) */
@@ -43,13 +44,6 @@ typedef struct {
     bool                enable_auto_state_preservation; /* 使能自动状态保存 */
 } fpu_config_t;
 
-/* 浮点寄存器上下文 (用于任务切换) */
-typedef struct {
-    uint32_t fpscr;                        /* 浮点状态控制寄存器 */
-    uint32_t s_regs[16];                   /* S0~S15 */
-    // 注意：完整的上下文还包括 S16~S31，但 Cortex-M4 硬件自动处理
-} fpu_context_t;
-
 
 /* ========== API ========== */
 int hal_fpu_init(const fpu_config_t *cfg);
@@ -58,10 +52,6 @@ void hal_fpu_deinit(void);
 /* FPU 使能/禁止 */
 void hal_fpu_enable(fpu_mode_t mode);
 void hal_fpu_disable(void);
-
-/* 上下文管理 (用于 RTOS 任务切换) */
-void hal_fpu_save_context(fpu_context_t *ctx);
-void hal_fpu_restore_context(const fpu_context_t *ctx);
 
 /* 状态查询 */
 bool hal_fpu_is_enabled(void);

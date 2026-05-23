@@ -5,6 +5,7 @@
 #include "../scheduler/thread_scheduler.h"
 #include "../log/log.h"
 #include "hal/hal_systick.h"
+#include "common/rcc.h"
 
 
 static void systick_stop(Systick* self);
@@ -23,23 +24,21 @@ static const SystickFun systick_fun = {
 	.stop = systick_stop,
 };
 // 构造函数实现
-Systick* systick_create(const systick_config_t *conf) {
+Systick* systick_create(const systick_config_t *conf, const dev_pripority_t *priority) {
     Systick* obj = (Systick*)os_malloc(sizeof(Systick));
     if (obj) {
         memset(obj, 0, sizeof(Systick));
-        systick_init(obj, conf);
+        systick_init(obj, conf, priority);
     }
     return obj;
 }
 
-void systick_init(Systick* self, const systick_config_t *conf) {
+void systick_init(Systick* self, const systick_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(systick_fun);
     // TODO: 初始化派生类特有成员
-
 	GET_DEVICE_VTABLE(self)->dev_init = systick_dev_init_impl;
-    //GET_DEVICE(self)->irq_num = SYSTIC_IRQ;
     self->conf = conf;
 }
 
@@ -60,25 +59,12 @@ dev_init_override(systick_dev_init_impl) {
     Systick *systick = (Systick *)self;
     LOG_DEBUG("systick", "systick init");
     // TODO: add dev_init method
-    if (!systick->conf || systick->conf->frequency_hz == 0 || systick->conf->interval_us == 0) {
+    if (!systick->conf || systick->conf->interval_us == 0) {
         return;
     }
+    hal_systick_init(systick->conf->interval_us);
 
-    /* 计算重装载值: 每微秒时钟周期数 = frequency_hz / 1000000 */
-    uint32_t ticks_per_us = systick->conf->frequency_hz / 1000000UL;
-    uint32_t reload = systick->conf->interval_us * ticks_per_us;
-
-    /* 限制为 24 位 */
-    if (reload > SYSTICK_MAX_RELOAD) {
-        reload = SYSTICK_MAX_RELOAD;
-    }
-
-    /* 关闭定时器以确保安全配置 */
-    xSYSTICK->CTRL = 0;
-    xSYSTICK->LOAD = reload;
-    xSYSTICK->VAL  = 0;  // 清除当前值
     self->irq_conf.irq_num = SYSTIC_IRQ;
-    self->irq_conf.priority = self->fun->encode_pripority(self, 0x03, 0x03);
     self->irq_conf.handler = systick_irq_handler_impl;
     self->irq_conf.semaphore = sem;
     self->irq_conf.arg = self;
@@ -94,32 +80,23 @@ bool systick_irq_handler_impl(void *arg) {
     //Systick *systick = (Systick *)arg;
     //params , void *arg
     getSystime()->systick++;
-//    HAL_IncTick();
-    /* USER CODE BEGIN SysTick_IRQn 1 */
-    if (gloable_current_stack != NULL) {
+    if (gloable_current_tcb->sp != NULL) {
         global_thread_scheduler->fun->delay_ticks(global_thread_scheduler);
         // 触发 PendSV 中断
         Trigger_PendSV;
     }
-    return false;
+    return true;
 }
 
 
 // start method
 static void systick_start(Systick* self) {
-    uint32_t ctrl = 0;
-    /* 使用处理器时钟 (HCLK) */
-    ctrl |= SYSTICK_CTRL_CLKSOURCE;   // 1: 内核时钟
-    /* 使能中断*/
-    ctrl |= SYSTICK_CTRL_TICKINT;
-    /* 使能计数器 */
-    ctrl |= SYSTICK_CTRL_ENABLE;
-    xSYSTICK->CTRL = ctrl;
+    hal_systick_start();
 }
 
 
 // stop method
 static void systick_stop(Systick* self) {
-    xSYSTICK->CTRL &= ~SYSTICK_CTRL_ENABLE;
+    hal_systick_stop();
 }
 

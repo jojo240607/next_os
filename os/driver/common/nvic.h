@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include "../../scheduler/semaphore.h"
+#include "../hal/hal_nvic.h"
 
-#define nvic_MAX_IRQ 82
 #define GET_Nvic(obj) ((Nvic *)obj)
 // 类声明
 typedef struct _Nvic Nvic;
@@ -92,8 +92,7 @@ struct _NvicFun {
     bool (*register_handler)(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
 	void (*unregister_handler)(Nvic* self, nvic_irq_num irq_num);
 	void (*attach_semaphore)(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
-	void (*set_priority)(Nvic* self, nvic_irq_num irq_num, uint32_t priority);
-	uint32_t (*encode_priority)(Nvic* self, uint32_t preempt_priority, uint32_t sub_priority);
+	void (*set_priority)(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
 
 };
 // 中断控制块
@@ -125,13 +124,14 @@ extern Nvic *gloable_nvic;
 
 void NMI_Handler(void);
 void HardFault_Handler(void);
-void MemManage_Handler(void);
+
 void BusFault_Handler(void);
 void UsageFault_Handler(void);
 void SVC_Handler(void);
 void DebugMon_Handler(void);
 
 void SysTick_Handler(void);
+void USART1_IRQHandler();
 void USART3_IRQHandler();
 void UART4_IRQHandler();
 void TIM2_IRQHandler();

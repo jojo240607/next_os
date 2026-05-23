@@ -1,9 +1,9 @@
 #include "thread_scheduler.h"
 #include <stdio.h>
-#include "main.h"
 #include "../common/linear_pool.h"
 #include "../log/log.h"
 #include "../common/sys_time.h"
+#include "../driver/svc.h"
 
 static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
 static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
@@ -21,7 +21,7 @@ static inline void thread_scheduler_thread_exit();
 
 // 当前任务栈指针
 
-uint32_t *gloable_current_stack = NULL;
+Tcb_t *gloable_current_tcb = NULL;
 Thread_scheduler *global_thread_scheduler = NULL;
 
 // TODO: 初始化数据成员
@@ -105,7 +105,6 @@ static Tcb_t *thread_scheduler_create_thread(Thread_scheduler* self, const char 
     Tcb_t *new_thread = tcb_t_create(name, entry_s, entry_s->stack_size);
     new_thread->tid = self->tid_num++;
     thread_scheduler_add_readly_list(self, new_thread, true);
-    //self->priority_list[entry_s->priority]->fun->enqueue(self->priority_list[entry_s->priority], GET_NODE(new_thread));
     return new_thread;
 }
 
@@ -114,7 +113,7 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     if (NULL == self || self->current_thread == NULL) {
         return;
     }
-    hal_fpu_save_context(&self->current_thread->fpu_ctx);
+    //hal_fpu_save_context(&self->current_thread->fpu_ctx);
     if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
         while (1) {
             LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
@@ -126,10 +125,10 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
         while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
             left++;
         }
-        self->current_thread->stack_left = left;
+        self->current_thread->stack_left = left * sizeof(uint32_t);
 #endif
     }
-    DISABLE_IRQ;
+//    DISABLE_IRQ;
     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {
         thread_scheduler_add_readly_list(self, self->current_thread, true);
     } else if (TCB_STATER_TERMINATED == self->current_thread->state) {
@@ -138,7 +137,7 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
 
     uint8_t highest_priority = thread_scheduler_get_highest_priority(self);
     if (highest_priority > 31) {
-        ENABLE_IRQ;
+//        ENABLE_IRQ;
         return;
     }
     //判断当前优先级的任务队列是否为空，若为空则将标志位清空
@@ -148,27 +147,31 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     }
     Tcb_t *next_tcb = GET_TCB_T(
             self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
-    self->current_thread->run_time += getSystime()->systick - self->current_thread->start_time;
-
+    self->current_thread->cpu_usage_info.total_run_time += getSystime()->systick - self->current_thread->cpu_usage_info.last_reported_time;
+    self->current_thread->cpu_usage_info.last_reported_time = getSystime()->systick;
 
     //if (self->current_thread->need_print) {
     //    self->current_thread->need_print = false;
     //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
     //}
     self->current_thread = next_tcb;
-    hal_fpu_restore_context(&self->current_thread->fpu_ctx);
+    //hal_fpu_restore_context(&self->current_thread->fpu_ctx);
     if (self->current_thread != NULL) {
-        self->current_thread->start_time = getSystime()->systick;
+#ifndef USE_CCMRAM
+        //如果使用ccm，则不能使用mpu来保护栈内存
+        mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr, self->current_thread->stack_size);
+#endif
+        self->current_thread->cpu_usage_info.last_reported_time = getSystime()->systick;
         self->current_thread->state = TCB_STATER_RUNNING;
-        gloable_current_stack = (uint32_t *)(&self->current_thread->sp);
+        gloable_current_tcb = (self->current_thread);
     }
-    ENABLE_IRQ;
+//    ENABLE_IRQ;
 }
 
 
 // start method
 static void thread_scheduler_start(Thread_scheduler* self) {
-    LOG_DEBUG("scheduler", "thread_scheduler_start");
+    LOG_DEBUG("scheduler", "system os start runing");
     if (NULL == self) {
         return;
     }
@@ -179,13 +182,16 @@ static void thread_scheduler_start(Thread_scheduler* self) {
     }
     __set_PSP( (uint32_t)self->current_thread->sp );
     // 设置 CONTROL 寄存器，选择使用 PSP
-    __set_CONTROL( __get_CONTROL() | 0x2 );
+    __set_CONTROL( __get_CONTROL() | CONTROL_THREAD_PSP_PRIV ); // 线程模式 + 进程堆栈(PSP) + 非特权级 (nPRIV=1, SPSEL=1)
     // 执行 ISB 指令确保立即生效
     __ISB();
-    Trigger_PendSV;
+    //Trigger_PendSV;
+    start_pendsv_user();
     // 或者直接使用 svc 指令
     // 注意：永远不会返回到这里
-    while(1);
+    while(1) {
+            LOW_POWER;
+    }
 }
 
 static inline void thread_scheduler_thread_exit() {
@@ -193,7 +199,9 @@ static inline void thread_scheduler_thread_exit() {
     // 4. 触发 PendSV 完成切换
     Trigger_PendSV;
     // 5. 永不返回
-    while(1);
+    while(1) {
+        LOW_POWER;
+    }
 }
 
 // delay_ticks method

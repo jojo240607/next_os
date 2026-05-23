@@ -15,9 +15,7 @@ static bool spi_txdma_irq_handler_impl(void *arg);
 static bool spi_rxdma_irq_handler_impl(void *arg);
 
 dev_init_override(spi_dev_init_impl);
-dev_read_override(spi_dev_read_impl);
-dev_write_override(spi_dev_write_impl);
-dev_ioctl_override(spi_dev_ioctl_impl);
+
 
 // 析构函数声明
 static void spi_destroy(Spi* self);
@@ -31,25 +29,23 @@ static const SpiFun spi_fun = {
 };
 
 // 构造函数实现
-Spi* spi_create(const spi_config_t *conf) {
+Spi* spi_create(const spi_config_t *conf, const dev_pripority_t *priority) {
     Spi* obj = (Spi*)os_malloc(sizeof(Spi));
     if (obj) {
         memset(obj, 0, sizeof(Spi));
-        spi_init(obj, conf);
+        spi_init(obj, conf, priority);
     }
     return obj;
 }
 
-void spi_init(Spi* self, const spi_config_t *conf) {
+void spi_init(Spi* self, const spi_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(spi_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
 	def_dev_init(self) = spi_dev_init_impl;
-	def_dev_read(self) = spi_dev_read_impl;
-	def_dev_write(self) = spi_dev_write_impl;
-	def_dev_ioctl(self) = spi_dev_ioctl_impl;
+
     self->spi_rx_sem = semaphore_create(0);
     self->spi_tx_sem = semaphore_create(0);
 }
@@ -122,33 +118,11 @@ dev_init_override(spi_dev_init_impl) {
     hal_spi_clock_enable(spi->conf->id);
 
     /* 3. 配置 SPI */
-    xSPI_TypeDef *spi_ctrl = SPIx[spi->conf->id];
-
-    uint32_t cr1 = 0;
-    if (spi->conf->master) cr1 |= (1 << 2);   // MSTR
-    cr1 |= (spi->conf->baudrate_div & 0x7) << 3;              // BR
-    cr1 |= (spi->conf->mode & 0x3) << 0;                      // CPHA, CPOL
-    cr1 |= (spi->conf->frame_format & 0x1) << 11;             // DFF
-    cr1 |= (1 << 8) | (1 << 9);                         // SSI, SSM (软件 NSS)
-    cr1 |= (1 << 6);                                    // SPE 最后使能
-    spi_ctrl->CR1 = cr1;
+    hal_spi_init(spi->conf->id, spi->conf->mode, spi->conf->frame_format, spi->conf->baudrate_div, spi->conf->master);
 
     /* CR2 */
-    spi_ctrl->CR2 = 0;
-    if (spi->conf->it_enable) {
-        uint32_t cr2 = spi_ctrl->CR2;
-        if (spi->conf->it_enable & xSPI_IT_TXE) {
-            cr2 |= (1 << 7);   // TXEIE
-        }
-        if (spi->conf->it_enable & xSPI_IT_RXNE) {
-            cr2 |= (1 << 6);   // RXNEIE
-        }
-        if (spi->conf->it_enable & xSPI_IT_ERR) {
-            cr2 |= (1 << 5);   // ERRIE
-        }
-        spi_ctrl->CR2 = cr2;
-
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+    hal_spi_disable_it(spi->conf->id);
+    if (hal_spi_it_init(spi->conf->id, spi->conf->it_enable)) {
         self->irq_conf.handler = spi_irq_handler_impl;
         self->irq_conf.semaphore = sem;
         self->irq_conf.arg = self;
@@ -157,61 +131,33 @@ dev_init_override(spi_dev_init_impl) {
     }
     /* 4. 申请 DMA 流 (可选) */
     if (spi->conf->dma_cfg) {
-        if (dma_stream_request(spi->conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
-            return ;
+        if (spi->conf->dma_cfg->tx_dma) {
+            if (dma_stream_request(spi->conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
+                return;
+            }
+            if (spi->conf->dma_cfg->tx_dma->it_enable) {
+                self->irq_conf.handler = spi_txdma_irq_handler_impl;
+                self->irq_conf.semaphore = sem;
+                self->irq_conf.arg = self;
+                self->irq_conf.irq_num = dma_get_irqnum(spi->conf->dma_cfg->tx_dma);
+                self->fun->attach_irq(self, &self->irq_conf);
+            }
         }
-        //spi_tx_dma_cfgs[cfg->id] = *spi->conf->dma_cfg->tx_dma;
-        //spi_tx_dma_used[cfg->id] = true;
-        spi_ctrl->CR2 |= xSPI_CR2_TXDMAEN;
+        if (spi->conf->dma_cfg->rx_dma) {
+            if (dma_stream_request(spi->conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
+                return;
+            }
+            if (spi->conf->dma_cfg->rx_dma->it_enable) {
+                self->irq_conf.handler = spi_rxdma_irq_handler_impl;
+                self->irq_conf.semaphore = sem;
+                self->irq_conf.arg = self;
+                self->irq_conf.irq_num = dma_get_irqnum(spi->conf->dma_cfg->rx_dma);
+                self->fun->attach_irq(self, &self->irq_conf);
+            }
+        }
+        hal_spi_dma_init(spi->conf->id, spi->conf->dma_cfg->tx_dma, spi->conf->dma_cfg->rx_dma);
 
-        if (spi->conf->dma_cfg->tx_dma->it_enable) {
-            self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-            self->irq_conf.handler = spi_txdma_irq_handler_impl;
-            self->irq_conf.semaphore = sem;
-            self->irq_conf.arg = self;
-            self->irq_conf.irq_num = dma_get_irqnum(spi->conf->dma_cfg->tx_dma);
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
     }
-    if (spi->conf->dma_cfg) {
-        if (dma_stream_request(spi->conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
-            return;
-        }
-        //spi_rx_dma_cfgs[cfg->id] = *cfg->rx_dma_cfg;
-        //spi_rx_dma_used[cfg->id] = true;
-        spi_ctrl->CR2 |= xSPI_CR2_RXDMAEN;
-
-        if (spi->conf->dma_cfg->rx_dma->it_enable) {
-            self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-            self->irq_conf.handler = spi_rxdma_irq_handler_impl;
-            self->irq_conf.semaphore = sem;
-            self->irq_conf.arg = self;
-            self->irq_conf.irq_num = dma_get_irqnum(spi->conf->dma_cfg->rx_dma);
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-    }
-}
-// dev_read method
-dev_read_override(spi_dev_read_impl) {
-    // TODO: add dev_read method
-    //Spi *spi = (Spi *)self;
-    //params , void *buf, size_t count
-    
-}
-// dev_write method
-dev_write_override(spi_dev_write_impl) {
-    // TODO: add dev_write method
-    //Spi *spi = (Spi *)self;
-    //params , const void *buf, size_t count
-
-    return;
-}
-// dev_ioctl method
-dev_ioctl_override(spi_dev_ioctl_impl) {
-    // TODO: add dev_ioctl method
-    //Spi *spi = (Spi *)self;
-    //params , int cmd, void *arg
-    
 }
 
 
@@ -222,13 +168,13 @@ static void spi_transfer(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, ui
         return;
     }
 
-    xSPI_TypeDef *spi_ctrl = SPIx[self->conf->id];
+    uint32_t sr = hal_spi_get_it_event(self->conf->id);
     for (int i = 0; i < len; i++) {
-        while (!(spi_ctrl->SR & xSPI_SR_TXE));      // 等待发送缓冲区空
+        while (!(sr & xSPI_IT_TXE));      // 等待发送缓冲区空
         uint8_t tx_byte = tx_data ? tx_data[i] : 0xFF;   // 发送数据或哑字节
-        *(volatile uint8_t*)&spi_ctrl->DR = tx_byte;
-        while (!(spi_ctrl->SR & xSPI_SR_RXNE));     // 等待接收缓冲区非空
-        uint8_t rx_byte = *(volatile uint8_t*)&spi_ctrl->DR;
+        *hal_spi_data_addr(self->conf->id) = tx_byte;
+        while (!(sr & xSPI_IT_RXNE));     // 等待接收缓冲区非空
+        uint8_t rx_byte = *hal_spi_data_addr(self->conf->id);
         if (rx_data) {
             rx_data[i] = rx_byte;
         }
@@ -243,14 +189,12 @@ static void spi_transfer_dma(Spi* self, const uint8_t *tx_data, uint8_t *rx_data
         return;
     }
 
-    xSPI_TypeDef *spi_ctrl = SPIx[self->conf->id];
-
     /* TX DMA */
     if (self->conf->dma_cfg && self->conf->dma_cfg->tx_dma && tx_data) {
         if (dma_is_busy(self->conf->dma_cfg->tx_dma)) {
             return ;
         }
-        dma_start_transfer(self->conf->dma_cfg->tx_dma, (uint32_t)tx_data, (uint32_t)&spi_ctrl->DR, len);
+        dma_start_transfer(self->conf->dma_cfg->tx_dma, (uint32_t)tx_data, (uint32_t)hal_spi_data_addr(self->conf->id), len);
         //dma_tx_busy[id] = true;
     }
 
@@ -259,7 +203,7 @@ static void spi_transfer_dma(Spi* self, const uint8_t *tx_data, uint8_t *rx_data
         if (dma_is_busy(self->conf->dma_cfg->rx_dma)) {
             return;
         }
-        dma_start_transfer(self->conf->dma_cfg->rx_dma, (uint32_t)&spi_ctrl->DR, (uint32_t)rx_data, len);
+        dma_start_transfer(self->conf->dma_cfg->rx_dma, (uint32_t)hal_spi_data_addr(self->conf->id), (uint32_t)rx_data, len);
         //dma_rx_busy[id] = true;
     }
     return ;
@@ -267,26 +211,26 @@ static void spi_transfer_dma(Spi* self, const uint8_t *tx_data, uint8_t *rx_data
 
 static bool spi_irq_handler_impl(void *arg) {
     Spi *spi = (Spi *)arg;
-    xSPI_TypeDef *spi_ctrl = SPIx[spi->conf->id];
     spi_xfer_t *x = &spi->spi_xfer;
-    uint16_t sr = spi_ctrl->SR;
+    uint16_t sr = hal_spi_get_it_event(spi->conf->id);
 
     // --- 错误处理 (优先) ---
     if (sr & (0x07 << 4)) {   // OVR, MODF, CRCERR, etc.
         // 清除错误标志：根据手册，读 SR 后写 DR 可清除某些标志，或直接关 SPE 再开
-        uint8_t dummy __attribute__((unused)) = *(volatile uint8_t*)&spi_ctrl->DR;
+        uint8_t dummy __attribute__((unused)) = *hal_spi_data_addr(spi->conf->id);
         (void)dummy;
-        spi_ctrl->CR1 &= ~(1 << 6);   // 临时关 SPE
-        spi_ctrl->CR1 |= (1 << 6);
+        hal_spi_disable(spi->conf->id); // 临时关 SPE
+        hal_spi_enable(spi->conf->id);
 
         x->active = false;
-        spi_ctrl->CR2 &= ~((1<<7) | (1<<6) | (1<<5));  // 关中断
+
+        hal_spi_clear_it(spi->conf->id, xSPI_IE_ERR | xSPI_IE_TXE | xSPI_IE_RXNE);// 关中断
         return true;
     }
 
     // --- 接收中断 (RXNE) ---
-    if (sr & xSPI_SR_RXNE) {  // RXNE
-        uint8_t data = *(volatile uint8_t*)&spi_ctrl->DR;   // 读 DR 清 RXNE
+    if (sr & xSPI_IT_RXNE) {  // RXNE
+        uint8_t data = *hal_spi_data_addr(spi->conf->id);   // 读 DR 清 RXNE
         if (x->rx_buf && x->rx_index < x->total_len) {
             x->rx_buf[x->rx_index] = data;
         }
@@ -294,14 +238,14 @@ static bool spi_irq_handler_impl(void *arg) {
     }
 
     // --- 发送中断 (TXE) ---
-    if (sr & xSPI_SR_TXE) {  // TXE
+    if (sr & xSPI_IT_TXE) {  // TXE
         if (x->tx_index < x->total_len) {
             uint8_t byte = x->tx_buf ? x->tx_buf[x->tx_index] : 0xFF;
-            *(volatile uint8_t*)&spi_ctrl->DR = byte;
+            *hal_spi_data_addr(spi->conf->id) = byte;
             x->tx_index++;
         } else {
             // 数据已发完，关闭 TXE 中断
-            spi_ctrl->CR2 &= ~(1 << 7);
+            hal_spi_clear_it(spi->conf->id, xSPI_IE_TXE);
         }
     }
 
@@ -309,7 +253,7 @@ static bool spi_irq_handler_impl(void *arg) {
     // 当发送和接收都完成（索引达到长度）时，关闭中断并通知
     if (x->tx_index >= x->total_len && x->rx_index >= x->total_len && x->active) {
         x->active = false;
-        spi_ctrl->CR2 &= ~((1<<7) | (1<<6));   // 关闭 TXE/RXNE 中断（ERRIE 可保留或关）
+        hal_spi_clear_it(spi->conf->id, xSPI_IE_RXNE | xSPI_IE_TXE);// 关闭 TXE/RXNE 中断（ERRIE 可保留或关）
         spi->spi_tx_sem->fun->give(spi->spi_tx_sem);
     }
     return true;
@@ -347,14 +291,12 @@ static void spi_transfer_it(Spi* self, const uint8_t *tx_data, uint8_t *rx_data,
     x->tx_index = 0;
     x->rx_index = 0;
     x->active = true;
+    hal_spi_set_it(self->conf->id, xSPI_IE_TXE | xSPI_IE_RXNE);// TXEIE  RXNEIE
 
-    xSPI_TypeDef *spi_ctrl = SPIx[self->conf->id];
-    spi_ctrl->CR2 |= (1 << 7);   // TXEIE
-    spi_ctrl->CR2 |= (1 << 6);   // RXNEIE
     // 启动传输：写入第一个字节，这将产生时钟并置 TXE 为低
     // 如果是全双工，即使 rx_data 为 NULL 也要发哑字节；如果 tx_data 为 NULL 也要发哑字节（0xFF）
     uint8_t first_byte = tx_data ? tx_data[0] : 0xFF;
-    *(volatile uint8_t*)&spi_ctrl->DR = first_byte;
+    *hal_spi_data_addr(self->conf->id) = first_byte;
     x->tx_index = 1;
     LOG_DEBUG("spi", "spi sem take");
     self->spi_tx_sem->fun->take(self->spi_tx_sem);

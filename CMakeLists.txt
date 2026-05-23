@@ -45,11 +45,11 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-        Src/context_switch.s
+        os/scheduler/context_switch.s
         os/common/queue.c
         os/common/ring.c
         os/common/linear_pool.c
-        os/common/object_init.c
+        os/common/os_init.c
         os/common/sys_time.c
         os/common/sys_mutex.c
         os/scheduler/tcb_t.c
@@ -64,6 +64,20 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/task/log_task.c
         os/task/systick_task.c
         os/task/os_cb_task.c
+        os/driver/hal/hal_scb.c
+        os/driver/hal/hal_svc.c
+        os/driver/hal/hal_svc_handler.s
+        os/driver/hal/hal_fault_diag.c
+        os/driver/hal/hal_mpu.c
+        os/driver/hal/hal_flash.c
+        os/driver/hal/hal_dwt.c
+        os/driver/hal/hal_nvic.c
+        os/driver/hal/hal_systick.c
+        os/driver/hal/hal_rng.c
+        os/driver/hal/hal_crc.c
+        os/driver/hal/hal_cryp.c
+        os/driver/hal/hal_hash.c
+        os/driver/hal/hal_dac.c
         os/driver/hal/hal_usart.c
         os/driver/hal/hal_wdg.c
         os/driver/hal/hal_timer.c
@@ -79,6 +93,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/hal/hal_i2s.c
         os/driver/hal/hal_fsmc.c
         os/driver/hal/hal_fpu.c
+        os/driver/hal/hal_rcc.c
         os/driver/common/device.c
         os/driver/device_config.c
         os/driver/common/pinmux.c
@@ -86,6 +101,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/common/nvic.c
         os/driver/common/rcc.c
         os/driver/common/gpio.c
+        os/driver/svc.c
         os/driver/usart.c
         os/driver/adc.c
         os/driver/spi.c
@@ -100,7 +116,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/pwm.c
         os/driver/i2s.c
         os/driver/fsmc.c
-        os/driver/fpu.c
         os/driver/device_manager.c
         os/test/task_test1.c
         os/test/time_task.c

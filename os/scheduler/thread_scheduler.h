@@ -24,12 +24,21 @@ struct _Thread_schedulerFun {
 	void (*add_readly_list)(Thread_scheduler* self, Tcb_t *tcb, bool protected);
 
 };
+
+typedef enum : uint8_t {
+    // Handler模式(中断/异常)：硬件强制使用MSP，SPSEL位被忽略。
+    // 以下值描述的是退出异常，返回Thread模式时的状态。
+    CONTROL_THREAD_MSP_PRIV   = 0x00, // 线程模式 + 主堆栈(MSP) + 特权级    (nPRIV=0, SPSEL=0)
+    CONTROL_THREAD_PSP_PRIV   = 0x02, // 线程模式 + 进程堆栈(PSP) + 特权级  (nPRIV=0, SPSEL=1)
+    CONTROL_THREAD_MSP_UNPRIV = 0x01, // 线程模式 + 主堆栈(MSP) + 非特权级  (nPRIV=1, SPSEL=0)
+    CONTROL_THREAD_PSP_UNPRIV = 0x03, // 线程模式 + 进程堆栈(PSP) + 非特权级 (nPRIV=1, SPSEL=1)
+} control_thread_state_t;
+
 // 类结构
 struct _Thread_scheduler {
     const Thread_schedulerFun* fun;
     // TODO: 添加数据成员
-    //Queue *run_queue; //运行线程队列
-    uint32_t priority_bitmap;                    // 位图，标记哪些优先级有就绪任务
+    volatile uint32_t priority_bitmap;                    // 位图，标记哪些优先级有就绪任务
     Queue *priority_list[MAX_PRIORITY];          // 每个优先级的就绪任务链表（可简化成单任务）
     Queue *delay_list;
     Queue *destory_list;
@@ -45,6 +54,6 @@ void thread_scheduler_init(Thread_scheduler* self);
 void thread_scheduler_deinit(Thread_scheduler* self);
 void thread_scheduler_switch_context(Thread_scheduler* self);
 
-extern uint32_t *gloable_current_stack;
+extern Tcb_t *gloable_current_tcb;
 extern Thread_scheduler *global_thread_scheduler;
 #endif // THREAD_SCHEDULER_H

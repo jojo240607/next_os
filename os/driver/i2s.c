@@ -15,18 +15,18 @@ static const I2sFun i2s_fun = {
     .destroy = i2s_destroy,
 };
 // 构造函数实现
-I2s* i2s_create(const i2s_config_t *conf) {
+I2s* i2s_create(const i2s_config_t *conf, const dev_pripority_t *priority) {
     I2s* obj = (I2s*)os_malloc(sizeof(I2s));
     if (obj) {
         memset(obj, 0, sizeof(I2s));
-        i2s_init(obj, conf);
+        i2s_init(obj, conf, priority);
     }
     return obj;
 }
 
-void i2s_init(I2s* self, const i2s_config_t *conf) {
+void i2s_init(I2s* self, const i2s_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(i2s_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
@@ -125,8 +125,6 @@ dev_init_override(i2s_dev_init_impl) {
             cr2 |= xI2S_CR2_ERRIE;
         }
         i2s_ctrl->CR2 = cr2;
-
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
         self->irq_conf.handler = i2s_irq_handler_impl;
         self->irq_conf.semaphore = sem;
         self->irq_conf.arg = self;

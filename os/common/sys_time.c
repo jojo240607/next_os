@@ -12,5 +12,13 @@ sys_time *gloable_sys_time;
 void systime_init() {
     LOG_DEBUG("sys_time", "systime_init");
     gloable_sys_time = os_malloc(sizeof(sys_time));
+    hal_dwt_init();
 }
+
+
+uint64_t get_systime_us() {
+    return hal_dwt_get_timestamp_us();
+}
+
+
 

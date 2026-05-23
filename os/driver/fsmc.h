@@ -68,8 +68,8 @@ struct _Fsmc {
 };
 
 // 构造函数声明
-Fsmc* fsmc_create(const fsmc_lcd_config_t *conf);
-void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf);
+Fsmc* fsmc_create(const fsmc_lcd_config_t *conf, const dev_pripority_t *priority);
+void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void fsmc_deinit(Fsmc* self);

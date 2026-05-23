@@ -5,7 +5,6 @@
 #include "../log/log.h"
 #include "../task/os_cb_task.h"
 #include "hal/hal_exti.h"
-#include "hal/hal_gpio.h"
 
 dev_init_override(exti_dev_init_impl);
 
@@ -18,19 +17,19 @@ static const ExtiFun exti_fun = {
 
 };
 // 构造函数实现
-Exti* exti_create(const exti_config *conf) {
+Exti* exti_create(const exti_config *conf, const dev_pripority_t *priority) {
     Exti* obj = (Exti*)os_malloc(sizeof(Exti));
     if (obj) {
         memset(obj, 0, sizeof(Exti));
-        exti_init(obj, conf);
+        exti_init(obj, conf, priority);
     }
     return obj;
 }
 
 
-void exti_init(Exti* self, const exti_config *conf) {
+void exti_init(Exti* self, const exti_config *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(exti_fun);
     // TODO: 初始化派生类特有成员
 	def_dev_init(self) = exti_dev_init_impl;
@@ -75,8 +74,6 @@ dev_init_override(exti_dev_init_impl) {
             return;
         }
     }
-
-    self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);
     self->irq_conf.handler = exti_irq_handler_impl;
     self->irq_conf.semaphore = sem;
     self->irq_conf.arg = self;

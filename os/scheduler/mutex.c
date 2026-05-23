@@ -52,20 +52,20 @@ static void mutex_destroy(Mutex* self) {
 
 // take method
 static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
-    DISABLE_IRQ;
+    uint32_t key = arch_irq_lock();
     Tcb_t *curr = global_thread_scheduler->current_thread;
     // 情况1：互斥量空闲，直接获取
     if (self->owner == NULL) {
         self->owner = curr;
         self->lock_count = 1;
         self->owner_original_prio = curr->priority;  // 记录原优先级
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 1;
     }
     // 情况2：已经持有，递归加锁
     if (self->owner == curr) {
         self->lock_count++;
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 1;
     }
 
@@ -97,12 +97,12 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
     //}
  //   LOG_DEBUG("mutex", "%s wait", curr->name);
     //curr->need_print = true;
-    ENABLE_IRQ;
+    arch_irq_unlock(key);
     Trigger_PendSV;   // 切换到其他任务
     //LOG_DEBUG("mutex", "mutex_take 2");
     // 被唤醒后，重新获取互斥量所有权
     // 注意：此时互斥量已由原持有者释放，并可能已经转移给当前任务
-    DISABLE_IRQ;
+    key = arch_irq_lock();
  //   LOG_DEBUG("mutex", "wake up %s", curr->name);
     //被唤醒后第一次的状态应该是TCB_STATER_WAITING_MUTEX
     if (curr->state == TCB_STATER_RUNNING) {
@@ -110,30 +110,30 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
         self->owner = curr;
         self->lock_count = 1;
         self->owner_original_prio = curr->priority;  // 覆盖为实际优先级
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         LOG_DEBUG("mutex", "wake up %s right", curr->name);
         return 1;
     } else {
         LOG_ERROR("mutex", "lock fail, state %d", curr->state);
         // 超时或被中断唤醒
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 0;
     }
 }
 // give method
 static uint8_t mutex_give(Mutex* self) {
-    DISABLE_IRQ;
+    uint32_t key = arch_irq_lock();
     if (self->owner != global_thread_scheduler->current_thread) {
         // 非法释放：不是持有者
         LOG_ERROR("mutex", "Illegal give owner %s current is %s", self->owner->name, global_thread_scheduler->current_thread->name);
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 0;
     }
 
     self->lock_count--;
     if (self->lock_count > 0) {
         // 递归锁未完全释放
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 1;
     }
 
@@ -150,7 +150,7 @@ static uint8_t mutex_give(Mutex* self) {
     if (self->wait_list->size == 0) {
         // 没有等待者，直接清空所有者
         self->owner = NULL;
-        ENABLE_IRQ;
+        arch_irq_unlock(key);
         return 1;
     }
 
@@ -166,7 +166,7 @@ static uint8_t mutex_give(Mutex* self) {
     global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, new_owner, true);
     // 如果有超时机制，清除该任务的超时定时器
     //os_clear_task_timeout(new_owner);
-    ENABLE_IRQ;
+    arch_irq_unlock(key);
     Trigger_PendSV;   // 让新拥有者运行（如果优先级足够高）
     return 1;
 }

@@ -7,16 +7,10 @@
 #include "stdint.h"
 
 
-/* ---------- SysTick 寄存器 (Cortex-M4) ---------- */
-typedef struct {
-    volatile uint32_t CTRL;     // 控制与状态
-    volatile uint32_t LOAD;     // 重装载值
-    volatile uint32_t VAL;      // 当前值
-    volatile const uint32_t CALIB; // 校准 (只读)
-} xSysTick_TypeDef;
+
 
 #define xSYSTICK_BASE  0xE000E010UL
-#define xSYSTICK       ((xSysTick_TypeDef *)xSYSTICK_BASE)
+
 
 /* CTRL 位定义 */
 #define SYSTICK_CTRL_ENABLE    (1UL << 0)
@@ -27,5 +21,8 @@ typedef struct {
 /* 最大重装载值 (24位) */
 #define SYSTICK_MAX_RELOAD     0x00FFFFFFUL
 
+void hal_systick_init(uint32_t interval_us);
+void hal_systick_start();
+void hal_systick_stop();
 
 #endif //STM32F4DISCOVERY_HAL_SYSTICK_H

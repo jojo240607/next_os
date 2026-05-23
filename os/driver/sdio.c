@@ -20,18 +20,18 @@ static const SdioFun sdio_fun = {
 
 
 // 构造函数实现
-Sdio* sdio_create(const sdio_config_t *conf) {
+Sdio* sdio_create(const sdio_config_t *conf, const dev_pripority_t *priority) {
     Sdio* obj = (Sdio*)os_malloc(sizeof(Sdio));
     if (obj) {
         memset(obj, 0, sizeof(Sdio));
-        sdio_init(obj, conf);
+        sdio_init(obj, conf, priority);
     }
     return obj;
 }
 
-void sdio_init(Sdio* self, const sdio_config_t *conf) {
+void sdio_init(Sdio* self, const sdio_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(sdio_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
@@ -293,7 +293,7 @@ dev_init_override(sdio_dev_init_impl) {
     if (sdio->conf->it_enable) {
         // nvic_set_priority(SDIO_IRQn, 1, 0);
         // nvic_enable_irq(SDIO_IRQn);
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+        //self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
         self->irq_conf.handler = sdio_irq_handler_impl;
         self->irq_conf.semaphore = sem;
         self->irq_conf.arg = self;

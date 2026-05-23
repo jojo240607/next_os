@@ -41,7 +41,7 @@ struct _TaskVTable {
 // 类成员函数结构
 struct _TaskFun {
     void (*destroy)(Task* self);
-	void (*add_task)(Task* self, const char *name, uint8_t priority, size_t stack_size);
+	void (*add_task)(Task* self, const char *name, uint8_t priority, mpu_region_size_t stack_size);
 
 };
 // 类结构

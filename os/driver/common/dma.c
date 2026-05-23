@@ -1,5 +1,6 @@
 #include "dma.h"
 #include "rcc.h"
+#include "../../log/log.h"
 
 
 /* 获取 stream 寄存器指针 */
@@ -20,6 +21,7 @@ static dma_stream_state_t dma_states[xDMA_CONTROLLER_MAX][8];
 
 void dma_init(void)
 {
+    LOG_DEBUG("dma", "dma init");
     for (int c = 0; c < xDMA_CONTROLLER_MAX; c++) {
         for (int s = 0; s < 8; s++) {
             dma_states[c][s].allocated = false;
@@ -36,9 +38,10 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     dma_stream_state_t *st = &dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
     if (st->allocated) {
         /* 简单冲突检查：只要占用就不让用（也可按需求宽松处理） */
+        LOG_ERROR("dma", "error dma %d stream %d have allocated", DMA_REQ_GET_CTRL(cfg->dma_request), DMA_REQ_GET_STREAM(cfg->dma_request));
         return DMA_ERROR;
     }
-
+    LOG_DEBUG("dma", "dma init ctrl %d, stream %d", DMA_REQ_GET_CTRL(cfg->dma_request), DMA_REQ_GET_STREAM(cfg->dma_request));
     /* 使能时钟 */
     dma_clock_enable(DMA_REQ_GET_CTRL(cfg->dma_request));
 

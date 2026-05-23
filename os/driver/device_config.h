@@ -38,6 +38,6 @@ extern const can_config_t can1_conf;
 extern const pwm_config_t pwm1_conf;
 extern const i2s_config_t i2s2_conf;
 extern const fsmc_lcd_config_t fsmc_conf;
-extern const fpu_config_t fpu_conf;
+
 
 #endif //STM32F4DISCOVERY_DEVICE_CONFIG_H

@@ -17,28 +17,16 @@ typedef struct _I2cFun I2cFun;
 // 类成员函数结构
 struct _I2cFun {
     void (*destroy)(I2c* self);
-	void (*transmit)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
-	void (*receive)(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+	//void (*transmit)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+	//void (*receive)(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
 	void (*transmit_it)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
 	void (*receive_it)(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
-	void (*transmit_dma)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+	//void (*transmit_dma)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
 };
 
 
 
-/* 地址位数 */
-typedef enum :uint8_t {
-    I2C_ADDR_7BIT = 0,
-    I2C_ADDR_10BIT
-} i2c_addr_mode_t;
 
-/* 中断使能选项 */
-typedef enum :uint8_t {
-    xI2C_IT_NONE = 0,
-    xI2C_IT_TXE = (1 << 0),
-    xI2C_IT_RXNE = (1 << 1),
-    xI2C_IT_ERR = (1 << 2)   // 错误中断
-} i2c_it_t;
 
 /* 回调事件类型 */
 #define I2C_EVT_TX_COMPLETE    1
@@ -90,8 +78,8 @@ struct _I2c {
 };
 
 // 构造函数声明
-I2c* i2c_create(const i2c_config_t *conf);
-void i2c_init(I2c* self, const i2c_config_t *conf);
+I2c* i2c_create(const i2c_config_t *conf, const dev_pripority_t *priority);
+void i2c_init(I2c* self, const i2c_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void i2c_deinit(I2c* self);

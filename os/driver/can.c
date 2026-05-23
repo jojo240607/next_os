@@ -15,18 +15,18 @@ static const CanFun can_fun = {
     .destroy = can_destroy,
 };
 // 构造函数实现
-Can* can_create(const can_config_t * conf) {
+Can* can_create(const can_config_t * conf, const dev_pripority_t *priority) {
     Can* obj = (Can*)os_malloc(sizeof(Can));
     if (obj) {
         memset(obj, 0, sizeof(Can));
-        can_init(obj, conf);
+        can_init(obj, conf, priority);
     }
     return obj;
 }
 
-void can_init(Can* self, const can_config_t * conf) {
+void can_init(Can* self, const can_config_t * conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(can_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
@@ -75,7 +75,7 @@ dev_ioctl_override(can_dev_ioctl_impl) {
               .pupd = PIN_PUPD_NONE,
               .af =can->conf->pins.can_rx }
     };
-    if (pinmux_request_group(pins, 2) != 0) {
+    if (pinmux_request_group(pins, 2) != PINMUX_SUCCESS) {
         LOG_DEBUG("can", "init pinmux error!");
         return;
     }
@@ -163,7 +163,6 @@ dev_ioctl_override(can_dev_ioctl_impl) {
 
     // 7. 配置中断
     if (can->conf->it_enable) {
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
         self->irq_conf.handler = can_irq_handler_impl;
         //can_callbacks[can->conf->id] = can->conf->callback;
         uint32_t ier = 0;

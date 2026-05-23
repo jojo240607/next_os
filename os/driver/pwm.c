@@ -25,18 +25,18 @@ static const PwmFun pwm_fun = {
 	.set_period = pwm_set_period,
 };
 // 构造函数实现
-Pwm* pwm_create(const pwm_config_t *conf) {
+Pwm* pwm_create(const pwm_config_t *conf, const dev_pripority_t *priority) {
     Pwm* obj = (Pwm*)os_malloc(sizeof(Pwm));
     if (obj) {
         memset(obj, 0, sizeof(Pwm));
-        pwm_init(obj, conf);
+        pwm_init(obj, conf, priority);
     }
     return obj;
 }
 
-void pwm_init(Pwm* self, const pwm_config_t *conf) {
+void pwm_init(Pwm* self, const pwm_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(pwm_fun);
     // TODO: 初始化派生类特有成员
     self->conf = conf;
@@ -97,7 +97,7 @@ dev_init_override(pwm_dev_init_impl) {
     }
 
     // 4. 调用底层定时器初始化
-    pwm->time = timer_create(&tim_cfg);
+    pwm->time = timer_create(&tim_cfg, self->irq_conf.priority);
     if (pwm->time == NULL) {
         LOG_DEBUG("pwm", "timer create error");
         return;
@@ -110,7 +110,11 @@ dev_init_override(pwm_dev_init_impl) {
 // start method
 static void pwm_start(Pwm* self) {
     // TODO: add start method
-    self->time->fun->start(self->time);
+    if (self->time != NULL) {
+        self->time->fun->start(self->time);
+    } else {
+        LOG_ERROR("PWM", "time is null");
+    }
 }
 // stop method
 static void pwm_stop(Pwm* self) {
@@ -127,11 +131,6 @@ static void pwm_set_duty(Pwm* self, uint8_t channel, uint32_t duty) {
 // set_period method
 static void pwm_set_period(Pwm* self, uint32_t autoreload) {
     // TODO: add set_period method
-    if (self->time->conf->id >= TIM_MAX) {
-        return;
-    }
-    // 直接写 ARR 寄存器 (需要定时器处于运行状态)
-    TIMx[self->time->conf->id]->ARR = autoreload;
-    // 如果有预装载，更新事件后生效
+    self->time->fun->set_period(self->time, autoreload);
 }
 

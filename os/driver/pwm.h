@@ -49,8 +49,8 @@ struct _Pwm {
 };
 
 // 构造函数声明
-Pwm* pwm_create(const pwm_config_t *conf);
-void pwm_init(Pwm* self, const pwm_config_t *conf);
+Pwm* pwm_create(const pwm_config_t *conf, const dev_pripority_t *priority);
+void pwm_init(Pwm* self, const pwm_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void pwm_deinit(Pwm* self);

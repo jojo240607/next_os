@@ -27,13 +27,13 @@ typedef enum : uint8_t  {
     TASK_LOG,
     TASK_TEST1,
     TASK_TIME,
-} Task_tag;
+} task_id_t;
 struct _Task_list {
-    const Task_tag tag;
+    const task_id_t id;
     const char *name;
     //Task *task;
-    uint8_t priority;
-    size_t stack_size;
+    uint8_t task_priority;
+    mpu_region_size_t stack_size;
     Task_create task_create;
 };
 // 类结构

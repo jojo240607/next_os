@@ -59,8 +59,8 @@ struct _I2s {
 };
 
 // 构造函数声明
-I2s* i2s_create(const i2s_config_t *conf);
-void i2s_init(I2s* self, const i2s_config_t *conf);
+I2s* i2s_create(const i2s_config_t *conf, const dev_pripority_t *priority);
+void i2s_init(I2s* self, const i2s_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void i2s_deinit(I2s* self);

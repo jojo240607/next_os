@@ -25,18 +25,18 @@ static const WdgFun wdg_fun = {
 
 
 // 构造函数实现
-Wdg* wdg_create(const iwdg_config_t *cfg) {
+Wdg* wdg_create(const iwdg_config_t *cfg, const dev_pripority_t *priority) {
     Wdg* obj = (Wdg*)os_malloc(sizeof(Wdg));
     if (obj) {
         memset(obj, 0, sizeof(Wdg));
-        wdg_init(obj, cfg);
+        wdg_init(obj, cfg, priority);
     }
     return obj;
 }
 
-void wdg_init(Wdg* self, const iwdg_config_t *cfg) {
+void wdg_init(Wdg* self, const iwdg_config_t *cfg, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(wdg_fun);
     // TODO: 初始化派生类特有成员
     self->conf = cfg;

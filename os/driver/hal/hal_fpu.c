@@ -3,7 +3,7 @@
 //
 
 #include "hal_fpu.h"
-#include "main.h"
+#include "cmsis_gcc.h"
 
 /* ────────────────────────────────
    系统初始化
@@ -68,35 +68,6 @@ void hal_fpu_enable(fpu_mode_t mode)
     xSCB_CPACR |= xCPACR_CP10_FULL | xCPACR_CP11_FULL;
     __DSB();
     __ISB();
-}
-
-
-
-/* ────────────────────────────────
-   上下文保存/恢复 (汇编优化)
-   ──────────────────────────────── */
-void hal_fpu_save_context(fpu_context_t *ctx)
-{
-    if (!ctx) return;
-    __ASM volatile (
-            "VMRS %0, FPSCR\n"          /* 保存 FPSCR */
-            "VSTM %1, {S0-S15}\n"       /* 保存 S0~S15 */
-    : "=r"(ctx->fpscr)
-    : "r"(ctx->s_regs)
-    : "memory"
-    );
-}
-
-void hal_fpu_restore_context(const fpu_context_t *ctx)
-{
-    if (!ctx) return;
-    __ASM volatile (
-            "VLDM %1, {S0-S15}\n"       /* 恢复 S0~S15 */
-            "VMSR FPSCR, %0\n"          /* 恢复 FPSCR */
-    :
-    : "r"(ctx->fpscr), "r"(ctx->s_regs)
-    : "memory"
-    );
 }
 
 /* ────────────────────────────────

@@ -29,7 +29,6 @@ void systick_task_init(Systick_task* self) {
     self->fun = &(systick_task_fun);
     // TODO: 初始化派生类特有成员
     self->systick = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SYSTICK);
-    self->fpu = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_FPU);
 	def_task_init(self) = systick_task_task_init_impl;
 }
 
@@ -55,7 +54,6 @@ task_init_override(systick_task_task_init_impl) {
     Systick_task *systick_task = (Systick_task *)self;
     //params , void *parent
     virtual_dev_init(systick_task->systick, NULL);
-    virtual_dev_init(systick_task->fpu, NULL);
     GET_SYSTICK(systick_task->systick)->fun->start(GET_SYSTICK(systick_task->systick));
 }
 

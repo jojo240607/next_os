@@ -34,8 +34,8 @@ struct _Rtc {
 };
 
 // 构造函数声明
-Rtc* rtc_create(const rtc_config_t *conf);
-void rtc_init(Rtc* self, const rtc_config_t *conf);
+Rtc* rtc_create(const rtc_config_t *conf, const dev_pripority_t *priority);
+void rtc_init(Rtc* self, const rtc_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void rtc_deinit(Rtc* self);

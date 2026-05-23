@@ -14,6 +14,7 @@ override void dev_ioctl(int cmd, void *arg);
 #include <stdbool.h>
 #include <string.h>
 #include "nvic.h"
+#include "../hal/hal_nvic.h"
 
 #define GET_DEVICE_VTABLE(obj) (*(DeviceVTable **)obj)
 
@@ -48,12 +49,17 @@ struct _DeviceVTable {
 	void (*dev_ioctl)(Device* self, int cmd, void *arg);
 };
 
+typedef struct {
+    nvic_priority_t peer_pripority;
+    uint8_t sub_pripority;
+} dev_pripority_t;
+
 struct _irq_config {
     nvic_irq_num irq_num;
     void *arg;
     nvic_handler_t handler;
     Semaphore * semaphore;
-    uint32_t priority;
+    const dev_pripority_t *priority;
 };
 
 // 类成员函数结构
@@ -61,8 +67,6 @@ struct _DeviceFun {
     void (*destroy)(Device* self);
 	bool (*transfer)(Device* self, const void *data, size_t count);
     bool (*attach_irq)(Device* self, irq_config *conf);
-
-	uint32_t (*encode_pripority)(Device* self, uint32_t peer_pripority, uint32_t sub_pripority);
 
 };
 // 类结构
@@ -74,8 +78,8 @@ struct _Device {
 };
 
 // 构造函数声明
-Device* device_create();
-void device_init(Device* self);
+Device* device_create(const dev_pripority_t *priority);
+void device_init(Device* self, const dev_pripority_t *priority);
 
 // 析构函数声明
 void device_deinit(Device* self);

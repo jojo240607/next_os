@@ -8,6 +8,7 @@
 #include "semaphore.h"
 #include "../common/util.h"
 #include "../driver/hal/hal_fpu.h"
+#include "../driver/hal/hal_mpu.h"
 
 
 #define MAGIC_NUM (0xDEADBEEF)
@@ -33,40 +34,64 @@ struct _Tcb_tFun {
 	void (*os_sleep)(Tcb_t* self, uint32_t ms);
 
 };
+/* 单个任务的 CPU 统计信息 */
+typedef struct {
+    volatile uint64_t    total_run_time;     // 累计运行时间（时间戳单位）
+    volatile uint64_t    last_reported_time; // 上次统计时的累计时间
+    uint32_t usage_percent;      // 最近一次统计的 CPU 使用率 (%)
+} cpu_usage_task_info_t;
+/*
+ *  EXC_RETURN 关键比特位定义与对比
+    位	名称 (ARMv7-M)	ARMv7-M 描述	ARMv8-M (无安全扩展) 描述
+    0	保留位	固定为1	固定为0
+    2	SPSEL	堆栈指针选择：0 返回后使用MSP，1 返回后使用PSP	含义不变，与 v7-M 相同
+    3	Mode	返回模式：0 返回Handler模式，1 返回Thread模式	含义不变，与 v7-M 相同
+    4	FType	浮点上下文标志：0 表示栈帧包含FPU寄存器（扩展帧），1 表示标准帧	含义不变，是GDB等调试器识别v8-M栈帧的关键位之一
+    5	保留	保留	默认被调用者寄存器堆栈，用于安全扩展
+    6	保留	保留	安全或非安全堆栈，用于安全扩展
+ *
+ * */
+typedef enum : uint32_t {
+    EXC_RETURN_HAND_MSP_NF = 0xFFFFFFF1,//中断嵌套返回，或裸机中断返回
+    EXC_RETURN_THRD_MSP_NF = 0xFFFFFFF9,//裸机系统或RTOS线程使用MSP时，从中断返回
+    EXC_RETURN_THRD_PSP_NF = 0xFFFFFFFD,//RTOS任务使用PSP时，从中断返回（最常见场景）
+    EXC_RETURN_HAND_MSP_FT = 0xFFFFFFE1,//带FPU保存的Handler模式返回
+    EXC_RETURN_THRD_MSP_FT = 0xFFFFFFE9,//带FPU保存，返回使用MSP的Thread模式
+    EXC_RETURN_THRD_PSP_FT = 0xFFFFFFED,//带FPU保存，返回使用PSP的Thread模式
+} tch_exc_return_t;
+
 // 类结构
 struct _Tcb_t {
     Node base;
     const Tcb_tFun* fun;
     // TODO: 添加数据成员
-    void *parent;//base_task
+    void *parent;           //base_task
     const char *name;       //名称
     uint16_t tid;           //线程id
-    uint8_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
+    volatile uint8_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
     uint8_t original_priority; //原始优先级，优先级提升后需要恢复原始优先级
-    Tcb_State state;    /* 线程状态 */
+    volatile Tcb_State state;    /* 线程状态 */
     Semaphore *semaphore;   //信号量
-    uint32_t start_time;    //时间片开始时刻计数
-    uint32_t run_time;    //时间片结束运行计数
-    size_t stack_left;      //栈剩余大小
-    uint32_t delay_ticks;   //剩余等待节拍数
-    fpu_context_t fpu_ctx;
+    cpu_usage_task_info_t cpu_usage_info;
+    volatile size_t stack_left;      //栈剩余大小
+    volatile uint32_t delay_ticks;   //剩余等待节拍数
    // bool need_print;
-    uint32_t *sp;           //sp指针
-    size_t stack_size;      //栈大小
-    uint32_t stack_ptr[];   //栈空间
+    volatile uint32_t *sp;           //sp指针
+    mpu_region_size_t  stack_size;      //栈大小
+    volatile uint32_t stack_ptr[];   //栈空间
 };
 
 struct _Thread_entry_t {
     uint8_t priority;
-    size_t stack_size;
+    mpu_region_size_t stack_size;
     void *parent;
     Tcb_entry entry_fun;
     void *arg;
     void *exit;
 };
 // 构造函数声明
-Tcb_t* tcb_t_create(const char *name, Entry_t *entry, size_t stack_size);
-void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, size_t stack_size);
+Tcb_t* tcb_t_create(const char *name, Entry_t *entry, mpu_region_size_t stack_size);
+void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, mpu_region_size_t stack_size);
 
 // 析构函数声明
 void tcb_t_deinit(Tcb_t* self);

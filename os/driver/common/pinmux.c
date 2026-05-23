@@ -36,16 +36,16 @@ static void apply_config(const pin_config_t *cfg)
 
     if (cfg->mode == PIN_MODE_AF) {
         pin_af_mode af_mode = AF_REQ_GET_MODE(cfg->af);
-        LOG_ERROR("pinmux", "use gpio af port %d pin %d af mode %d", port, pin, af_mode);
+        LOG_DEBUG("pinmux", "use gpio af port %d pin %d af mode %d", port, pin, af_mode);
         hal_gpio_set_af(gpio, pin, af_mode);
     } else if (cfg->mode == PIN_MODE_INPUT && cfg->irq_mode != PIN_IRQ_MODE_NONE) {
-        LOG_ERROR("pinmux", "use gpio exti port %d pin %d", port, pin);
+        LOG_DEBUG("pinmux", "use gpio exti port %d pin %d", port, pin);
         /* 中断配置 */
         hal_syscfg_exti_line_config(cfg->port, cfg->pin);
         hal_exti_set_trigger(cfg->pin, cfg->irq_mode);
         hal_exti_enable_irq(cfg->pin);
     } else {
-        LOG_ERROR("pinmux", "use gpio as normal port %d pin %d mode %d", port, pin, cfg->mode);
+        LOG_DEBUG("pinmux", "use gpio as normal port %d pin %d mode %d", port, pin, cfg->mode);
     }
 
 }
@@ -53,6 +53,7 @@ static void apply_config(const pin_config_t *cfg)
 /* ---------- 核心接口 ---------- */
 void pinmux_init(void)
 {
+    LOG_DEBUG("pinmux", "pinmux init");
     for (int port = 0; port < PORT_MAX; port++) {
         for (int pin = 0; pin < 16; pin++) {
             pin_states[port][pin].allocated = false;

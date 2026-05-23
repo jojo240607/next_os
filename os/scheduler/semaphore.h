@@ -16,15 +16,15 @@ struct _SemaphoreFun {
     void (*destroy)(Semaphore* self);
 	void (*take)(Semaphore* self);
 	void (*give)(Semaphore* self);
-
+    void (*take_user)(Semaphore* self);
 };
 // 类结构
 struct _Semaphore {
     const SemaphoreFun* fun;
     // TODO: 添加数据成员
-    uint8_t count;                     // 计数值
+    volatile uint8_t count;                     // 计数值
     Queue *wait_list;               // 等待队列头（单向链表或双向）
-    uint32_t sem_event;             //信号量携带的状态
+    volatile uint32_t sem_event;             //信号量携带的状态
 };
 
 // 构造函数声明

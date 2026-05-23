@@ -77,27 +77,27 @@ task_thread_override(time_task_task_thread_impl) {
     Time_task *time_task = (Time_task *)self->parent;
     //params , void *arg
     while (true) {
-        self->semaphore->fun->take(self->semaphore);
+        self->semaphore->fun->take_user(self->semaphore);
         uint32_t adc_data = 0;
         uint8_t tx[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
         uint8_t rx[5];
         time_task->adc->vtable->dev_read(time_task->adc, &adc_data, 2);
         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
-        //GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
-        //LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
-        //uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
-        //uint8_t write_val = 0xA5;
-        //uint8_t read_val = 0;
+        GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
+        LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
+        uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
+        uint8_t write_val = 0xA5;
+        uint8_t read_val = 0;
 //
         //// 向从机地址 0x50 的寄存器 0x10 写入 0xA5
-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);
-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &write_val, 1);
+        GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);
+        GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &write_val, 1);
         //// 从同一设备地址 0x50 读取一个字节
-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);// 先发寄存器地址
-        //GET_I2C(time_task->i2c)->fun->receive_it(GET_I2C(time_task->i2c), 0x50, &read_val, 1);// 再读回
-        //LOG_DEBUG("time_task", "----- timer on ----- i2c read addr %x %x", reg_addr, read_val);
-        //GET_WDG(time_task->wdg)->fun->iwdg_reload();
-        //LOG_DEBUG("time_task", "feed watch dog");
+        GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);// 先发寄存器地址
+        GET_I2C(time_task->i2c)->fun->receive_it(GET_I2C(time_task->i2c), 0x50, &read_val, 1);// 再读回
+        LOG_DEBUG("time_task", "----- timer on ----- i2c read addr %x %x", reg_addr, read_val);
+        GET_WDG(time_task->wdg)->fun->iwdg_reload();
+        LOG_DEBUG("time_task", "feed watch dog");
     }
 }
 

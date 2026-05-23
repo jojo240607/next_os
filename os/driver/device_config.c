@@ -11,7 +11,7 @@ rcc_sysclk_config_t clk_cfg = {
     // 其他字段不重要
 };
  */
-//168MHz (HSE 8MHz + PLL)
+//168MHz (HSE 8MHz + PLL 168M)
 const rcc_sysclk_config_t clk_conf = {
         .sysclk_src  = RCC_CLK_PLL,
         .pll_src     = RCC_PLLSRC_HSE,
@@ -29,11 +29,21 @@ const rcc_sysclk_config_t clk_conf = {
         .target_sysclk = 168000000
 };
 const systick_config_t sys_tick_conf = {
-        .frequency_hz = 168000000,
         .interval_us  = 1000,        // 1ms
         .one_shot     = false,       // 周期性
 };
 
+const tim_config_t time2_conf = {
+        .id = TIM_2,
+        .timebase = {
+                .counter_mode = TIM_COUNTER_UP,
+                .prescaler    = 20999,        // 42MHz / 21000 = 2000 Hz
+                .autoreload   = 1999,         // 2000 / 2000 = 1 Hz (0.1秒中断)
+                .clock_division = 0,
+                .repetition  = 0
+        },
+        .it_enable = TIM_IT_UPDATE,
+};
 
 const usart_config usart1_conf = {
         .id = UART_1,
@@ -41,35 +51,12 @@ const usart_config usart1_conf = {
         .word_len = UART_WORDLEN_8,
         .stop_bits = UART_STOP_1,
         .parity = UART_PARITY_NONE,
-        .tx_conf = &(const pin_config_t) {
-                 .mode = PIN_MODE_AF,
-                 .otype  = PIN_OTYPE_PP,
-                 .ospeed = PIN_OSPEED_HIGH,
-                 .pupd   = PIN_PUPD_PULLUP,
-                 .af     = PA9_REQ_USART1_TX,
-         },
-        .rx_conf = &(const pin_config_t) {
-                .mode   = PIN_MODE_AF,
-                .otype  = PIN_OTYPE_PP,
-                .ospeed = PIN_OSPEED_HIGH,
-                .pupd   = PIN_PUPD_PULLUP,
-                .af     = PA10_REQ_USART1_RX,
-         },
-        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
-        .dma_cfg = &(const uart_dma_config_t)  {
-                    .tx_dma = &(const dma_stream_config_t) {
-                    .dma_request    = DMA2_REQ_USART1_TX,
-                    .direction      = DMA_DIR_M2P,
-                    .priority       = xDMA_PRIORITY_HIGH,
-                    .mem_data_size  = DMA_DATA_SIZE_BYTE,
-                    .per_data_size  = DMA_DATA_SIZE_BYTE,
-                    .mem_inc        = 1,
-                    .per_inc        = 0,
-                    .mode           = DMA_MODE_NORMAL,     // 单次发送
-                    .fifo_mode      = DMA_FIFO_DIRECT,
-                    .it_enable      = xDMA_IT_TC,           // 只使能传输完成中断
-                }
+        .pins = {
+                .uart_tx = PA9_REQ_USART1_TX,
+                .uart_rx = PA10_REQ_USART1_RX,
         },
+        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .dma_cfg = NULL,
 };
 
 const usart_config usart4_conf = {
@@ -78,20 +65,10 @@ const usart_config usart4_conf = {
         .word_len = UART_WORDLEN_8,
         .stop_bits = UART_STOP_1,
         .parity = UART_PARITY_NONE,
-        .tx_conf = &(const pin_config_t) {
-                 .mode = PIN_MODE_AF,
-                 .ospeed = PIN_OSPEED_HIGH,
-                 .otype = PIN_OTYPE_PP,
-                 .pupd = PIN_PUPD_PULLUP,
-                 .af = PC10_REQ_UART4_TX,
-                 .irq_mode = PIN_IRQ_MODE_NONE},
-        .rx_conf = &(const pin_config_t) {
-                  .mode = PIN_MODE_AF,
-                  .ospeed = PIN_OSPEED_HIGH,
-                  .otype = PIN_OTYPE_PP,
-                  .pupd = PIN_PUPD_PULLUP,
-                  .af = PC11_REQ_UART4_RX,
-                  .irq_mode = PIN_IRQ_MODE_NONE},
+        .pins = {
+                .uart_tx = PC10_REQ_UART4_TX,
+                .uart_rx = PC11_REQ_UART4_RX,
+        },
         .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
         .dma_cfg =  &(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
@@ -119,18 +96,6 @@ const usart_config usart4_conf = {
                     .it_enable      = 0,                 // 直接读取缓冲区则无需中断
                 },
         },
-};
-
-const tim_config_t time2_conf = {
-        .id = TIM_2,
-        .timebase = {
-                .counter_mode = TIM_COUNTER_UP,
-                .prescaler    = 41999,        // 84MHz / 42000 = 2000 Hz
-                .autoreload   = 199,         // 2000 / 200 = 10 Hz (0.1秒中断)
-                .clock_division = 0,
-                .repetition  = 0
-        },
-        .it_enable = TIM_IT_UPDATE,
 };
 
 const exti_config exti_conf = {
@@ -242,7 +207,6 @@ const can_config_t can1_conf = {
         .sjw = 1,
         .bs1 = 8,            // 11 time quanta
         .bs2 = 3,
-        .pclk1_hz = 42000000,
         .auto_bus_off = true,
         .auto_wakeup = false,
         .no_auto_retrans = false,
@@ -283,8 +247,8 @@ const pwm_config_t pwm1_conf = {
         .num_channels = 3,
         .channels = {
                 &(const pwm_channel_t) { .channel=1, .mode=TIM_OC_MODE_PWM1, .duty=300, .enable_preload=true, .pwm_pin = PA8_REQ_TIM1_CH1},
-                &(const pwm_channel_t) { .channel=2, .mode=TIM_OC_MODE_PWM2, .duty=500, .enable_preload=true, .pwm_pin = PA9_REQ_TIM1_CH2},
-                &(const pwm_channel_t) { .channel=3, .mode=TIM_OC_MODE_PWM1, .duty=800, .enable_preload=true, .pwm_pin = PA10_REQ_TIM1_CH3}
+                &(const pwm_channel_t) { .channel=2, .mode=TIM_OC_MODE_PWM2, .duty=500, .enable_preload=true, .pwm_pin = PE11_REQ_TIM1_CH2},
+                &(const pwm_channel_t) { .channel=3, .mode=TIM_OC_MODE_PWM1, .duty=800, .enable_preload=true, .pwm_pin = PE13_REQ_TIM1_CH3}
         }
 };
 
@@ -374,8 +338,3 @@ const iwdg_config_t iwdg_conf = {
         .reload    = 1250       // (0..4095)
 };
 
-const fpu_config_t fpu_conf = {
-        .mode                     = FPU_MODE_FULL_ACCESS,
-        .enable_lazy_stacking     = false,
-        .enable_auto_state_preservation = true
-};

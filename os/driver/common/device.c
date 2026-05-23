@@ -2,8 +2,6 @@
 #include "../../common/linear_pool.h"
 #include <stdio.h>
 
-static uint32_t device_encode_pripority(Device* self, uint32_t peer_pripority, uint32_t sub_pripority);
-
 static bool device_attach_irq(Device* self, irq_config *conf);
 
 static bool device_transfer(Device* self, const void *data, size_t count);
@@ -16,19 +14,19 @@ static const DeviceFun device_fun = {
     .destroy = device_destroy,
 	.transfer = device_transfer,
 	.attach_irq = device_attach_irq,
-	.encode_pripority = device_encode_pripority,
 };
+
 // 构造函数实现
-Device* device_create() {
+Device* device_create(const dev_pripority_t *priority) {
     Device* obj = (Device*)os_malloc(sizeof(Device));
     if (obj) {
         memset(obj, 0, sizeof(Device));
-        device_init(obj);
+        device_init(obj, priority);
     }
     return obj;
 }
 
-void device_init(Device* self) {
+void device_init(Device* self, const dev_pripority_t *priority) {
     if (self->vtable == NULL) {
         self->vtable = (DeviceVTable *) os_malloc(sizeof(DeviceVTable));
         memset(self->vtable , 0, sizeof(DeviceVTable));
@@ -36,6 +34,7 @@ void device_init(Device* self) {
     self->fun = &(device_fun);
     // TODO: 初始化数据成员
     self->irq_conf.semaphore = NULL;
+    self->irq_conf.priority = priority;
 }
 
 void device_deinit(Device* self) {
@@ -63,7 +62,7 @@ static bool device_attach_irq(Device* self, irq_config *conf) {
 
     if (gloable_nvic->fun->register_handler(gloable_nvic, conf->irq_num, conf->handler, self)) {
         gloable_nvic->fun->attach_semaphore(gloable_nvic, conf->irq_num, self->irq_conf.semaphore);
-        gloable_nvic->fun->set_priority(gloable_nvic, conf->irq_num, conf->priority);
+        gloable_nvic->fun->set_priority(gloable_nvic, conf->irq_num, self->irq_conf.priority->peer_pripority, self->irq_conf.priority->sub_pripority);
         return true;
     }
 
@@ -82,11 +81,4 @@ static bool device_transfer(Device* self, const void *data, size_t count) {
     return true;
 }
 
-
-
-
-// encode_pripority method
-static uint32_t device_encode_pripority(Device* self, uint32_t peer_pripority, uint32_t sub_pripority) {
-    return gloable_nvic->fun->encode_priority(gloable_nvic, peer_pripority, sub_pripority);
-}
 

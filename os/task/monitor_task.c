@@ -39,7 +39,6 @@ void monitor_task_init(Monitor_task* self) {
 	def_task_thread(self) = monitor_task_task_thread_impl;
     self->idletask = NULL;
     self->last_call = 0;
-    self->cpu_usage = 0;
 }
 
 void monitor_task_deinit(Monitor_task* self) {
@@ -71,23 +70,22 @@ task_thread_override(monitor_task_task_thread_impl) {
         LOG_DEBUG("monitor", "----------------monitor lock----------------");
         gloable_mutex->fun->mutex_lock(gloable_mutex, 0);
         self->fun->os_sleep(self, 3000);
-
-        uint32_t now_call = getSystime()->systick;//HAL_GetTick();//get_system_tick();
-        uint32_t run_time =  now_call - monitor_task->last_call;
-        monitor_task->last_call = now_call;
-        // 假设每秒统计一次，总时间片为 SYSTEM_TICKS_PER_SEC
-        //monitor_task->cpu_usage = 100 - (monitor_task->idletask->idle_total_ticks * 100 / run_time);
-       // monitor_task->idletask->idle_total_ticks = 0;
+        uint32_t now = getSystime()->systick;
+        uint32_t run_time =  now - monitor_task->last_call;
+        monitor_task->last_call = now;
         LOG_DEBUG("monitor", "--------------------------------");
         LOG_DEBUG("monitor", "name      cpu     mem     stack");
         for (uint8_t i =0; i < gloable_taskManager->task_size; i++) {
             if (gloable_taskManager->task_tab[i]->task_tcb) {
-                LOG_DEBUG("monitor", "%-10s %-4d    %-4d   %-4d",
+                gloable_taskManager->task_tab[i]->task_tcb->cpu_usage_info.usage_percent =
+                        (gloable_taskManager->task_tab[i]->task_tcb->cpu_usage_info.total_run_time * 1000)/ run_time;
+                LOG_DEBUG("monitor", "%-10s %d.%-4d    %-4d   %-4d",
                           gloable_taskManager->task_tab[i]->task_tcb->name,
-                          (gloable_taskManager->task_tab[i]->task_tcb->run_time * 100)/ run_time,
+                          gloable_taskManager->task_tab[i]->task_tcb->cpu_usage_info.usage_percent / 10,
+                          gloable_taskManager->task_tab[i]->task_tcb->cpu_usage_info.usage_percent % 10,
                           linear_pool_get()->size,
                           gloable_taskManager->task_tab[i]->task_tcb->stack_left);
-                gloable_taskManager->task_tab[i]->task_tcb->run_time = 0;
+                gloable_taskManager->task_tab[i]->task_tcb->cpu_usage_info.total_run_time = 0;
             }
         }
         LOG_DEBUG("monitor", "--------------------------------");

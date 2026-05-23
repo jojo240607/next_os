@@ -14,18 +14,18 @@ static const FsmcFun fsmc_fun = {
     .destroy = fsmc_destroy,
 };
 // 构造函数实现
-Fsmc* fsmc_create(const fsmc_lcd_config_t *conf) {
+Fsmc* fsmc_create(const fsmc_lcd_config_t *conf, const dev_pripority_t *priority) {
     Fsmc* obj = (Fsmc*)os_malloc(sizeof(Fsmc));
     if (obj) {
         memset(obj, 0, sizeof(Fsmc));
-        fsmc_init(obj, conf);
+        fsmc_init(obj, conf, priority);
     }
     return obj;
 }
 
-void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf) {
+void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(fsmc_fun);
     // TODO: 初始化派生类特有成员
 

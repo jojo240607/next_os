@@ -2,7 +2,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 
-static void task_add_task(Task* self, const char *name, uint8_t priority, size_t stack_size);
+static void task_add_task(Task* self, const char *name, uint8_t priority, mpu_region_size_t stack_size);
 
 // 析构函数声明
 static void task_destroy(Task* self);
@@ -49,11 +49,11 @@ static void task_destroy(Task* self) {
 }
 
 // add_task method
-static void task_add_task(Task* self, const char *name, uint8_t priority, size_t stack_size) {
+static void task_add_task(Task* self, const char *name, uint8_t priority, mpu_region_size_t stack_size) {
     if (NULL == self) {
         return;
     }
-    if (GET_TASK_VTABLE(self)->task_thread != NULL && stack_size > 0) {
+    if (GET_TASK_VTABLE(self)->task_thread != NULL && stack_size > MPU_SIZE_0B) {
         Entry_t entry_s = {
                 .priority = priority,
                 .stack_size = stack_size,

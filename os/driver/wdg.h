@@ -68,8 +68,8 @@ struct _Wdg {
 };
 
 // 构造函数声明
-Wdg* wdg_create(const iwdg_config_t *cfg);
-void wdg_init(Wdg* self, const iwdg_config_t *cfg);
+Wdg* wdg_create(const iwdg_config_t *cfg, const dev_pripority_t *priority);
+void wdg_init(Wdg* self, const iwdg_config_t *cfg, const dev_pripority_t *priority);
 
 // 析构函数声明
 void wdg_deinit(Wdg* self);

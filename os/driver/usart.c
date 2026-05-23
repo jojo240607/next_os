@@ -28,21 +28,21 @@ static const UsartFun usart_fun = {
 };
 
 // 构造函数实现
-Usart* usart_create(const usart_config * conf) {
+Usart* usart_create(const usart_config * conf, const dev_pripority_t *priority) {
     if (conf == NULL) {
         return NULL;
     }
     Usart* obj = (Usart*)os_malloc(sizeof(Usart));
     if (obj) {
         memset(obj, 0, sizeof(Usart));
-        usart_init(obj, conf);
+        usart_init(obj, conf, priority);
     }
     return obj;
 }
 
-void usart_init(Usart* self, const usart_config * conf) {
+void usart_init(Usart* self, const usart_config * conf, const dev_pripority_t *priority) {
     // 初始化基类部分
-    device_init(&self->base);
+    device_init(&self->base, priority);
     self->fun = &(usart_fun);
     // TODO: 初始化派生类特有成员
 
@@ -50,12 +50,9 @@ void usart_init(Usart* self, const usart_config * conf) {
     GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
-    //self->rx_complete = 0;
-   // self->rx_index = 0;
     self->conf = conf;
     self->uart_tx_sem = semaphore_create(0);
     self->uart_rx_sem = semaphore_create(0);
-    //self->rx_size = conf->buffer_size == 0 ? DEFAULT_RX_BUFFER : conf->buffer_size;
 }
 
 void usart_deinit(Usart* self) {
@@ -76,89 +73,73 @@ dev_init_override(usart_dev_init_impl) {
     Usart *usart = (Usart *)self;
     //params
     LOG_DEBUG("usart", "usart init");
-    if (pinmux_request(usart->conf->tx_conf) == PINMUX_ERROR) {
-        LOG_ERROR("usart", "tx pinmux error");
+
+    // 2. 配置引脚 (AF9)
+    pin_config_t pins[2] = {
+            {.mode = PIN_MODE_AF,
+                    .otype = PIN_OTYPE_PP,
+                    .ospeed = PIN_OSPEED_HIGH,
+                    .pupd = PIN_PUPD_NONE,
+                    .af = usart->conf->pins.uart_tx },
+            {.mode = PIN_MODE_AF,
+                    .otype = PIN_OTYPE_PP,
+                    .ospeed = PIN_OSPEED_HIGH,
+                    .pupd = PIN_PUPD_NONE,
+                    .af = usart->conf->pins.uart_rx }
+    };
+    if (pinmux_request_group(pins, 2) != PINMUX_SUCCESS) {
+        LOG_DEBUG("can", "init pinmux error!");
+        return;
     }
 
-    if (pinmux_request(usart->conf->rx_conf) == PINMUX_ERROR) {
-        LOG_ERROR("usart", "rx pinmux error");
-    }
-
-    // 使能UART4时钟 (APB1总线，位19)
     // 1. 使能时钟
     hal_uart_clock_enable(usart->conf->id);
-    xUSART_TypeDef *uart_ctrl = USARTx[usart->conf->id];
-    // 3. 波特率 (假设 APB2=84MHz for USART1, APB1=42MHz for USART2/3)
-    uint32_t pclk = (usart->conf->id == UART_1) ? 84000000UL : 42000000UL;
-    uart_ctrl->BRR = pclk / usart->conf->baudrate;
+    hal_uart_set_baudrate(usart->conf->id, usart->conf->baudrate);
     // 4. 配置帧格式
-    uint32_t cr1 = (1 << 3) | (1 << 2);  // TE, RE
-    cr1 |= (usart->conf->word_len & 0x01) << 12; // M
-    cr1 |= (usart->conf->parity & 0x03) << 9;   // PS, PCE
-    uart_ctrl->CR1 = cr1;
+    hal_uart_set_format(usart->conf->id, usart->conf->word_len, usart->conf->stop_bits, usart->conf->parity);
 
-    uart_ctrl->CR2 = (usart->conf->stop_bits & 0x03) << 12;
-
-    // 5. 使能模块
-    uart_ctrl->CR1 |= (1 << 13);  // UE
+    hal_uart_enable(usart->conf->id);
 
     // 6. 中断配置
-    if (usart->conf->it_enable) {
-        xUSART_TypeDef *uart_ctrl = USARTx[usart->conf->id];
-        uint32_t cr1 = uart_ctrl->CR1;
-        if (usart->conf->it_enable & xUART_IT_TXE) {
-            cr1 |= (1 << 7);   // TXEIE
-        }
-        if (usart->conf->it_enable & xUART_IT_RXNE) {
-            cr1 |= (1 << 5);   // RXNEIE
-        }
-        if (usart->conf->it_enable & xUART_IT_TC) {
-            cr1 |= (1 << 6);   // TCIE
-        }
-        uart_ctrl->CR1 = cr1;
+    if (hal_uart_it_init(usart->conf->id, usart->conf->it_enable)) {
         self->irq_conf.irq_num = USART1_IRQ + usart->conf->id;
-        self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);
         self->irq_conf.handler = usart_irq_handler_impl;
         self->irq_conf.semaphore = sem;
         self->irq_conf.arg = self;
-
         if (!self->fun->attach_irq(self, &self->irq_conf)) {
             LOG_ERROR("systick", "attach irq %d error", self->irq_conf.irq_num);
         }
     }
+    if (usart->conf->dma_cfg) {
+        if (usart->conf->dma_cfg->tx_dma) {
+            if (dma_stream_request(usart->conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
+                // 申请失败，回滚
+                //goto error;
+                return;
+            }
+            if (usart->conf->dma_cfg->tx_dma->it_enable) {
+                self->irq_conf.handler = usart_txdma_irq_handler_impl;
+                self->irq_conf.semaphore = sem;
+                self->irq_conf.arg = self;
+                self->irq_conf.irq_num = dma_get_irqnum(usart->conf->dma_cfg->tx_dma);
+                self->fun->attach_irq(self, &self->irq_conf);
+            }
+        }
+        if (usart->conf->dma_cfg->rx_dma) {
+            if (dma_stream_request(usart->conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
+                //goto error;
+                return;
+            }
+            if (usart->conf->dma_cfg->rx_dma->it_enable) {
+                self->irq_conf.handler = usart_rxdma_irq_handler_impl;
+                self->irq_conf.semaphore = sem;
+                self->irq_conf.arg = self;
 
-    if (usart->conf->dma_cfg && usart->conf->dma_cfg->tx_dma) {
-        if (dma_stream_request(usart->conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
-            // 申请失败，回滚
-            //goto error;
-            return;
+                self->irq_conf.irq_num = dma_get_irqnum(usart->conf->dma_cfg->rx_dma);
+                self->fun->attach_irq(self, &self->irq_conf);
+            }
         }
-        // 使能 USART 的 DMA 发送位 CR3 bit7 (DMAT)
-        USARTx[usart->conf->id]->CR3 |= (1 << 7);
-        if (usart->conf->dma_cfg->tx_dma->it_enable) {
-            self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-            self->irq_conf.handler = usart_txdma_irq_handler_impl;
-            self->irq_conf.semaphore = sem;
-            self->irq_conf.arg = self;
-            self->irq_conf.irq_num = dma_get_irqnum(usart->conf->dma_cfg->tx_dma);
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-    }
-    if (usart->conf->dma_cfg && usart->conf->dma_cfg->rx_dma) {
-        if (dma_stream_request(usart->conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
-            //goto error;
-            return;
-        }
-        USARTx[usart->conf->id]->CR3 |= (1 << 6); // DMAR
-        if (usart->conf->dma_cfg->rx_dma->it_enable) {
-            self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-            self->irq_conf.handler = usart_rxdma_irq_handler_impl;
-            self->irq_conf.semaphore = sem;
-            self->irq_conf.arg = self;
-
-            self->irq_conf.irq_num = dma_get_irqnum(usart->conf->dma_cfg->rx_dma);
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
+        hal_uart_dma_init(usart->conf->id, usart->conf->dma_cfg->tx_dma, usart->conf->dma_cfg->rx_dma);
     }
 
 }
@@ -167,8 +148,7 @@ dev_read_override(usart_dev_read_impl) {
     // TODO: add dev_read method
     Usart *usart = (Usart *)self;
     //params , void *buf, size_t count
-    while(!(USARTx[usart->conf->id]->SR & (1 << 5)));
-    *(char *)buf = (char)USARTx[usart->conf->id]->DR;
+    hal_uart_recv(usart->conf->id, (uint8_t *)buf, count);
 }
 // dev_write method
 dev_write_override(usart_dev_write_impl) {
@@ -176,10 +156,7 @@ dev_write_override(usart_dev_write_impl) {
     Usart *usart = (Usart *)self;
     //params , const void *buf, size_t count
     // 检查发送数据寄存器是否为空 (TXE标志位)
-    while (count--) {
-        while (!(USARTx[usart->conf->id]->SR & (1 << 7)));
-        USARTx[usart->conf->id]->DR = *(char *) buf++;
-    }
+    hal_uart_send(usart->conf->id, (uint8_t *)buf, count);
 
 }
 // dev_ioctl method
@@ -196,50 +173,48 @@ static bool usart_irq_handler_impl(void *arg) {
     Usart *usart = (Usart *)arg;
     //params , void *arg
     // 检查SR寄存器的RXNE位，表示接收到了新数据
-    xUSART_TypeDef *uart_ctrl = USARTx[usart->conf->id];
     uart_xfer_t *x = &usart->uart_xfer;
-    uint32_t sr = uart_ctrl->SR;
-    uint8_t data;
+    uint32_t sr = hal_uart_get_it_event(usart->conf->id);
+   // uint8_t data;
 
     // --- 接收中断 (RXNE) ---
-    if (sr & (1 << 5)) {  // RXNE
-        data = (uint8_t)uart_ctrl->DR;   // 读取数据自动清 RXNE
+    if (sr & xUART_FLAG_RXNE) {  // RXNE
         if (x->rx_active && x->rx_index < x->rx_total) {
-            x->rx_buf[x->rx_index++] = data;
+            x->rx_buf[x->rx_index++] = *hal_uart_data_addr(usart->conf->id);  // 读取数据自动清 RXNE
         }
         if (x->rx_active && x->rx_index >= x->rx_total) {
             x->rx_active = false;
-            uart_ctrl->CR1 &= ~(1 << 5);   // 关闭 RXNE 中断
+            hal_uart_clear_it_event(usart->conf->id, xUART_IT_RXNE);// 关闭 RXNE 中断
             usart->uart_rx_sem->fun->give(usart->uart_rx_sem);
         }
     }
 
     // --- 发送中断 (TXE) ---
-    if (sr & (1 << 7)) {  // TXE
+    if (sr & xUART_FLAG_TXE) {  // TXE
         if (x->tx_active && x->tx_index < x->tx_total) {
-            uart_ctrl->DR = x->tx_buf[x->tx_index++];
+            *hal_uart_data_addr(usart->conf->id) = x->tx_buf[x->tx_index++];
         } else {
             // 缓冲区已空，关闭 TXE 中断，保留 TC 中断用于完成通知
-            uart_ctrl->CR1 &= ~(1 << 7);   // 关 TXEIE
+            hal_uart_clear_it_event(usart->conf->id, xUART_IT_TXE);
         }
     }
 
     // --- 发送完成中断 (TC) ---
-    if (sr & (1 << 6)) {  // TC
+    if (sr & xUART_FLAG_TC) {  // TC
         // 清除 TC 标志：先读 SR，再写 DR 无效（TC 是软件清除，写0到SR的TC位）
         // 但 USART 的 TC 标志是通过写 0 清？实际上写 0 无效，需要读 SR + 写 DR？不，TC 清法：直接向 SR 的 TC 位写 0 即可（F4手册：通过对 USART_SR 寄存器的 TC 位写 0 来清除）
-        uart_ctrl->SR &= ~(1 << 6);  // 清除 TC
+        hal_uart_clear_it_event(usart->conf->id, xUART_IT_TC);
         if (x->tx_active && x->tx_index >= x->tx_total) {
             x->tx_active = false;
-            uart_ctrl->CR1 &= ~(1 << 6);   // 关闭 TCIE
+            hal_uart_clear_it_event(usart->conf->id, xUART_IT_TC);// 关闭 TCIE
             usart->uart_tx_sem->fun->give(usart->uart_tx_sem);
         }
     }
 
     // --- 错误处理 ---
-    if (sr & (1 << 0) || sr & (1 << 1) || sr & (1 << 2) || sr & (1 << 3)) {
+    if (sr & xUART_FLAG_PE || sr & xUART_FLAG_FE || sr & xUART_FLAG_NE || sr & xUART_FLAG_ORE) {
         // PE, FE, NF, ORE 等
-        uint32_t dr = uart_ctrl->DR;  // 读 DR 可清除部分错误标志
+        uint32_t dr = *hal_uart_data_addr(usart->conf->id);  // 读 DR 可清除部分错误标志
         (void)dr;
     }
     return true;
@@ -257,9 +232,6 @@ static bool usart_rxdma_irq_handler_impl(void *arg) {
     return true;
 }
 
-
-
-
 // send_it method
 static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
     if (self->conf->id >= UART_MAX || len == 0) {
@@ -275,9 +247,8 @@ static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
     x->tx_index = 0;
     x->tx_active = true;
 
-    xUSART_TypeDef *uart = USARTx[self->conf->id];
     // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
-    uart->CR1 |= (1 << 7) | (1 << 6);   // TXEIE + TCIE
+    hal_uart_set_it_event(self->conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
     self->uart_tx_sem->fun->take(self->uart_tx_sem);
 }
 
@@ -296,9 +267,7 @@ static void usart_recv_it(Usart* self, uint8_t *buffer, uint16_t len) {
     x->rx_total = len;
     x->rx_index = 0;
     x->rx_active = true;
-
-    xUSART_TypeDef *uart = USARTx[self->conf->id];
-    uart->CR1 |= (1 << 5);   // RXNEIE
+    hal_uart_set_it_event(self->conf->id, xUART_IT_RXNE);// RXNEIE
     self->uart_rx_sem->fun->take(self->uart_rx_sem);
 }
 

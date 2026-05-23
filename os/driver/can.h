@@ -43,7 +43,7 @@ typedef struct {
     uint8_t            sjw;                // 同步跳跃宽度 (1..4)
     uint8_t            bs1;                // 时间段 1 (1..16)
     uint8_t            bs2;                // 时间段 2 (1..8)
-    uint32_t           pclk1_hz;           // APB1 时钟频率 (通常 42MHz)
+    //uint32_t           pclk1_hz;           // APB1 时钟频率 (通常 42MHz)
     bool               auto_bus_off;       // 自动总线恢复
     bool               auto_wakeup;        // 自动唤醒
     bool               no_auto_retrans;    // 禁止自动重传
@@ -63,8 +63,8 @@ struct _Can {
 };
 
 // 构造函数声明
-Can* can_create(const can_config_t * conf);
-void can_init(Can* self, const can_config_t * conf);
+Can* can_create(const can_config_t * conf, const dev_pripority_t *priority);
+void can_init(Can* self, const can_config_t * conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void can_deinit(Can* self);

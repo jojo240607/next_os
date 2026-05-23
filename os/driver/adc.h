@@ -73,8 +73,8 @@ struct _Adc {
 };
 
 // 构造函数声明
-Adc* adc_create(const adc_config *conf);
-void adc_init(Adc* self, const adc_config *conf);
+Adc* adc_create(const adc_config *conf, const dev_pripority_t *priority);
+void adc_init(Adc* self, const adc_config *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void adc_deinit(Adc* self);

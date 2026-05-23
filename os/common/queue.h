@@ -25,7 +25,7 @@ struct _Queue {
     // TODO: 添加数据成员
     Node *head; //头指针
     Node *tail; //尾指针
-    size_t size;
+    volatile size_t size;
 };
 
 // 构造函数声明

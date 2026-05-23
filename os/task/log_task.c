@@ -43,7 +43,7 @@ void log_task_init(Log_task* self) {
 	def_task_init(self) = log_task_task_init_impl;
 	def_task_thread(self) = log_task_task_thread_impl;
     self->log_buf = queue_create();
-    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
+    self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
 }
 
 void log_task_deinit(Log_task* self) {
@@ -87,7 +87,7 @@ task_thread_override(log_task_task_thread_impl) {
     Ring *log_buf = log_buffer();
     log_entry_t entry;
     while (1) {
-        self->semaphore->fun->take(self->semaphore);
+        self->semaphore->fun->take_user(self->semaphore);
         /* 批量处理，直到缓冲区空 */
         while (log_buf->fun->pop(log_buf, &entry)) {
             /* 格式化并发送到串口 */

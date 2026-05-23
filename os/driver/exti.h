@@ -36,8 +36,8 @@ struct _Exti {
 };
 
 // 构造函数声明
-Exti* exti_create(const exti_config *conf);
-void exti_init(Exti* self, const exti_config *conf);
+Exti* exti_create(const exti_config *conf, const dev_pripority_t *priority);
+void exti_init(Exti* self, const exti_config *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void exti_deinit(Exti* self);

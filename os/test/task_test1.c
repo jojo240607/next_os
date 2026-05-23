@@ -2,6 +2,7 @@
 #include "../common/linear_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <fastmath.h>
 #include "../log/log.h"
 #include "../common/sys_mutex.h"
 
@@ -70,13 +71,22 @@ task_thread_override(task_test1_thread_impl) {
     // TODO: add thread method
     Task_test1 *task_test1 = (Task_test1 *)self->parent;
     //params , void *arg
-    uint8_t dd = 0;
+    float dd = 1.0f;
+    float a = 1.2345f, b = 6.7890f, result;
+    volatile float f_result; // volatile 避免优化掉
+    f_result = a + b;
+    f_result = a * b;
+    f_result = a / b;
+    f_result = sqrtf(a);
+    f_result = a * b + 1.0f;
     while (true) {
         for (uint32_t i = 0; i < 1000; i++) {
             for(uint32_t j = 0; j < 1000; j++) {
-                dd++;
+                dd *= 3.14f;
+
             }
         }
+        LOG_DEBUG("test1", "dd = %x", dd);
         self->fun->os_sleep(self, 300);
         if (task_test1->start_mutex) {
             task_test1->start_mutex = false;

@@ -62,8 +62,8 @@ struct _Usb_cdc {
 };
 
 // 构造函数声明
-Usb_cdc* usb_cdc_create(const usb_cdc_config_t *conf);
-void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf);
+Usb_cdc* usb_cdc_create(const usb_cdc_config_t *conf, const dev_pripority_t *priority);
+void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf, const dev_pripority_t *priority);
 
 // 析构函数声明
 void usb_cdc_deinit(Usb_cdc* self);
