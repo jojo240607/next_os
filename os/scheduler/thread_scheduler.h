@@ -43,7 +43,7 @@ struct _Thread_scheduler {
     Queue *delay_list;
     Queue *destory_list;
     uint16_t tid_num;
-    Tcb_t *current_thread;
+    volatile Tcb_t *current_thread;
 };
 
 // 构造函数声明
@@ -54,6 +54,6 @@ void thread_scheduler_init(Thread_scheduler* self);
 void thread_scheduler_deinit(Thread_scheduler* self);
 void thread_scheduler_switch_context(Thread_scheduler* self);
 
-extern Tcb_t *gloable_current_tcb;
-extern Thread_scheduler *global_thread_scheduler;
+extern volatile Tcb_t *gloable_current_tcb;
+extern volatile Thread_scheduler *global_thread_scheduler;
 #endif // THREAD_SCHEDULER_H

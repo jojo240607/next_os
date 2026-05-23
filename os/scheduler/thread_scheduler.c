@@ -21,8 +21,8 @@ static inline void thread_scheduler_thread_exit();
 
 // 当前任务栈指针
 
-Tcb_t *gloable_current_tcb = NULL;
-Thread_scheduler *global_thread_scheduler = NULL;
+volatile Tcb_t *gloable_current_tcb = NULL;
+volatile Thread_scheduler *global_thread_scheduler = NULL;
 
 // TODO: 初始化数据成员
 static const Thread_schedulerFun thread_scheduler_fun = {
@@ -159,7 +159,7 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     if (self->current_thread != NULL) {
 #ifndef USE_CCMRAM
         //如果使用ccm，则不能使用mpu来保护栈内存
-        mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr, self->current_thread->stack_size);
+        //mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr, self->current_thread->stack_size);
 #endif
         self->current_thread->cpu_usage_info.last_reported_time = getSystime()->systick;
         self->current_thread->state = TCB_STATER_RUNNING;
@@ -180,8 +180,9 @@ static void thread_scheduler_start(Thread_scheduler* self) {
     if (self->current_thread == NULL) {
         return;
     }
-    hal_nvic_enable_irq(xPendSV_IRQn);
-    hal_nvic_enable_irq(xSVCall_IRQn);
+    //hal_nvic_enable_irq(xPendSV_IRQn);
+    //hal_nvic_enable_irq(xSVCall_IRQn);
+    //hal_nvic_global_irq_enable();
     __set_PSP( (uint32_t)self->current_thread->sp );
     // 设置 CONTROL 寄存器，选择使用 PSP
     __set_CONTROL( __get_CONTROL() | CONTROL_THREAD_PSP_PRIV ); // 线程模式 + 进程堆栈(PSP) + 非特权级 (nPRIV=1, SPSEL=1)

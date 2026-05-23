@@ -33,7 +33,7 @@
 static const scb_config_t scb_cfg = {
         .priority_group    = SCB_PRIORITY_GROUP_4,   // 4位抢占优先级
         .vector_table_base = 0x08000000UL,           // 设置中断向量表基地址（VTOR）
-        .enable_fault_trap = true,                   // 开启除零/非对齐陷阱
+        .enable_fault_trap = false,                   // 开启除零/非对齐陷阱
         .enable_sleep_on_exit = false,               //
         .enable_deep_sleep = false,                   // 使能深度睡眠 (配合 WFI)
 };
@@ -106,7 +106,7 @@ void os_init() {
     gloable_taskManager = task_manager_create();
     gloable_nvic = nvic_create();
     gloable_taskManager->fun->boot_init(gloable_taskManager);
-    //system_mpu_setup();
+    system_mpu_setup();
     system_svc_init();
     global_thread_scheduler->fun->start(global_thread_scheduler);
 }

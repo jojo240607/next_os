@@ -82,7 +82,7 @@ task_thread_override(time_task_task_thread_impl) {
         uint8_t tx[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
         uint8_t rx[5];
         time_task->adc->vtable->dev_read(time_task->adc, &adc_data, 2);
-        LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
+        //LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
         //GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
         //LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
         //uint8_t reg_addr = 0x10;        // 假设设备寄存器地址

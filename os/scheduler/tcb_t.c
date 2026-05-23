@@ -85,10 +85,17 @@ static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry) {
     top[5] = (uint32_t)entry->exit;//0xFFFFFFED;//      // LR (EXC_RETURN)
     top[6] = (uint32_t)entry->entry_fun; // PC
     top[7] = 0x01000000;      // xPSR (Thumb 位)
+    //top[8] = 0;      // 保留位，为了字节对齐
 
 // 再向下移动，留出 R4-R11, R14区
-    top -= 9;                       //R4-R11, R14
-    top[8] = EXC_RETURN_THRD_PSP_NF;//R14保存为 EXC_RETURN 为返回的值
+    top -= 10;  // 原来是 top -= 9
+    top[9] = 0xFFFFFFFD;// LR (EXC_RETURN)
+    top[8] = CONTROL_THREAD_PSP_PRIV;
+    // R4 - R11 初始化为 0 或其他安全值
+    for (int i = 0; i < 8; i++) {
+        top[i] = 0x00;   // 或保留 MAGIC_NUM 用于栈调试，但不影响运行
+    }
+    //top[8] = EXC_RETURN_THRD_PSP_NF;//R14保存为 EXC_RETURN 为返回的值
     self->sp = top; //此时指向R4-R11区的栈底
     self->state = TCB_STATER_READY;
 }
