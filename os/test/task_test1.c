@@ -80,10 +80,14 @@ task_thread_override(task_test1_thread_impl) {
     f_result = sqrtf(a);
     f_result = a * b + 1.0f;
     while (true) {
-        for (uint32_t i = 0; i < 1000; i++) {
-            for(uint32_t j = 0; j < 1000; j++) {
+        for (uint32_t i = 0; i < 100; i++) {
+            for(uint32_t j = 0; j < 100; j++) {
                 dd *= 3.14f;
-
+                f_result = a + b;
+                f_result = a * b;
+                f_result = a / b;
+                f_result = sqrtf(a);
+                f_result = a * b + 1.0f;
             }
         }
         LOG_DEBUG("test1", "dd = %x", dd);

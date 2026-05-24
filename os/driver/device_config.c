@@ -37,7 +37,7 @@ const tim_config_t time2_conf = {
         .id = TIM_2,
         .timebase = {
                 .counter_mode = TIM_COUNTER_UP,
-                .prescaler    = 20999,        // 42MHz / 21000 = 2000 Hz
+                .prescaler    = 41999,        // 42MHz / 42000 = 1000 Hz
                 .autoreload   = 1999,         // 2000 / 2000 = 1 Hz (0.1秒中断)
                 .clock_division = 0,
                 .repetition  = 0
@@ -55,7 +55,7 @@ const usart_config usart1_conf = {
                 .uart_tx = PA9_REQ_USART1_TX,
                 .uart_rx = PA10_REQ_USART1_RX,
         },
-        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .it_enable = xUART_IT_NONE,//xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
         .dma_cfg = NULL,
 };
 
@@ -69,7 +69,7 @@ const usart_config usart4_conf = {
                 .uart_tx = PC10_REQ_UART4_TX,
                 .uart_rx = PC11_REQ_UART4_RX,
         },
-        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .it_enable = xUART_IT_NONE,//xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
         .dma_cfg = NULL /*&(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
                     .dma_request    = DMA1_REQ_UART4_TX,

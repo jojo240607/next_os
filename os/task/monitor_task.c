@@ -70,7 +70,7 @@ task_thread_override(monitor_task_task_thread_impl) {
         LOG_DEBUG("monitor", "----------------monitor lock----------------");
         gloable_mutex->fun->mutex_lock(gloable_mutex, 0);
         self->fun->os_sleep(self, 3000);
-        uint32_t now = getSystime()->systick;
+        uint32_t now = get_systime_us();
         uint32_t run_time =  now - monitor_task->last_call;
         monitor_task->last_call = now;
         LOG_DEBUG("monitor", "--------------------------------");

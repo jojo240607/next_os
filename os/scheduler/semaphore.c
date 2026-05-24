@@ -118,8 +118,8 @@ static void semaphore_take_user(Semaphore* self) {
     //insert_into_wait_list(&sem->wait_list, current);
     self->wait_list->fun->enqueue(self->wait_list, GET_NODE(current));
     arch_irq_unlock(key);
-    start_pendsv_user();
-
+    //start_pendsv_user();
+    Trigger_PendSV;
     return;
 }
 

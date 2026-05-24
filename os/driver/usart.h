@@ -18,6 +18,8 @@ struct _UsartFun {
     void (*destroy)(Usart* self);
 	void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
 	void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
+    void (*send)(Usart* self, const uint8_t *data, uint16_t len);
+    void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
 
 };
 
@@ -63,8 +65,8 @@ struct _Usart {
     // TODO: 添加派生类特有的数据成员
     const usart_config *conf;
     uart_xfer_t uart_xfer;
-    Semaphore * uart_tx_sem;
-    Semaphore * uart_rx_sem;
+    volatile Semaphore * uart_tx_sem;
+    volatile Semaphore * uart_rx_sem;
 };
 
 // 构造函数声明

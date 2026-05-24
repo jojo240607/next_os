@@ -129,7 +129,7 @@ static void tcb_t_os_sleep(Tcb_t* self, uint32_t ms) {
     // 按 delay_ticks 升序插入
     arch_irq_unlock(key);
     // 触发调度，切换到下一个就绪任务
-    //Trigger_PendSV;
-    start_pendsv_user();
+    Trigger_PendSV;
+    //start_pendsv_user();
 }
 

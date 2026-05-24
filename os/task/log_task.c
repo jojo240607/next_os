@@ -44,6 +44,7 @@ void log_task_init(Log_task* self) {
 	def_task_thread(self) = log_task_task_thread_impl;
     self->log_buf = queue_create();
     self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
+    self->log_semaphore = semaphore_create(0);
 }
 
 void log_task_deinit(Log_task* self) {
@@ -77,7 +78,7 @@ task_init_override(log_task_task_init_impl) {
         return;
     }
     virtual_dev_init(log_task->usart, self->task_tcb->semaphore);
-    log_setsem(self->task_tcb->semaphore);
+    log_setsem(log_task->log_semaphore);
 }
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
@@ -87,7 +88,7 @@ task_thread_override(log_task_task_thread_impl) {
     Ring *log_buf = log_buffer();
     log_entry_t entry;
     while (1) {
-        self->semaphore->fun->take(self->semaphore);
+        log_task->log_semaphore->fun->take(log_task->log_semaphore);
         /* 批量处理，直到缓冲区空 */
         while (log_buf->fun->pop(log_buf, &entry)) {
             /* 格式化并发送到串口 */
@@ -99,7 +100,7 @@ task_thread_override(log_task_task_thread_impl) {
                                entry.tag,
                                entry.text);
             if (len > 0) {
-                GET_USART(log_task->usart)->fun->send_it(GET_USART(log_task->usart), (const uint8_t *)log_task->line, len);
+                GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)log_task->line, len);
             }
         }
     }

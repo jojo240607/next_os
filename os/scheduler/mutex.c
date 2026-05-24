@@ -99,8 +99,8 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
  //   LOG_DEBUG("mutex", "%s wait", curr->name);
     //curr->need_print = true;
     arch_irq_unlock(key);
-    //Trigger_PendSV;   // 切换到其他任务
-    start_pendsv_user();
+    Trigger_PendSV;   // 切换到其他任务
+    //start_pendsv_user();
     //LOG_DEBUG("mutex", "mutex_take 2");
     // 被唤醒后，重新获取互斥量所有权
     // 注意：此时互斥量已由原持有者释放，并可能已经转移给当前任务
@@ -169,8 +169,8 @@ static uint8_t mutex_give(Mutex* self) {
     // 如果有超时机制，清除该任务的超时定时器
     //os_clear_task_timeout(new_owner);
     arch_irq_unlock(key);
-    //Trigger_PendSV;   // 让新拥有者运行（如果优先级足够高）
-    start_pendsv_user();
+    Trigger_PendSV;   // 让新拥有者运行（如果优先级足够高）
+    //start_pendsv_user();
     return 1;
 }
 

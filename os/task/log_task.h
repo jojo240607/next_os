@@ -26,6 +26,7 @@ struct _Log_task {
     // TODO: 添加派生类特有的数据成员
     Device *usart;
     Queue *log_buf;//String
+    Semaphore *log_semaphore;
     char line[LOG_MSG_MAX_LEN + 32];
 };
 

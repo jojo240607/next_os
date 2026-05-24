@@ -50,7 +50,7 @@ static void systick_task_destroy(Systick_task* self) {
 // task_init method
 task_init_override(systick_task_task_init_impl) {
     // TODO: add task_init method
-    LOG_DEBUG("systick","systick_task init");
+//    LOG_DEBUG("systick","systick_task init");
     Systick_task *systick_task = (Systick_task *)self;
     //params , void *parent
     virtual_dev_init(systick_task->systick, NULL);

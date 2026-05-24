@@ -147,8 +147,8 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     }
     Tcb_t *next_tcb = GET_TCB_T(
             self->priority_list[highest_priority]->fun->dequeue(self->priority_list[highest_priority]));
-    self->current_thread->cpu_usage_info.total_run_time += getSystime()->systick - self->current_thread->cpu_usage_info.last_reported_time;
-    self->current_thread->cpu_usage_info.last_reported_time = getSystime()->systick;
+    self->current_thread->cpu_usage_info.total_run_time += get_systime_us() - self->current_thread->cpu_usage_info.last_reported_time;
+    self->current_thread->cpu_usage_info.last_reported_time = get_systime_us();
 
     //if (self->current_thread->need_print) {
     //    self->current_thread->need_print = false;
@@ -161,7 +161,7 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
         //如果使用ccm，则不能使用mpu来保护栈内存
         //mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr, self->current_thread->stack_size);
 #endif
-        self->current_thread->cpu_usage_info.last_reported_time = getSystime()->systick;
+        self->current_thread->cpu_usage_info.last_reported_time = get_systime_us();
         self->current_thread->state = TCB_STATER_RUNNING;
         gloable_current_tcb = (self->current_thread);
     }

@@ -59,6 +59,7 @@ PendSV_Handler:
 //    msr     control, r0
 //    isb
     msr     control, r12          // 恢复 CONTROL（SP 可能立刻切换）
+    isb                            //指令同步屏障，确保切换完成
     // 6. 退出中断（使用 bx lr，CPU自动从PSP弹出剩余寄存器）
     bx      lr
 

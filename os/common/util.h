@@ -13,6 +13,8 @@
 #define GET_TASK_MANAGER(obj) ((Task_manager *)obj)
 
 //  __DSB() 确保所有内存访问完成
+#define USE_CCMRAM
+
 #ifdef USE_CCMRAM
 #define CCMRAM __attribute__((section(".ccmram")))
 #else

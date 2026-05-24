@@ -6,11 +6,7 @@
 #include "../hal/hal_nvic.h"
 #include "../hal/hal_fault_diag.h"
 
-static bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
-static void nvic_unregister(Nvic* self, nvic_irq_num irq_num);
-static void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
-static void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
-static void nvic_dispatch(Nvic* self, nvic_irq_num irq_num);
+
 
 /* NVIC 初始化：设置优先级分组 + 批量配置中断 */
 static const nvic_config_t nvic_cfg = {
@@ -35,10 +31,10 @@ Nvic *gloable_nvic = NULL;
 // TODO: 初始化数据成员
 static const NvicFun nvic_fun = {
     .destroy = nvic_destroy,
-	.register_handler = nvic_register,
-	.unregister_handler = nvic_unregister,
-	.attach_semaphore = nvic_attach_semaphore,
-	.set_priority = nvic_set_priority,
+	//.register_handler = nvic_register,
+	//.unregister_handler = nvic_unregister,
+	//.attach_semaphore = nvic_attach_semaphore,
+	//.set_priority = nvic_set_priority,
 };
 
 typedef struct {
@@ -149,7 +145,7 @@ static void nvic_destroy(Nvic* self) {
 
 
 // register method
-static bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg) {
+bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg) {
     if (self == NULL) {
         return false;
     }
@@ -172,7 +168,7 @@ static bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handl
     return true;
 }
 // unregister method
-static void nvic_unregister(Nvic* self, nvic_irq_num irq_num) {
+void nvic_unregister(Nvic* self, nvic_irq_num irq_num) {
     if (self == NULL) {
         return;
     }
@@ -189,7 +185,7 @@ static void nvic_unregister(Nvic* self, nvic_irq_num irq_num) {
     arch_irq_unlock(key);
 }
 // attach_semaphore method
-static void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem) {
+void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem) {
     if (irq_num >= MAX_IRQ || sem == NULL)
         return;
     uint32_t key = arch_irq_lock();
@@ -197,7 +193,7 @@ static void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *s
     arch_irq_unlock(key);
 }
 // set_priority method
-static void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority) {
+void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority) {
     if (self == NULL) {
         return;
     }
@@ -209,7 +205,7 @@ static void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t 
     LOG_DEBUG("nvic", "irq %s, priority (%d, %d)", (IRQx + irq_num)->irq_name, preempt_priority, sub_priority);
 }
 // dispatch method
-static void nvic_dispatch(Nvic* self, nvic_irq_num irq_num) {
+void nvic_dispatch(Nvic* self, nvic_irq_num irq_num) {
     if (self == NULL) {
         return;
     }

@@ -7,8 +7,9 @@
 #include "hal/hal_usart.h"
 
 static void usart_recv_it(Usart* self, uint8_t *buffer, uint16_t len);
-
 static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len);
+static void usart_recv(Usart* self, uint8_t *buffer, uint16_t len);
+static void usart_send(Usart* self, const uint8_t *data, uint16_t len);
 
 dev_init_override(usart_dev_init_impl);
 dev_read_override(usart_dev_read_impl);
@@ -25,6 +26,8 @@ static const UsartFun usart_fun = {
     .destroy = usart_destroy,
 	.send_it = usart_send_it,
 	.recv_it = usart_recv_it,
+    .send = usart_send,
+    .recv = usart_recv,
 };
 
 // 构造函数实现
@@ -166,7 +169,12 @@ dev_ioctl_override(usart_dev_ioctl_impl) {
     //params , int cmd, void *arg
     
 }
-
+static void usart_recv(Usart* self, uint8_t *buffer, uint16_t len) {
+    hal_uart_recv(self->conf->id, (uint8_t *)buffer, len);
+}
+static void usart_send(Usart* self, const uint8_t *data, uint16_t len) {
+    hal_uart_send(self->conf->id, (uint8_t *)data, len);
+}
 // irq_handler method
 static bool usart_irq_handler_impl(void *arg) {
     // TODO: add irq_handler method
@@ -249,7 +257,7 @@ static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
 
     // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
     hal_uart_set_it_event(self->conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
-    self->uart_tx_sem->fun->take(self->uart_tx_sem);
+    //self->uart_tx_sem->fun->take(self->uart_tx_sem);
 }
 
 

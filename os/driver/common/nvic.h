@@ -89,10 +89,10 @@ typedef enum : uint8_t {
 // 类成员函数结构
 struct _NvicFun {
     void (*destroy)(Nvic* self);
-    bool (*register_handler)(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
-	void (*unregister_handler)(Nvic* self, nvic_irq_num irq_num);
-	void (*attach_semaphore)(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
-	void (*set_priority)(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
+    //bool (*register_handler)(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
+	//void (*unregister_handler)(Nvic* self, nvic_irq_num irq_num);
+	//void (*attach_semaphore)(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
+	//void (*set_priority)(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
 
 };
 // 中断控制块
@@ -120,7 +120,11 @@ void nvic_deinit(Nvic* self);
 // 全局中断分发函数，在具体的中断处理函数中调用
 void dispatch(nvic_irq_num irq_num);
 extern Nvic *gloable_nvic;
-
+bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
+void nvic_unregister(Nvic* self, nvic_irq_num irq_num);
+void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
+void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
+void nvic_dispatch(Nvic* self, nvic_irq_num irq_num);
 
 void NMI_Handler(void);
 void HardFault_Handler(void);
