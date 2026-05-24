@@ -9,7 +9,7 @@
 #include "log_config.h"
 #include "../common/ring.h"
 #include "../scheduler/semaphore.h"
-
+#include "../task/task.h"
 /* 日志级别 */
 typedef enum : uint8_t {
     LOG_LEVEL_DEBUG = 0,
@@ -68,5 +68,6 @@ void log_init(void);
 /* 实际调用函数 */
 void log_output(log_level_t level, const char *tag, const char *fmt, ...);
 Ring * log_buffer();
-void log_setsem(Semaphore *sem);
+void log_bound_task(Task *ptask);
+void log_directly_error(char *buf, size_t size);
 #endif

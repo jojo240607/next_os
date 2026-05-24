@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>   // 仅用于 snprintf，若不需要格式化可移除
 #include "cmsis_gcc.h"
+#include "../../log/log.h"
 
 
 /* ──────── 内部全局配置 ──────── */
@@ -85,6 +86,9 @@ void hal_fault_diag_decode(fault_info_t *info)
     /* 如果未找到具体子故障，但 HFSR 已置 FORCED，则保留为 HardFault */
     if (info->type == FAULT_TYPE_NONE && (hfsr & (1 << 30)))
         info->type = FAULT_TYPE_HARD_FAULT;
+    uint8_t  error_buf[80] = {0};
+    int len = hal_fault_diag_snprint(error_buf, 80, info);
+    log_directly_error(error_buf, len);
 }
 
 /* ===================================================================

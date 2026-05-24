@@ -123,8 +123,9 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
 #endif
     if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
         while (1) {
+            log_directly_error("stack out of size", 18);
             LOW_POWER;
-            LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
+            //LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
             //stack out bound
         }
     }

@@ -6,6 +6,10 @@
 #include "../common/ring.h"
 #include "../scheduler/thread_scheduler.h"
 #include "../common/sys_time.h"
+#include "../driver/common/device.h"
+#include "../task/task.h"
+#include "../driver/usart.h"
+#include "../task/log_task.h"
 
 /* ------- 日志条目与环形缓冲区 ------- */
 
@@ -17,7 +21,7 @@ typedef struct {
 } log_ring_buf_t;
 */
 static Ring *log_buf;
-static Semaphore *log_sem;            // 信号量，用于唤醒日志任务
+static Task *task;            // 信号量，用于唤醒日志任务
 Ring * log_buffer() {
     return log_buf;
 }
@@ -105,17 +109,24 @@ void log_output(log_level_t level, const char * tag, const char *fmt, ...) {
     va_end(args);
 
     if (log_buf->fun->push(log_buf, &entry)) {
-        if (log_sem) {
-            log_sem->fun->give(log_sem);
+        if (task) {
+            task->task_tcb->semaphore->fun->give(task->task_tcb->semaphore);
         }
     } else {
         // 缓冲区满，记录丢弃次数（可选，这里省略）
-        if (log_sem) {
-            log_sem->fun->give(log_sem);
+        if (task) {
+            task->task_tcb->semaphore->fun->give(task->task_tcb->semaphore);
         }
     }
 }
 
+void log_directly_error(char *buf, size_t size) {
+    if (task == NULL) {
+        return;
+    }
+    Log_task *log_task = (Log_task *)task;
+    GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)buf, size);
+}
 /* 初始化日志系统 */
 void log_init(void) {
     log_buf = ring_create(LOG_RING_BUF_SIZE, sizeof(log_entry_t));
@@ -128,9 +139,9 @@ void log_init(void) {
     //               NULL, LOG_TASK_PRIORITY, log_task_stack);
 }
 
-void log_setsem(Semaphore *sem) {
-    log_sem = sem;
+void log_bound_task(Task *ptask) {
+    task = ptask;
     if (log_buf->count > 0) {
-        log_sem->fun->give(log_sem);
+        task->task_tcb->semaphore->fun->give(task->task_tcb->semaphore);
     }
 }
