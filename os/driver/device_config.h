@@ -26,11 +26,11 @@
 
 extern const rcc_sysclk_config_t clk_conf;
 extern const systick_config_t sys_tick_conf;
-extern const usart_config usart4_conf;
-extern const usart_config usart1_conf;
+extern const usart_config_t usart4_conf;
+extern const usart_config_t usart1_conf;
 extern const tim_config_t time2_conf;
-extern const exti_config exti_conf;
-extern const adc_config adc1_conf;
+extern const exti_config_t exti_conf;
+extern const adc_config_t adc1_conf;
 extern const spi_config_t spi1_conf;
 extern const i2c_config_t i2c1_conf;
 extern const iwdg_config_t iwdg_conf;

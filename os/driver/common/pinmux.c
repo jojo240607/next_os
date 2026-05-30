@@ -3,6 +3,7 @@
 #include "../../log/log.h"
 #include "../hal/hal_exti.h"
 #include "rcc.h"
+#include "../../common/linear_pool.h"
 
 
 /* ---------- 引脚状态管理 ---------- */
@@ -11,7 +12,7 @@ typedef struct {
     const pin_config_t *config;
 } pin_state_t;
 
-static pin_state_t pin_states[PORT_MAX][PIN_MAX];
+static pin_state_t *pin_states[PORT_MAX][PIN_MAX];
 
 /* 将配置写入硬件 */
 static void apply_config(const pin_config_t *cfg)
@@ -55,8 +56,8 @@ void pinmux_init(void)
 {
     LOG_DEBUG("pinmux", "pinmux init");
     for (int port = 0; port < PORT_MAX; port++) {
-        for (int pin = 0; pin < 16; pin++) {
-            pin_states[port][pin].allocated = false;
+        for (int pin = 0; pin < PIN_MAX; pin++) {
+            pin_states[port][pin] = NULL;
         }
     }
 }
@@ -77,11 +78,15 @@ int pinmux_request(const pin_config_t *cfg)
         LOG_DEBUG("pinmux", "cport %d pin %d >= PIN_MAX", port, pin);
         return PINMUX_ERROR;
     }
-    pin_state_t *state = &pin_states[port][pin];
-
-    if (state->allocated) {
+    pin_state_t *select_pin = pin_states[port][pin];
+    if (!select_pin) {
+        select_pin = os_malloc(sizeof(pin_state_t));
+        memset(select_pin, 0 , sizeof(pin_state_t));
+        pin_states[port][pin] = select_pin;
+    }
+    if (select_pin->allocated) {
         /* 已经分配，检查配置是否一致 */
-        const pin_config_t *old = state->config;
+        const pin_config_t *old = select_pin->config;
         if (old->mode   != cfg->mode   ||
             old->otype  != cfg->otype  ||
             old->ospeed != cfg->ospeed ||
@@ -96,8 +101,8 @@ int pinmux_request(const pin_config_t *cfg)
 
     /* 分配新引脚 */
     apply_config(cfg);
-    state->allocated = true;
-    state->config = cfg;
+    select_pin->allocated = true;
+    select_pin->config = cfg;
     return PINMUX_SUCCESS;
 }
 
@@ -105,8 +110,10 @@ int pinmux_release(gpio_port_t port, uint8_t pin)
 {
     if (port >= PORT_MAX || pin >= PIN_MAX)
         return PINMUX_ERROR;
-
-    pin_states[port][pin].allocated = false;
+    pin_state_t *select_pin = pin_states[port][pin];
+    if (select_pin) {
+        select_pin->allocated = false;
+    }
     /* 注意：不改变硬件配置，例如可将引脚设为输入浮空，视需求实现 */
     return PINMUX_SUCCESS;
 }

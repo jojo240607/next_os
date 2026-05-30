@@ -2,8 +2,8 @@
 #define SYSTICK_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "task.h"
-#include "../driver/systick.h"
+#include "../task.h"
+#include "../../driver/systick.h"
 
 #define GET_SYSTICK_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Systick_taskVTable **)obj)
 #define GET_SYSTICK_TASK(obj) ((Systick_task *)obj)
@@ -20,12 +20,12 @@ struct _Systick_task {
     const Systick_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
     Device *systick;
-    Device *fpu;
+  //  Device *fpu;
 };
 
 // 构造函数声明
-Systick_task* systick_task_create();
-void systick_task_init(Systick_task* self);
+Systick_task* systick_task_create(const task_into_t *info);
+void systick_task_init(Systick_task* self, const task_into_t *info);
 
 // 析构函数声明
 void systick_task_deinit(Systick_task* self);

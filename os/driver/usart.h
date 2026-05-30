@@ -12,7 +12,6 @@
 // 派生类声明
 typedef struct _Usart Usart;
 typedef struct _UsartFun UsartFun;
-typedef struct _usart_config usart_config;
 // 类成员函数结构
 struct _UsartFun {
     void (*destroy)(Usart* self);
@@ -41,13 +40,15 @@ typedef struct {
     uint16_t       rx_index;
     bool           tx_active;
     bool           rx_active;
+    Semaphore * uart_tx_sem;
+    Semaphore * uart_rx_sem;
 } uart_xfer_t;
 /* USART 引脚描述 */
 typedef struct {
     pin_af uart_tx;
     pin_af uart_rx;
 } uart_pins_t;
-struct _usart_config {
+typedef struct {
     uart_id_t id;
     uint32_t    baudrate;
     uart_word_len_t     word_len;
@@ -57,21 +58,19 @@ struct _usart_config {
     uart_it_t it_enable;
     /* DMA 可选 */
     const uart_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
-};
+} usart_config_t;
 
 struct _Usart {
     Device base;  // 基类作为第一个成员
     const UsartFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const usart_config *conf;
-    uart_xfer_t uart_xfer;
-    volatile Semaphore * uart_tx_sem;
-    volatile Semaphore * uart_rx_sem;
+    uart_xfer_t *uart_xfer;
+
 };
 
 // 构造函数声明
-Usart* usart_create(const usart_config * conf, const dev_pripority_t *priority);
-void usart_init(Usart* self, const usart_config *conf, const dev_pripority_t *priority);
+Usart* usart_create(const device_info_t *info);
+void usart_init(Usart* self, const device_info_t *info);
 
 // 析构函数声明
 void usart_deinit(Usart* self);

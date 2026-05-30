@@ -6,7 +6,7 @@
 #include "cmsis_gcc.h"
 
 
-
+//volatile xSCB_TypeDef *xSCB = (volatile xSCB_TypeDef *)xSCB_BASE;
 /* ───────── 内部状态 ───────── */
 static bool scb_initialized = false;
 //static scb_config_t current_cfg;

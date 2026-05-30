@@ -2,7 +2,7 @@
 #define IDLE_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "task.h"
+#include "../task.h"
 
 #define GET_IDLE_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Idle_taskVTable **)obj)
 #define GET_IDLE_TASK(obj) ((Idle_task *)obj)
@@ -21,8 +21,8 @@ struct _Idle_task {
 };
 
 // 构造函数声明
-Idle_task* idle_task_create();
-void idle_task_init(Idle_task* self);
+Idle_task* idle_task_create(const task_into_t *info);
+void idle_task_init(Idle_task* self, const task_into_t *info);
 
 // 析构函数声明
 void idle_task_deinit(Idle_task* self);

@@ -8,7 +8,7 @@ static void tcb_t_os_sleep(Tcb_t* self, uint32_t ms);
 
 // 析构函数声明
 static void tcb_t_destroy(Tcb_t* self);
-static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry);
+static void tcb_t_stack_init(Tcb_t *self, const thread_conf_t *conf);
 
 // TODO: 初始化数据成员
 static const Tcb_tFun tcb_t_fun = {
@@ -16,31 +16,32 @@ static const Tcb_tFun tcb_t_fun = {
 	.os_sleep = tcb_t_os_sleep,
 };
 // 构造函数实现
-Tcb_t* tcb_t_create(const char *name, Entry_t *entry, mpu_region_size_t stack_size) {
-    if (stack_size > DEFAULT_STACK_SIZE) {
-        stack_size = DEFAULT_STACK_SIZE;
-    }
-    Tcb_t* obj = (Tcb_t*)os_ccm_malloc(sizeof(Tcb_t) + (1 << stack_size));
+Tcb_t* tcb_t_create(const char *name, const thread_conf_t *conf) {
+
+    Tcb_t* obj = (Tcb_t*)os_ccm_malloc(sizeof(Tcb_t), 8);   //8字节对齐
     if (obj) {
-        memset(obj, 0, sizeof(Tcb_t) + (1 << stack_size));
-        tcb_t_init(obj, name, entry, stack_size);
+        memset(obj, 0, sizeof(Tcb_t));
+        tcb_t_init(obj, name, conf);
     }
     return obj;
 }
 
-void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, mpu_region_size_t stack_size) {
+void tcb_t_init(Tcb_t* self, const char *name, const thread_conf_t *conf) {
     self->fun = &(tcb_t_fun);
     // TODO: 初始化数据成员
-    self->priority = entry->priority;
+    self->stack_ptr = os_stack_malloc((1 << conf->stack_size) + PROTECT_STACK_SIZE, 32);//32字节对齐
+    memset(self->stack_ptr, 0, (1 << conf->stack_size) + PROTECT_STACK_SIZE);
+    self->stack_ptr += PROTECT_STACK_SIZE >> 2;//32字节栈保护空间
+    self->priority = conf->priority;
     self->original_priority = self->priority;
-    self->parent = entry->parent;
+    self->parent = conf->parent;
     self->semaphore = semaphore_create(0);
     GET_NODE(self)->next = NULL;
     self->name = name;
     self->stack_left = 0;
     //self->need_print = false;
-    self->stack_size = stack_size;
-    tcb_t_stack_init(self, entry);
+    self->stack_size = conf->stack_size;
+    tcb_t_stack_init(self, conf);
 }
 
 /*
@@ -66,7 +67,7 @@ void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, mpu_region_size_t
     FPCA = 1（用过 FPU） → LR = 0xFFFFFFFD（bit4=0）且预留 S0‑S15 + FPSCR 的空间（仅预留空间，不写入数据——这就是 Lazy Stacking 的核心）
  */
 
-static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry) {
+static void tcb_t_stack_init(Tcb_t *self, const thread_conf_t *conf) {
 // 从栈顶高地址开始
     volatile uint32_t *top = self->stack_ptr + (1 << (self->stack_size - 2));
     for (size_t i = 0; i < (1 << (self->stack_size - 2)); i++) {
@@ -78,19 +79,19 @@ static void tcb_t_stack_init(Tcb_t *self, Entry_t *entry) {
 // CPU已自动将 xPSR, PC, LR, R12, R0-R3 压入当前任务的堆栈
 //  xPSR, PC, LR, R12, R0-R3 //R4-R11
     top[0] = (uint32_t)self;      // R0
-    top[1] = (uint32_t)entry->arg;// R1
+    top[1] = (uint32_t)conf->arg;// R1
     top[2] = 0;               // R2
     top[3] = 0;               // R3
     top[4] = 0;               // R12
-    top[5] = (uint32_t)entry->exit;//EXC_RETURN_THRD_PSP_FT;//      // LR (EXC_RETURN)
-    top[6] = (uint32_t)entry->entry_fun; // PC
+    top[5] = (uint32_t)conf->exit;//EXC_RETURN_THRD_PSP_FT;//      // LR (EXC_RETURN)
+    top[6] = (uint32_t)conf->loop; // PC
     top[7] = 0x01000000;      // xPSR (Thumb 位)
     //top[8] = 0;      // 保留位，为了字节对齐
 
 // 再向下移动，留出 R4-R11, R14区
     top -= 10;  // 原来是 top -= 9
     top[9] = EXC_RETURN_THRD_PSP_NF;// LR (EXC_RETURN)
-    top[8] = CONTROL_THREAD_PSP_PRIV;//线程都是特权模式
+    top[8] = CONTROL_THREAD_PSP_UNPRIV;//线程都是非特权模式
     // R4 - R11 初始化为 0 或其他安全值
     for (int i = 0; i < 8; i++) {
         top[i] = 0x00;   // 或保留 MAGIC_NUM 用于栈调试，但不影响运行

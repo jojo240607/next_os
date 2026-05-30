@@ -10,18 +10,21 @@
 /* ── 系统调用号枚举（按需扩展） ── */
 typedef enum {
     SVC_PEND_SVC      = 1,
-    SVC_UART_GETC      = 2,
-    SVC_UART_WRITE     = 3,
-    SVC_UART_READ      = 4,
-    SVC_SPI_TRANSFER   = 5,
-    SVC_I2C_TRANSFER   = 6,
-    SVC_DELAY_MS       = 7,
-    SVC_GET_TICK       = 8,
-    SVC_TASK_EXIT      = 9,
-    SVC_TASK_SLEEP     = 10,
-    SVC_MPU_PROTECT    = 11,    // 动态任务栈保护
-    SVC_MALLOC         = 12,
-    SVC_FREE           = 13,
+    SVC_TASK_SLEEP    ,
+    SVC_SEMAPHORE_TAKE     ,
+    SVC_SEMAPHORE_GIVE    ,
+    SVC_MUTEX_LOCK    ,
+    SVC_MUTEX_UNLOCK  ,
+    SVC_DEVICE ,
+    SVC_SPI_TRANSFER  ,
+    SVC_I2C_TRANSFER  ,
+    SVC_DELAY_MS      ,
+    SVC_GET_TICK      ,
+    SVC_TASK_EXIT     ,
+
+    SVC_MPU_PROTECT  ,    // 动态任务栈保护
+    SVC_MALLOC       ,
+    SVC_FREE         ,
     SVC_MAX_ID
 } svc_number_t;
 

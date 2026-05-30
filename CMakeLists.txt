@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/scheduler/context_switch.s
         os/common/queue.c
         os/common/ring.c
+        os/common/list.c
         os/common/linear_pool.c
         os/common/os_init.c
         os/common/sys_time.c
@@ -58,12 +59,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/scheduler/mutex.c
         os/log/log.c
         os/task/task.c
+        os/task/task_config.c
         os/task/task_manager.c
-        os/task/idle_task.c
-        os/task/monitor_task.c
-        os/task/log_task.c
-        os/task/systick_task.c
-        os/task/os_cb_task.c
+        os/task/os/idle_task.c
+        os/task/os/monitor_task.c
+        os/task/os/log_task.c
+        os/task/os/systick_task.c
+        os/task/os/os_cb_task.c
         os/driver/hal/hal_scb.c
         os/driver/hal/hal_svc.c
         os/driver/hal/hal_svc_handler.s

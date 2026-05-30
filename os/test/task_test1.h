@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "../task/task.h"
 #include "../driver/exti.h"
-#include "../task/os_cb_task.h"
+#include "../task/os/os_cb_task.h"
 
 #define GET_TASK_TEST1_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Task_test1VTable **)obj)
 #define GET_TASK_TEST1(obj) ((Task_test1 *)obj)
@@ -21,14 +21,14 @@ struct _Task_test1 {
     const Task_test1Fun* fun;
     // TODO: 添加派生类特有的数据成员
     //Exti *exti;
-    os_callback callback;
+    os_callback *callback;
     volatile bool start_mutex;
     bool locked;
 };
 
 // 构造函数声明
-Task_test1* task_test1_create(const char *name, uint8_t priority);
-void task_test1_init(Task_test1* self, const char *name, uint8_t priority);
+Task_test1* task_test1_create(const task_into_t *info);
+void task_test1_init(Task_test1* self, const task_into_t *info);
 
 // 析构函数声明
 void task_test1_deinit(Task_test1* self);

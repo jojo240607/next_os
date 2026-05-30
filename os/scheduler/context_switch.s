@@ -26,19 +26,20 @@ PendSV_Handler:
     ldr     r1, =gloable_current_tcb
     ldr     r2, [r1]                    // r2 = gloable_current_tcb (TCB Stack指针)
     str     r0, [r2, #SP_OFFSET]        // TCB->sp = 新栈顶 更新当前 TCB 栈顶指针
+     // ************ 刷新所有未完成的内存访问 ************
+    dsb                           // 确保之前的所有写操作都已完成
+    isb                           // 同步指令流，保证后续指令看到最新状态
     //保护现场 设置中断屏蔽 IRQ_PREEMPT_PRIORITY_SYSCALL
     stmdb sp!, {r0, r1}   // ───── ⑦ 保护现场 r0 r1
     mov r0, #IRQ_PREEMPT_PRIORITY_SYSCALL
     msr basepri, r0       // 提升中断屏蔽级别
     dsb
     isb
-//    mov r4, lr          // 保存 EXC_RETURN 到 r4（r4 会被手动保存）
     // 4. 调用C调度器，选择下一个要运行的任务
     //    注意：C函数 vTaskSwitchContext 会修改 gloable_current_tcb
     ldr     r0, =global_thread_scheduler   // 加载全局变量的地址（如果参数是指针）
     ldr     r0, [r0]               // 取出值（如果参数是数值）
     bl      thread_scheduler_switch_context
-//    mov lr, r4          // 恢复 EXC_RETURN
     //恢复中断屏蔽
     mov r0, #0
     msr basepri, r0       // 恢复中断屏蔽
@@ -54,10 +55,6 @@ PendSV_Handler:
     vldmiaeq r0!, {s16-s31} // ── ⑫ 恢复高 16 个 FPU 寄存器
 
     msr     psp, r0         // 更新PSP为新任务的栈顶
-    // ★ 强制新任务进入用户模式
-//    mov     r0, #0x3            @ bit0 = 1 (nPRIV), bit1 = 1 (SPSEL, 使用PSP)
-//    msr     control, r0
-//    isb
     msr     control, r12          // 恢复 CONTROL（SP 可能立刻切换）
     isb                            //指令同步屏障，确保切换完成
     // 6. 退出中断（使用 bx lr，CPU自动从PSP弹出剩余寄存器）

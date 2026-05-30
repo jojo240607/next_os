@@ -14,7 +14,6 @@
 // 派生类声明
 typedef struct _Adc Adc;
 typedef struct _AdcFun AdcFun;
-typedef struct _adc_config adc_config;
 // 类成员函数结构
 struct _AdcFun {
     void (*destroy)(Adc* self);
@@ -54,7 +53,7 @@ typedef struct {
     uint8_t sample_time;    /* ADC_SMP_xxx */
 } adc_channel_cfg_t;
 
-struct _adc_config {
+typedef struct {
     adc_id_t id;
     adc_resolution_t  resolution;
     adc_align_t       align;
@@ -63,18 +62,17 @@ struct _adc_config {
     const dma_stream_config_t *dma_cfg;   /* 为 NULL 则不使用 DMA */
     uint8_t           num_channels;    /* 规则通道数量 */
     const adc_channel_cfg_t * const channels[];    /* 最多 16 个规则通道 */
-};
+} adc_config_t;
 
 struct _Adc {
     Device base;  // 基类作为第一个成员
     const AdcFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const adc_config *conf;
 };
 
 // 构造函数声明
-Adc* adc_create(const adc_config *conf, const dev_pripority_t *priority);
-void adc_init(Adc* self, const adc_config *conf, const dev_pripority_t *priority);
+Adc* adc_create(const device_info_t *info);
+void adc_init(Adc* self, const device_info_t *info);
 
 // 析构函数声明
 void adc_deinit(Adc* self);

@@ -267,3 +267,19 @@ uint32_t hal_rcc_get_apb1_clock(void) {
 uint32_t hal_rcc_get_apb2_clock(void) {
     return _apb2_clk;
 }
+
+uint32_t rcc_get_timer_clock(rcc_bus_t bus) {
+    uint32_t pclk, pre;
+    if (bus == RCC_BUS_APB1) {
+        pclk = hal_rcc_get_apb1_clock();
+        pre  = (xRCC->CFGR >> 10) & 0x7;   // APB1 PRE
+    } else {
+        pclk = hal_rcc_get_apb2_clock();
+        pre  = (xRCC->CFGR >> 13) & 0x7;   // APB2 PRE
+    }
+    // 如果预分频系数不等于 1，定时器时钟 = 2 x APB 时钟
+    if (pre == 0)       // 分频系数 = 1
+        return pclk;
+    else
+        return pclk * 2;
+}

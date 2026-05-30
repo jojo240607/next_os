@@ -11,7 +11,7 @@
 typedef struct _Task_manager Task_manager;
 typedef struct _Task_managerFun Task_managerFun;
 typedef struct _Task_list Task_list;
-typedef Task* (*Task_create)();
+
 // 类成员函数结构
 struct _Task_managerFun {
     void (*destroy)(Task_manager* self);
@@ -19,28 +19,13 @@ struct _Task_managerFun {
 
 };
 
-typedef enum : uint8_t  {
-    TASK_SYSTICK = 0,
-    TASK_IDLE,
-    TASK_OS_CALLBACK,
-    TASK_MONITOR,
-    TASK_LOG,
-    TASK_TEST1,
-    TASK_TIME,
-} task_id_t;
-struct _Task_list {
-    const task_id_t id;
-    const char *name;
-    //Task *task;
-    uint8_t task_priority;
-    mpu_region_size_t stack_size;
-    Task_create task_create;
-};
+
 // 类结构
 struct _Task_manager {
     const Task_managerFun* fun;
     // TODO: 添加数据成员
-    const Task_list* task_list;
+    //const task_into_t* task_list;
+    const task_into_t * const (*task_list_ptr)[];
     size_t task_size;
     Task *task_tab[];
 };

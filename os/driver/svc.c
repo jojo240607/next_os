@@ -4,13 +4,26 @@
 
 #include "svc.h"
 #include "../common/util.h"
-static uint32_t trigger_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+#include "../scheduler/mutex.h"
+#include "../log/log.h"
 
+
+static uint32_t kstart_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t ksleep(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t ksem_take(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t ksem_give(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t kmutex_lock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t kmutex_unlock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
 /* 系统调用表 */
 const svc_entry_t svc_entries[] = {
-        { SVC_PEND_SVC, trigger_pendsv },
-        //{ SVC_UART_WRITE,  my_uart_write },
-        //{ SVC_DELAY_MS,    my_delay_ms },
+        { SVC_PEND_SVC, kstart_pendsv },
+        { SVC_TASK_SLEEP,  ksleep },
+        { SVC_SEMAPHORE_TAKE,  ksem_take },
+        { SVC_SEMAPHORE_GIVE,  ksem_give },
+        { SVC_MUTEX_LOCK,  kmutex_lock },
+        { SVC_MUTEX_UNLOCK,  kmutex_unlock },
+        { SVC_DEVICE,    kdevice },
         // ... 其他系统调用
 };
 
@@ -24,11 +37,81 @@ int system_svc_init(void) {
             .num_entries = sizeof(svc_entries) / sizeof(svc_entries[0])
     };
     svc_init(&svc_cfg);
+    return 1;
 }
 
 
-static uint32_t trigger_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+static uint32_t kstart_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
     Trigger_PendSV;
-    return 0;
+    return 1;
+}
+static uint32_t ksleep(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    gloable_current_tcb->fun->os_sleep((Tcb_t *)gloable_current_tcb, a1);
+    return 1;
+}
+
+
+static uint32_t ksem_take(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!a1) {
+        return 0;
+    }
+    Semaphore *semaphore = (Semaphore *)a1;
+    semaphore->fun->take(semaphore);
+    return 1;
+}
+static uint32_t ksem_give(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!a1) {
+        return 0;
+    }
+    Semaphore *semaphore = (Semaphore *)a1;
+    semaphore->fun->give(semaphore);
+    return 1;
+}
+
+static uint32_t kmutex_lock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!a1) {
+        return 0;
+    }
+    Mutex *mutex = (Mutex *)a1;
+    LOG_DEBUG("svc", "kmutex_lock");
+    return mutex->fun->mutex_lock(mutex, a2);
+}
+static uint32_t kmutex_unlock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!a1) {
+        return 0;
+    }
+    Mutex *mutex = (Mutex *)a1;
+    LOG_DEBUG("svc", "kmutex_unlock");
+    return mutex->fun->mutex_unlock(mutex);
+}
+
+static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!a1 || !a2) {
+        return 0;
+    }
+    Device *device = (Device *)a1;
+    const device_ctrl *ctrl = (const device_ctrl *)a2;
+
+    switch (ctrl->cmd) {
+        case DEVICE_READ:
+            if (device->vtable->dev_read) {
+                device->vtable->dev_read(device, ctrl->buf, ctrl->count);
+            }
+
+            break;
+        case DEVICE_WRITE:
+            if (device->vtable->dev_write) {
+                device->vtable->dev_write(device, ctrl->buf, ctrl->count);
+            }
+            break;
+        case DEVICE_IOCTL:
+            if (device->vtable->dev_ioctl) {
+                //device->vtable->dev_ioctl(device, ctrl->buf, ctrl->count);
+            }
+            break;
+        default:
+            break;
+    }
+    return 1;
 }
 

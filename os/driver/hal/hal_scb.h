@@ -46,6 +46,10 @@ typedef struct {
 /* ICSR 位 */
 #define xSCB_ICSR_VECTACTIVE_Pos 0
 
+#define xSCB_SHCSR_MEMFAULTENA_Msk (1UL << 16) // MemManage (内存管理) 使能位
+#define xSCB_SHCSR_BUSFAULTENA_Msk (1UL << 17) // BusFault (总线错误) 使能位
+#define xSCB_SHCSR_USGFAULTENA_Msk (1UL << 18) // UsageFault (用法错误) 使能位
+
 /* 优先级分组 (复用 NVIC 定义) */
 /* NVIC 优先级分组 */
 typedef enum : uint8_t {

@@ -30,12 +30,11 @@ struct _Rtc {
     Device base;  // 基类作为第一个成员
     const RtcFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const rtc_config_t *conf;
 };
 
 // 构造函数声明
-Rtc* rtc_create(const rtc_config_t *conf, const dev_pripority_t *priority);
-void rtc_init(Rtc* self, const rtc_config_t *conf, const dev_pripority_t *priority);
+Rtc* rtc_create(const device_info_t *info);
+void rtc_init(Rtc* self, const device_info_t *info);
 
 // 析构函数声明
 void rtc_deinit(Rtc* self);

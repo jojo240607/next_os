@@ -65,21 +65,20 @@ typedef struct {
     bool active;       /* 传输进行中 */
     bool direction;    /* 0=TX, 1=RX */
     uint8_t slave_addr;
+    Semaphore * i2c_tx_sem;
+    Semaphore * i2c_rx_sem;
 } i2c_xfer_state_t;
 
 struct _I2c {
     Device base;  // 基类作为第一个成员
     const I2cFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const i2c_config_t *conf;
-    i2c_xfer_state_t i2c_xfer;
-    Semaphore * i2c_tx_sem;
-    Semaphore * i2c_rx_sem;
+    i2c_xfer_state_t *i2c_xfer;
 };
 
 // 构造函数声明
-I2c* i2c_create(const i2c_config_t *conf, const dev_pripority_t *priority);
-void i2c_init(I2c* self, const i2c_config_t *conf, const dev_pripority_t *priority);
+I2c* i2c_create(const device_info_t *info);
+void i2c_init(I2c* self, const device_info_t *info);
 
 // 析构函数声明
 void i2c_deinit(I2c* self);

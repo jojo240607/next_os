@@ -125,12 +125,11 @@ struct _Sdio {
     Device base;  // 基类作为第一个成员
     const SdioFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const sdio_config_t *conf;
 };
 
 // 构造函数声明
-Sdio* sdio_create(const sdio_config_t *conf, const dev_pripority_t *priority);
-void sdio_init(Sdio* self, const sdio_config_t *conf, const dev_pripority_t *priority);
+Sdio* sdio_create(const device_info_t *info);
+void sdio_init(Sdio* self, const device_info_t *info);
 
 // 析构函数声明
 void sdio_deinit(Sdio* self);

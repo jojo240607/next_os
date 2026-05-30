@@ -15,12 +15,8 @@ typedef struct _sys_time sys_time;
 struct _sys_time {
     volatile uint32_t systick;
 };
-void systime_init();
-
 extern sys_time *gloable_sys_time;
-static inline sys_time *getSystime() {
-    return gloable_sys_time;
-}
+void systime_init();
 
 uint64_t get_systime_us();
 

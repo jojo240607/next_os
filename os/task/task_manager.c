@@ -1,13 +1,14 @@
 #include "task_manager.h"
 #include <stdio.h>
-#include "systick_task.h"
-#include "idle_task.h"
-#include "monitor_task.h"
-#include "log_task.h"
-#include "os_cb_task.h"
+#include "os/systick_task.h"
+#include "os/idle_task.h"
+#include "os/monitor_task.h"
+#include "os/log_task.h"
+#include "os/os_cb_task.h"
 #include "../test/time_task.h"
 #include "../test/task_test1.h"
 #include "../common/linear_pool.h"
+#include "task_config.h"
 
 static void task_manager_boot_init(Task_manager* self);
 
@@ -20,21 +21,11 @@ static const Task_managerFun task_manager_fun = {
 	.boot_init = task_manager_boot_init,
 };
 Task_manager * gloable_taskManager;
-static const Task_list task_lists[] = {
-        {.id = TASK_OS_CALLBACK, .name = "os_cb", .task_priority = 5, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) os_cb_task_create},
-        {.id = TASK_IDLE, .name = "idle", .task_priority = 0, .stack_size = MPU_SIZE_128B, .task_create = (Task_create) idle_task_create},
-        {.id = TASK_MONITOR, .name = "monitor", .task_priority = 0, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) monitor_task_create},
-        {.id = TASK_LOG, .name = "log", .task_priority = 0, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) log_task_create},
-        {.id = TASK_TEST1, .name = "test1", .task_priority = 1, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) task_test1_create},
-        {.id = TASK_TIME, .name = "time", .task_priority = 1, .stack_size = MPU_SIZE_1K, .task_create = (Task_create) time_task_create},
-        {.id = TASK_SYSTICK, .name = "systick", .task_priority = 1, .stack_size = MPU_SIZE_0B, .task_create = (Task_create) systick_task_create},
-
-};
 // 构造函数实现
 Task_manager* task_manager_create() {
-    Task_manager* obj = (Task_manager*)os_malloc(sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Task *));
+    Task_manager* obj = (Task_manager*)os_malloc(sizeof(Task_manager) + totel_task * sizeof(Task *));
     if (obj) {
-        memset(obj, 0, sizeof(Task_manager) + ARRAY_SIZE(task_lists) * sizeof(Task *));
+        memset(obj, 0, sizeof(Task_manager) + totel_task * sizeof(Task *));
         task_manager_init(obj);
     }
     return obj;
@@ -44,8 +35,8 @@ void task_manager_init(Task_manager* self) {
     LOG_DEBUG("task_manager","task_manager_init");
     self->fun = &(task_manager_fun);
     // TODO: 初始化数据成员
-    self->task_list = task_lists;
-    self->task_size = ARRAY_SIZE(task_lists);
+    self->task_list_ptr = &task_lists;
+    self->task_size = totel_task;
 
 }
 
@@ -74,15 +65,21 @@ static void task_manager_boot_init(Task_manager* self) {
     }
     uint16_t task_num = 0;
     while (task_num < self->task_size) {
-        self->task_tab[(self->task_list + task_num)->id] = (self->task_list + task_num)->task_create();
-        LOG_DEBUG("task_manager", "create thread [%s]", (self->task_list + task_num)->name);
-        self->task_tab[(self->task_list + task_num)->id]->fun->add_task(
-                self->task_tab[(self->task_list + task_num)->id],
-                (self->task_list + task_num)->name,
-                (self->task_list + task_num)->task_priority,
-                (self->task_list + task_num)->stack_size);
-        if (def_task_init(self->task_tab[(self->task_list + task_num)->id])) {
-            virtual_task_init(self->task_tab[(self->task_list + task_num)->id], self);
+        Task **newtask = self->task_tab + task_num;
+        *newtask = ((*self->task_list_ptr)[task_num])->create((*self->task_list_ptr)[task_num]);
+        LOG_DEBUG("task_manager", "create thread [%s]", ((*self->task_list_ptr)[task_num])->name);
+        (*newtask)->fun->add_thread(*newtask);
+        if ((*newtask)->vtable->task_init) {
+            (*newtask)->vtable->task_init(*newtask, self);
+        }
+        task_num++;
+    }
+    task_num = 0;
+    while (task_num < self->task_size) {
+        Task **cur_task = self->task_tab + task_num;
+        if ((*cur_task)->vtable->task_start) {
+            LOG_DEBUG("task_manager", "start thread [%s]", ((*self->task_list_ptr)[task_num])->name);
+            (*cur_task)->vtable->task_start(*cur_task);
         }
         task_num++;
     }

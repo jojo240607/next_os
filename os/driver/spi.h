@@ -15,10 +15,6 @@
 typedef struct _Spi Spi;
 typedef struct _SpiFun SpiFun;
 
-
-
-
-
 /* SPI 引脚描述 */
 typedef struct {
     pin_af sck_pin;
@@ -54,6 +50,8 @@ typedef struct {
     uint16_t       tx_index;
     uint16_t       rx_index;
     bool           active;
+    Semaphore * spi_tx_sem;
+    Semaphore * spi_rx_sem;
 } spi_xfer_t;
 
 // 类成员函数结构
@@ -70,15 +68,13 @@ struct _Spi {
     Device base;  // 基类作为第一个成员
     const SpiFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const spi_config_t *conf;
-    spi_xfer_t spi_xfer;
-    Semaphore * spi_tx_sem;
-    Semaphore * spi_rx_sem;
+    spi_xfer_t *spi_xfer;
+
 };
 
 // 构造函数声明
-Spi* spi_create(const spi_config_t *conf, const dev_pripority_t *priority);
-void spi_init(Spi* self, const spi_config_t *conf, const dev_pripority_t *priority);
+Spi* spi_create(const device_info_t *info);
+void spi_init(Spi* self, const device_info_t *info);
 
 // 析构函数声明
 void spi_deinit(Spi* self);

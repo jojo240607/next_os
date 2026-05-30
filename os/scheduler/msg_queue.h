@@ -16,7 +16,6 @@ typedef struct _Msg_queueFun Msg_queueFun;
 struct _Msg_queueFun {
     void (*destroy)(Msg_queue* self);
 	uint8_t (*send)(Msg_queue* self, void **msg, uint32_t timeout);
-
 	uint8_t (*recv)(Msg_queue* self, void **msg, uint32_t timeout);
 
 };
@@ -25,12 +24,6 @@ struct _Msg_queue {
     const Msg_queueFun* fun;
     // TODO: 添加数据成员
     Ring *ringbuf;
-    //void **start;          // 环形缓冲区起始地址
-    //uint16_t msg_size;
-    //uint16_t queue_len;
-    //uint16_t in;
-    //uint16_t out;
-
     Mutex *lock;      // 保护结构体成员的互斥量
     Semaphore *room_sem;    // 计数信号量：初始值 = queue_len（空房间）
     Semaphore *data_sem;    // 计数信号量：初始值 = 0（已有数据）

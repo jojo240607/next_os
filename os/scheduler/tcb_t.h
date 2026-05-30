@@ -16,8 +16,7 @@
 // 类声明
 typedef struct _Tcb_t Tcb_t;
 typedef struct _Tcb_tFun Tcb_tFun;
-typedef struct _Thread_entry_t Entry_t;
-typedef void (*Tcb_entry)(Tcb_t *self, void *arg);
+typedef void (*Tcb_loop)(Tcb_t *self, void *arg);
 
 typedef enum : uint8_t {
     TCB_STATER_READY = 0x10,
@@ -59,7 +58,41 @@ typedef enum : uint32_t {
     EXC_RETURN_THRD_MSP_FT = 0xFFFFFFE9,//带FPU保存，返回使用MSP的Thread模式
     EXC_RETURN_THRD_PSP_FT = 0xFFFFFFED,//带FPU保存，返回使用PSP的Thread模式
 } tch_exc_return_t;
-
+typedef enum :uint8_t {
+    THREAD_PRIORITY_0 = 0,
+    THREAD_PRIORITY_1,
+    THREAD_PRIORITY_2,
+    THREAD_PRIORITY_3,
+    THREAD_PRIORITY_4,
+    THREAD_PRIORITY_5,
+    THREAD_PRIORITY_6,
+    THREAD_PRIORITY_7,
+    THREAD_PRIORITY_8,
+    THREAD_PRIORITY_9,
+    THREAD_PRIORITY_10,
+    THREAD_PRIORITY_11,
+    THREAD_PRIORITY_12,
+    THREAD_PRIORITY_13,
+    THREAD_PRIORITY_14,
+    THREAD_PRIORITY_15,
+    THREAD_PRIORITY_16,
+    THREAD_PRIORITY_17,
+    THREAD_PRIORITY_18,
+    THREAD_PRIORITY_19,
+    THREAD_PRIORITY_20,
+    THREAD_PRIORITY_21,
+    THREAD_PRIORITY_22,
+    THREAD_PRIORITY_23,
+    THREAD_PRIORITY_24,
+    THREAD_PRIORITY_25,
+    THREAD_PRIORITY_26,
+    THREAD_PRIORITY_27,
+    THREAD_PRIORITY_28,
+    THREAD_PRIORITY_29,
+    THREAD_PRIORITY_30,
+    THREAD_PRIORITY_31,
+    THREAD_PRIORITY_MAX
+} thread_priority_t;
 // 类结构
 struct _Tcb_t {
     Node base;
@@ -68,8 +101,8 @@ struct _Tcb_t {
     void *parent;           //base_task
     const char *name;       //名称
     uint16_t tid;           //线程id
-    volatile uint8_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
-    uint8_t original_priority; //原始优先级，优先级提升后需要恢复原始优先级
+    volatile thread_priority_t priority;      //优先级  0最低 31 最高，优先级低的会被优先级高的打断
+    thread_priority_t original_priority; //原始优先级，优先级提升后需要恢复原始优先级
     volatile Tcb_State state;    /* 线程状态 */
     Semaphore *semaphore;   //信号量
     cpu_usage_task_info_t cpu_usage_info;
@@ -78,20 +111,20 @@ struct _Tcb_t {
    // bool need_print;
     volatile uint32_t *sp;           //sp指针
     mpu_region_size_t  stack_size;      //栈大小
-    volatile uint32_t stack_ptr[];   //栈空间
+    uint32_t *stack_ptr;   //栈空间
 };
 
-struct _Thread_entry_t {
-    uint8_t priority;
+typedef struct {
+    thread_priority_t priority;
     mpu_region_size_t stack_size;
     void *parent;
-    Tcb_entry entry_fun;
+    Tcb_loop loop;
     void *arg;
     void *exit;
-};
+} thread_conf_t;
 // 构造函数声明
-Tcb_t* tcb_t_create(const char *name, Entry_t *entry, mpu_region_size_t stack_size);
-void tcb_t_init(Tcb_t* self, const char *name, Entry_t *entry, mpu_region_size_t stack_size);
+Tcb_t* tcb_t_create(const char *name, const thread_conf_t *conf);
+void tcb_t_init(Tcb_t* self, const char *name, const thread_conf_t *conf);
 
 // 析构函数声明
 void tcb_t_deinit(Tcb_t* self);

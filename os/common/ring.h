@@ -15,6 +15,8 @@ struct _RingFun {
 	bool (*push)(Ring* self, const void *data);
 	bool (*pop)(Ring* self, void *data);
 
+	void * (*pop_nocpy)(Ring* self);
+
 };
 // 类结构
 struct _Ring {

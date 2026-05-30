@@ -53,14 +53,12 @@ struct _I2s {
     Device base;  // 基类作为第一个成员
     const I2sFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const i2s_config_t *conf;
-    i2s_xfer_t i2s_xfer;
-
+    i2s_xfer_t *i2s_xfer;
 };
 
 // 构造函数声明
-I2s* i2s_create(const i2s_config_t *conf, const dev_pripority_t *priority);
-void i2s_init(I2s* self, const i2s_config_t *conf, const dev_pripority_t *priority);
+I2s* i2s_create(const device_info_t *info);
+void i2s_init(I2s* self, const device_info_t *info);
 
 // 析构函数声明
 void i2s_deinit(I2s* self);

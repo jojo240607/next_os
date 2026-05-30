@@ -194,4 +194,5 @@ uint32_t hal_rcc_get_system_clock(void);
 uint32_t hal_rcc_get_ahb_clock(void);
 uint32_t hal_rcc_get_apb1_clock(void);
 uint32_t hal_rcc_get_apb2_clock(void);
+uint32_t rcc_get_timer_clock(rcc_bus_t bus);
 #endif //STM32F4DISCOVERY_HAL_RCC_H

@@ -1,6 +1,6 @@
 #include "idle_task.h"
-#include "../common/linear_pool.h"
-#include "../log/log.h"
+#include "../../common/linear_pool.h"
+#include "../../log/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,18 +15,18 @@ static const Idle_taskFun idle_task_fun = {
     .destroy = idle_task_destroy,
 };
 // 构造函数实现
-Idle_task* idle_task_create() {
+Idle_task* idle_task_create(const task_into_t *info) {
     Idle_task* obj = (Idle_task*)os_malloc(sizeof(Idle_task));
     if (obj) {
         memset(obj, 0, sizeof(Idle_task));
-        idle_task_init(obj);
+        idle_task_init(obj, info);
     }
     return obj;
 }
 
-void idle_task_init(Idle_task* self) {
+void idle_task_init(Idle_task* self, const task_into_t *info) {
     // 初始化基类部分
-    task_init(&self->base);
+    task_init(&self->base, info);
     self->fun = &(idle_task_fun);
     // TODO: 初始化派生类特有成员
 	def_task_init(self) = idle_task_init_impl;

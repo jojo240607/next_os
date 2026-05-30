@@ -64,12 +64,11 @@ struct _Fsmc {
     Device base;  // 基类作为第一个成员
     const FsmcFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const fsmc_lcd_config_t *conf;
 };
 
 // 构造函数声明
-Fsmc* fsmc_create(const fsmc_lcd_config_t *conf, const dev_pripority_t *priority);
-void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf, const dev_pripority_t *priority);
+Fsmc* fsmc_create(const device_info_t *info);
+void fsmc_init(Fsmc* self, const device_info_t *info);
 
 // 析构函数声明
 void fsmc_deinit(Fsmc* self);

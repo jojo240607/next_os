@@ -15,9 +15,6 @@ typedef struct _PwmFun PwmFun;
 // 类成员函数结构
 struct _PwmFun {
     void (*destroy)(Pwm* self);
-	void (*start)(Pwm* self);
-	void (*stop)(Pwm* self);
-
 	void (*set_duty)(Pwm* self, uint8_t channel, uint32_t duty);
 	void (*set_period)(Pwm* self, uint32_t autoreload);
 
@@ -44,13 +41,12 @@ struct _Pwm {
     Device base;  // 基类作为第一个成员
     const PwmFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const pwm_config_t *conf;
     Timer* time;
 };
 
 // 构造函数声明
-Pwm* pwm_create(const pwm_config_t *conf, const dev_pripority_t *priority);
-void pwm_init(Pwm* self, const pwm_config_t *conf, const dev_pripority_t *priority);
+Pwm* pwm_create(const device_info_t *info);
+void pwm_init(Pwm* self, const device_info_t *info);
 
 // 析构函数声明
 void pwm_deinit(Pwm* self);

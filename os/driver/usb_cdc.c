@@ -8,7 +8,7 @@ dev_init_override(usb_cdc_dev_init_impl);
 
 // 析构函数声明
 static void usb_cdc_destroy(Usb_cdc* self);
-static bool usb_cdc_irq_handler_impl(void *arg);
+static bool usb_cdc_irq_handler_impl(nvic_irq_t *irq_conf);
 
 // TODO: 初始化数据成员
 static const Usb_cdcFun usb_cdc_fun = {
@@ -35,12 +35,7 @@ void usb_cdc_init(Usb_cdc* self, const usb_cdc_config_t *conf, const dev_pripori
 
 	def_dev_init(self) = usb_cdc_dev_init_impl;
     self->conf = conf;
-    self->usb_cdc_xfer.tx_len = 0;
-    self->usb_cdc_xfer.rx_len = 0;
-   // self->usb_cdc_xfer.rx_rd_idx = 0;
-    self->usb_cdc_xfer.rx_wr_idx = 0;
-    self->usb_cdc_xfer.usb_rx_sem = semaphore_create(0);
-    self->usb_cdc_xfer.usb_tx_sem = semaphore_create(0);
+    self->usb_cdc_xfer = NULL;
 
 }
 
@@ -123,17 +118,26 @@ dev_init_override(usb_cdc_dev_init_impl) {
     //nvic_set_priority(OTG_FS_IRQn, 0, 0);
     //nvic_enable_irq(OTG_FS_IRQn);
     //self->irq_conf.priority = self->fun->encode_pripority(self, 0x00, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-    self->irq_conf.handler = usb_cdc_irq_handler_impl;
-    self->irq_conf.semaphore = sem;
-    self->irq_conf.arg = self;
-    self->irq_conf.irq_num = OTG_FS_IRQ;
-    self->fun->attach_irq(self, &self->irq_conf);
+    self->irq_conf->handler = usb_cdc_irq_handler_impl;
+    self->irq_conf->arg = self;
+    self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, OTG_FS_IRQ);
+    self->fun->config_irq(self, self->irq_conf);
+
+    if (!usb_cdc->usb_cdc_xfer) {
+        usb_cdc->usb_cdc_xfer = os_malloc(sizeof(usb_cdc_xfer_t));
+        usb_cdc->usb_cdc_xfer->tx_len = 0;
+        usb_cdc->usb_cdc_xfer->rx_len = 0;
+        // usb_cdc->usb_cdc_xfer.rx_rd_idx = 0;
+        usb_cdc->usb_cdc_xfer->rx_wr_idx = 0;
+        usb_cdc->usb_cdc_xfer->usb_rx_sem = semaphore_create(0);
+        usb_cdc->usb_cdc_xfer->usb_tx_sem = semaphore_create(0);
+    }
     /* 10. 上电 */
       xUSB_OTG_FS->DCTL &= ~xUSB_OTG_DCTL_SDIS;  /* 清除 Soft Disconnect */
 }
 
-static bool usb_cdc_irq_handler_impl(void *arg) {
-    Usb_cdc * usb_cdc = (Usb_cdc *)arg;
+static bool usb_cdc_irq_handler_impl(nvic_irq_t *irq_conf) {
+    Usb_cdc * usb_cdc = (Usb_cdc *)irq_conf->arg;
     uint32_t gintsts = xUSB_OTG_FS->GINTSTS;
 
     /* ── 复位中断 ── */
@@ -157,7 +161,10 @@ static bool usb_cdc_irq_handler_impl(void *arg) {
         xUSB_OTG_FS->GINTSTS = xUSB_OTG_GINTSTS_ENUMDNE;
         //if (usb_user_cb) usb_user_cb(USB_EVT_ENUM_DONE, 0, 0);
     }
-
+    usb_cdc_xfer_t *x = usb_cdc->usb_cdc_xfer;
+    if (!x) {
+        return true;
+    }
     /* ── Rx FIFO 非空 ── */
     if (gintsts & xUSB_OTG_GINTSTS_RXFLVL) {
         uint32_t rxst = xUSB_OTG_FS->GRXSTSP;
@@ -167,13 +174,13 @@ static bool usb_cdc_irq_handler_impl(void *arg) {
         switch ((rxst >> 17) & 0x0F) {
             case 0x06: /* SETUP 包 */
                 usb_handle_setup(usb_cdc->conf->manufacturer_str, usb_cdc->conf->product_str,
-                                 usb_cdc->conf->serial_str, usb_cdc->usb_cdc_xfer.rx_len);
+                                 usb_cdc->conf->serial_str, x->rx_len);
                 break;
             case 0x02: /* OUT 数据包 */
-                if (usb_cdc->usb_cdc_xfer.rx_wr_idx < usb_cdc->usb_cdc_xfer.rx_len) {
-                    usb_read_rxfifo(usb_cdc->usb_cdc_xfer.rx_buf + usb_cdc->usb_cdc_xfer.rx_wr_idx, bcnt);
-                    usb_cdc->usb_cdc_xfer.rx_wr_idx += bcnt;
-                    usb_cdc->usb_cdc_xfer.usb_rx_sem->fun->give(usb_cdc->usb_cdc_xfer.usb_rx_sem);
+                if (x->rx_wr_idx < x->rx_len) {
+                    usb_read_rxfifo(x->rx_buf + x->rx_wr_idx, bcnt);
+                    x->rx_wr_idx += bcnt;
+                    x->usb_rx_sem->fun->give(x->usb_rx_sem);
                 } else {
                     // 缓冲区满，直接丢弃数据并读取 FIFO 清空硬件
                     uint8_t dummy[64];
@@ -182,7 +189,7 @@ static bool usb_cdc_irq_handler_impl(void *arg) {
                 //if (usb_user_cb)
                 //    usb_user_cb(USB_EVT_RX_READY, ep, bcnt);
                 /* 重新使能 OUT 端点 */
-                xUSB_OTG_FS->DOEPTSIZ[1] = (1 << 19) | usb_cdc->usb_cdc_xfer.rx_len;
+                xUSB_OTG_FS->DOEPTSIZ[1] = (1 << 19) | x->rx_len;
                 xUSB_OTG_FS->DOEPCTL[1] |= xUSB_OTG_DIEPCTL_CNAK |
                                           xUSB_OTG_DIEPCTL_EPENA;
 
@@ -198,7 +205,7 @@ static bool usb_cdc_irq_handler_impl(void *arg) {
                 uint32_t diepint = xUSB_OTG_FS->DIEPINT[ep];
                 if (diepint & xUSB_OTG_DIEPINT_XFRC) {
                     xUSB_OTG_FS->DIEPINT[ep] = xUSB_OTG_DIEPINT_XFRC;
-                    usb_cdc->usb_cdc_xfer.usb_tx_sem->fun->give(usb_cdc->usb_cdc_xfer.usb_tx_sem);
+                    x->usb_tx_sem->fun->give(x->usb_tx_sem);
                    // if (usb_user_cb)
                    //     usb_user_cb(USB_EVT_TX_DONE, ep | 0x80, tx_len);
                 }
@@ -226,28 +233,36 @@ int usb_cdc_send(Usb_cdc* self, const uint8_t *data, uint16_t len)
     if (!usb_cdc_is_connected()) {
         return -1;
     }
-    self->usb_cdc_xfer.tx_buf = data;
-    self->usb_cdc_xfer.tx_len = len;
+    usb_cdc_xfer_t *x = self->usb_cdc_xfer;
+    if (!x) {
+        return true;
+    }
+    x->tx_buf = data;
+    x->tx_len = len;
 
-    usb_write_txfifo(1, self->usb_cdc_xfer.tx_buf, len);
+    usb_write_txfifo(1, x->tx_buf, len);
     xUSB_OTG_FS->DIEPTSIZ[1] = (1 << 19) | len;
     xUSB_OTG_FS->DIEPCTL[1] |= xUSB_OTG_DIEPCTL_CNAK | xUSB_OTG_DIEPCTL_EPENA;
-    self->usb_cdc_xfer.usb_tx_sem->fun->take(self->usb_cdc_xfer.usb_tx_sem);
+    x->usb_tx_sem->fun->take(x->usb_tx_sem);
     return 0;
 }
 //uint16_t usb_cdc_available(Usb_cdc* self)
 //{
-//    if (self->usb_cdc_xfer.rx_wr_idx >= self->usb_cdc_xfer.rx_rd_idx) {
-//        return self->usb_cdc_xfer.rx_wr_idx - self->usb_cdc_xfer.rx_rd_idx;
+//    if (x->rx_wr_idx >= x->rx_rd_idx) {
+//        return x->rx_wr_idx - x->rx_rd_idx;
 //    } else {
-//        return self->usb_cdc_xfer.rx_len - self->usb_cdc_xfer.rx_rd_idx + self->usb_cdc_xfer.rx_wr_idx;
+//        return x->rx_len - x->rx_rd_idx + x->rx_wr_idx;
 //    }
 //}
 /* ───────── 接收数据 ───────── */
 int usb_cdc_recv(Usb_cdc* self, uint8_t *buffer, uint16_t len)
 {
-    self->usb_cdc_xfer.rx_buf = buffer;
-    self->usb_cdc_xfer.rx_len = len;
+    usb_cdc_xfer_t *x = self->usb_cdc_xfer;
+    if (!x) {
+        return true;
+    }
+    x->rx_buf = buffer;
+    x->rx_len = len;
     //uint16_t avail = usb_cdc_available(self);
     //if (avail == 0) {
     //    return 0;
@@ -255,6 +270,6 @@ int usb_cdc_recv(Usb_cdc* self, uint8_t *buffer, uint16_t len)
     //if (len > avail) {
     //    len = avail;
     //}
-    self->usb_cdc_xfer.usb_rx_sem->fun->take(self->usb_cdc_xfer.usb_rx_sem);
+    x->usb_rx_sem->fun->take(x->usb_rx_sem);
     return len;
 }

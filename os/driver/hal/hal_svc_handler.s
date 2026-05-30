@@ -8,7 +8,11 @@
 SVC_Handler:
     /* 1. 保存 R4-R11 到任务栈（CPU 已自动压栈 R0-R3,R12,LR,PC,xPSR） */
     mrs     r0, psp             // r0 = 自动压栈后的栈顶
+    isb
     mov     r12, r0             // 备份
+    tst lr, #0x10        // ───── ③ 检查是否使用过 FPU
+    it eq
+    vstmdbeq r0!, {s16-s31} // ── ④ 手动保存高 16 个 FPU 寄存器
     stmdb   r0!, {r4-r11}       // 手动压栈（会破坏 r0）
     msr     psp, r0
 
@@ -41,6 +45,9 @@ SVC_Handler:
     /* 6. 恢复 R4-R11 并异常返回 */
     mrs     r0, psp
     ldmia   r0!, {r4-r11}
+    tst lr, #0x10        // ───── ⑪ 检查新任务是否使用过 FPU
+    it eq
+    vldmiaeq r0!, {s16-s31} // ── ⑫ 恢复高 16 个 FPU 寄存器
     msr     psp, r0
     bx      lr
 

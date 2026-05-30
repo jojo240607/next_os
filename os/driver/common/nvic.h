@@ -6,6 +6,7 @@
 #include <string.h>
 #include "../../scheduler/semaphore.h"
 #include "../hal/hal_nvic.h"
+#include "../../task/task.h"
 
 #define GET_Nvic(obj) ((Nvic *)obj)
 // 类声明
@@ -13,7 +14,7 @@ typedef struct _Nvic Nvic;
 typedef struct _NvicFun NvicFun;
 typedef struct _nvic_irq_t nvic_irq_t;
 // 中断上半部回调函数原型（运行于中断上下文）
-typedef bool (*nvic_handler_t)(void *arg);
+typedef bool (*nvic_handler_t)(nvic_irq_t *irq_conf);
 typedef enum : uint8_t {
     SYSTIC_IRQ = 0,
     USART1_IRQ,
@@ -95,20 +96,25 @@ struct _NvicFun {
 	//void (*set_priority)(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
 
 };
+
+
+
 // 中断控制块
 struct _nvic_irq_t {
     Node base;
+    nvic_irq_num id;
     nvic_handler_t handler;      // 上半部回调
     void *arg;                   // 回调参数
-    Semaphore *bottom_sem;     // 关联的下半部信号量（可为 NULL）
-    bool registered;          // 是否已注册
+    Task *bottom_task;          // 关联的下半部任务函数.（可为 NULL）
+    void *event;                // 事件指针 该事件在中断后可以传递到中断任务函数中
+    bool registered;            // 是否已注册
 };
 
 // 类结构
 struct _Nvic {
     const NvicFun* fun;
     // TODO: 添加数据成员
-    nvic_irq_t irq_table[];
+    nvic_irq_t *irq_table[];
 };
 
 // 构造函数声明
@@ -120,9 +126,9 @@ void nvic_deinit(Nvic* self);
 // 全局中断分发函数，在具体的中断处理函数中调用
 void dispatch(nvic_irq_num irq_num);
 extern Nvic *gloable_nvic;
-bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
+bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg, void *event);
 void nvic_unregister(Nvic* self, nvic_irq_num irq_num);
-void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
+void nvic_attach_task(Nvic* self, nvic_irq_num irq_num, Task *task);
 void nvic_set_priority(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
 void nvic_dispatch(Nvic* self, nvic_irq_num irq_num);
 

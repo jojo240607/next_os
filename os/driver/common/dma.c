@@ -1,6 +1,7 @@
 #include "dma.h"
 #include "rcc.h"
 #include "../../log/log.h"
+#include "../../common/linear_pool.h"
 
 
 /* 获取 stream 寄存器指针 */
@@ -17,14 +18,14 @@ typedef struct {
     dma_stream_config_t  config;
 } dma_stream_state_t;
 
-static dma_stream_state_t dma_states[xDMA_CONTROLLER_MAX][8];
+static dma_stream_state_t *dma_states[xDMA_CONTROLLER_MAX][8];
 
 void dma_init(void)
 {
     LOG_DEBUG("dma", "dma init");
     for (int c = 0; c < xDMA_CONTROLLER_MAX; c++) {
         for (int s = 0; s < 8; s++) {
-            dma_states[c][s].allocated = false;
+            dma_states[c][s] = NULL;
         }
     }
 }
@@ -35,7 +36,13 @@ int dma_stream_request(const dma_stream_config_t *cfg)
         return DMA_ERROR;
     }
 
-    dma_stream_state_t *st = &dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    if (!st) {
+        st = os_malloc(sizeof(dma_stream_state_t));
+        memset(st, 0, sizeof(dma_stream_state_t));
+        dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)] = st;
+    }
+
     if (st->allocated) {
         /* 简单冲突检查：只要占用就不让用（也可按需求宽松处理） */
         LOG_ERROR("dma", "error dma %d stream %d have allocated", DMA_REQ_GET_CTRL(cfg->dma_request), DMA_REQ_GET_STREAM(cfg->dma_request));
@@ -105,7 +112,11 @@ int dma_stream_release(const dma_stream_config_t *cfg)
     if (DMA_REQ_GET_CTRL(cfg->dma_request) >= xDMA_CONTROLLER_MAX || DMA_REQ_GET_STREAM(cfg->dma_request) > 7) {
         return DMA_ERROR;
     }
-    dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)].allocated = false;
+    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    if (!st) {
+        return DMA_SUCCESS;
+    }
+    st->allocated = false;
     /* 关闭流 */
     xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
     dma->SxCR = 0;
@@ -115,7 +126,11 @@ int dma_stream_release(const dma_stream_config_t *cfg)
 int dma_start_transfer(const dma_stream_config_t *cfg,
                        uint32_t src_addr, uint32_t dst_addr, uint16_t count)
 {
-    if (!dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)].allocated) {
+    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    if (!st) {
+        return DMA_ERROR;
+    }
+    if (!st->allocated) {
         return DMA_ERROR;
     }
     xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
@@ -135,7 +150,11 @@ int dma_start_transfer(const dma_stream_config_t *cfg,
 
 int dma_stop_transfer(const dma_stream_config_t *cfg)
 {
-    if (!dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)].allocated) {
+    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    if (!st) {
+        return DMA_ERROR;
+    }
+    if (!st->allocated) {
         return DMA_ERROR;
     }
     xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);

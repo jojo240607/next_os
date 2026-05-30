@@ -18,7 +18,8 @@ typedef struct {
 
 void os_pool_init();
 void *os_malloc(size_t num_bytes);
-void *os_ccm_malloc(size_t num_bytes);
+void *os_ccm_malloc(size_t num_bytes, size_t alignment);
+void *os_stack_malloc(size_t num_bytes, size_t alignment);
 void os_free (void *p);
 linear_allocator_t *linear_pool_get();
 #endif //STM32F4DISCOVERY_LINEAR_POOL_H

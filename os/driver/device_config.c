@@ -32,12 +32,19 @@ const systick_config_t sys_tick_conf = {
         .interval_us  = 1000,        // 1ms
         .one_shot     = false,       // 周期性
 };
-
+/*
+ *      APB 预分频 = 1 → 定时器时钟 = APB 时钟
+        APB 预分频 ≠ 1 → 定时器时钟 = 2 × APB 时钟
+        → 因此定时器时钟 = 84 MHz。
+        所有挂载在 APB1 和 APB2 上的定时器都适用此规则，包括：
+        APB1：TIM2, TIM3, TIM4, TIM5, TIM6, TIM7, TIM12, TIM13, TIM14
+        APB2：TIM1, TIM8, TIM9, TIM10, TIM11
+ */
 const tim_config_t time2_conf = {
         .id = TIM_2,
         .timebase = {
                 .counter_mode = TIM_COUNTER_UP,
-                .prescaler    = 41999,        // 42MHz / 42000 = 1000 Hz
+                .prescaler    = 41999,        // 84MHz / 42000 = 2000 Hz
                 .autoreload   = 1999,         // 2000 / 2000 = 1 Hz (0.1秒中断)
                 .clock_division = 0,
                 .repetition  = 0
@@ -45,7 +52,7 @@ const tim_config_t time2_conf = {
         .it_enable = TIM_IT_UPDATE,
 };
 
-const usart_config usart1_conf = {
+const usart_config_t usart1_conf = {
         .id = UART_1,
         .baudrate = 115200,
         .word_len = UART_WORDLEN_8,
@@ -59,7 +66,7 @@ const usart_config usart1_conf = {
         .dma_cfg = NULL,
 };
 
-const usart_config usart4_conf = {
+const usart_config_t usart4_conf = {
         .id = UART_4,
         .baudrate = 115200,
         .word_len = UART_WORDLEN_8,
@@ -98,7 +105,7 @@ const usart_config usart4_conf = {
         }*/,
 };
 
-const exti_config exti_conf = {
+const exti_config_t exti_conf = {
         .pin_size = 2,
         .pin_conf = {&(const exti_pin_cfg_t) {
                         .port = PORT_A,
@@ -113,7 +120,7 @@ const exti_config exti_conf = {
         }
 };
 
-const adc_config adc1_conf = {
+const adc_config_t adc1_conf = {
         .id          = ADC_1,
         .resolution  = ADC_RES_12BIT,
         .align       = ADC_ALIGN_RIGHT,

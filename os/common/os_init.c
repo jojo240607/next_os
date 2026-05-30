@@ -7,11 +7,10 @@
 #include "../driver/common/dma.h"
 #include "../driver/common/rcc.h"
 #include "../driver/device_config.h"
+#include "../driver/device_manager.h"
 
-#include "../scheduler/thread_scheduler.h"
 #include "../task/task_manager.h"
 #include "../driver/hal/hal_flash.h"
-#include "../driver/hal/hal_mpu.h"
 #include "../driver/svc.h"
 
 /*
@@ -90,7 +89,7 @@ void SystemInit(void)
 
 void os_init() {
     os_pool_init();
-    log_init();
+    gloable_log = log_create();
     LOG_DEBUG("os_init", "all_object_init");
     if (!rcc_sysclk_init(&clk_conf)) {
         LOG_ERROR("os_init", "rcc init error");
@@ -105,9 +104,9 @@ void os_init() {
     gloable_deviceManager = device_manager_create();
     gloable_taskManager = task_manager_create();
     gloable_nvic = nvic_create();
-    gloable_taskManager->fun->boot_init(gloable_taskManager);
     system_mpu_setup();
+    gloable_taskManager->fun->boot_init(gloable_taskManager);
     system_svc_init();
-    global_thread_scheduler->fun->start(global_thread_scheduler);
+    global_thread_scheduler->fun->start((Thread_scheduler *)global_thread_scheduler);
 }
 

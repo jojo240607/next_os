@@ -21,8 +21,8 @@ struct _MutexFun {
 struct _Mutex {
     const MutexFun* fun;
     // TODO: 添加数据成员
-    Tcb_t *owner;       // 当前持有互斥量的任务（NULL 表示空闲）
-    uint8_t lock_count;          // 递归锁计数（同一个任务可多次 take）
+    volatile Tcb_t *owner;       // 当前持有互斥量的任务（NULL 表示空闲）
+    volatile uint8_t lock_count;          // 递归锁计数（同一个任务可多次 take）
     // 优先级继承相关
     uint8_t owner_original_prio; // 任务原本的优先级（当继承时记录）
     // 等待队列

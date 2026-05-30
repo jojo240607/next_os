@@ -1,8 +1,10 @@
 #include "os_cb_task.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "../common/linear_pool.h"
-#include "../log/log.h"
+#include "../../common/linear_pool.h"
+#include "../../log/log.h"
+#include "../../driver/svc.h"
+#include "../../driver/device_manager.h"
 
 
 task_init_override(os_cb_task_task_init_impl);
@@ -17,27 +19,26 @@ static const Os_cb_taskFun os_cb_task_fun = {
 };
 static Os_cb_task *gloable_os_callback;
 // 构造函数实现
-Os_cb_task* os_cb_task_create() {
+Os_cb_task* os_cb_task_create(const task_into_t *info) {
     Os_cb_task* obj = (Os_cb_task*)os_malloc(sizeof(Os_cb_task));
     if (obj) {
         memset(obj, 0, sizeof(Os_cb_task));
-        os_cb_task_init(obj);
+        os_cb_task_init(obj, info);
     }
     gloable_os_callback = obj;
     return obj;
 }
 
-void os_cb_task_init(Os_cb_task* self) {
+void os_cb_task_init(Os_cb_task* self, const task_into_t *info) {
     // 初始化基类部分
-    task_init(&self->base);
+    task_init(&self->base, info);
     self->fun = &(os_cb_task_fun);
     // TODO: 初始化派生类特有成员
 
 	def_task_init(self) = os_cb_task_task_init_impl;
 	def_task_thread(self) = os_cb_task_task_thread_impl;
-    self->cb_event = 0;
     self->callback_list = queue_create();
-    self->exti = GET_EXTI(gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_EXTI));
+    self->exti = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_EXTI);
 }
 
 void os_cb_task_deinit(Os_cb_task* self) {
@@ -69,7 +70,8 @@ task_init_override(os_cb_task_task_init_impl) {
     // TODO: add task_init method
     Os_cb_task *os_cb_task = (Os_cb_task *)self;
     //params , void *parent
-    virtual_dev_init(GET_DEVICE(os_cb_task->exti), self->task_tcb->semaphore);
+
+    os_cb_task->exti->fun->attach_irq(os_cb_task->exti, self);
 }
 // task_thread method
 task_thread_override(os_cb_task_task_thread_impl) {
@@ -78,13 +80,13 @@ task_thread_override(os_cb_task_task_thread_impl) {
 
     //params , void *arg
     while (true) {
-        self->semaphore->fun->take(self->semaphore);
-        os_cb_task->cb_event = self->semaphore->sem_event;
-        LOG_DEBUG("os_cb_task", "----- os callback ----- event %d", os_cb_task->cb_event);
+        sem_take_user(self->semaphore);
+        exti_event_t *cb_event = GET_TASK(os_cb_task)->fun->get_event(GET_TASK(os_cb_task));
+        LOG_DEBUG("os_cb_task", "----- os callback ----- irq num %d event source %d", cb_event->irq_num, cb_event->source);
         os_callback *cb = (os_callback*)os_cb_task->callback_list->head;
-        while (cb != NULL && cb->cb_event == os_cb_task->cb_event) {
+        while (cb != NULL && cb->cb_source == cb_event->source) {
             LOG_DEBUG("os_cb_task", "do cb_handler");
-            ((os_callback*)os_cb_task->callback_list->head)->cb_handler(os_cb_task->cb_event, cb->arg);
+            ((os_callback*)os_cb_task->callback_list->head)->cb_handler(cb_event, cb->arg);
             cb = (os_callback *)GET_NODE(cb)->next;
         }
     }

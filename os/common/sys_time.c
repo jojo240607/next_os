@@ -17,7 +17,11 @@ void systime_init() {
 
 
 uint64_t get_systime_us() {
+#ifdef USE_CCMRAM
     return hal_dwt_get_timestamp_us();
+#else
+    return gloable_sys_time->systick;
+#endif
 }
 
 

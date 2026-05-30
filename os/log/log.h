@@ -36,9 +36,12 @@ typedef struct {
     char        text[LOG_MSG_MAX_LEN];
 } log_entry_t;
 
+typedef struct {
+    Ring *ring_buf;
+    Task *log_task;            // 日志任务，串口发送或者保存
+} Log;
 
-/* 初始化日志系统（创建日志任务） */
-void log_init(void);
+extern Log *gloable_log;
 
 /* ------- 日志打印宏 ------- */
 
@@ -48,7 +51,7 @@ void log_init(void);
  */
 #define LOG(level, tag, fmt, ...) \
     do { \
-        log_output(level, tag, fmt "\r\n", ##__VA_ARGS__); \
+        log_output(gloable_log, level, tag, fmt "\r\n", ##__VA_ARGS__); \
     } while(0)
 
 /* 便捷级别宏 */
@@ -65,9 +68,15 @@ void log_init(void);
 #define LOG_FILTER(level) (1)
 #endif
 
+Log * log_create();
+/* 初始化日志系统（创建日志任务） */
+void log_init(Log *self);
+
 /* 实际调用函数 */
-void log_output(log_level_t level, const char *tag, const char *fmt, ...);
+void log_output(Log *self, log_level_t level, const char *tag, const char *fmt, ...);
 Ring * log_buffer();
-void log_bound_task(Task *ptask);
-void log_directly_error(char *buf, size_t size);
+void log_bound_task(Log *self, Task *task);
+void log_directly_error(Log *self, const char *fmt, ...);
+void *log_get_data_nocpy(Log *self);
+bool log_get_data(Log *self, void * data);
 #endif

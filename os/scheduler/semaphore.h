@@ -16,7 +16,6 @@ struct _SemaphoreFun {
     void (*destroy)(Semaphore* self);
 	void (*take)(Semaphore* self);
 	void (*give)(Semaphore* self);
-    void (*take_user)(Semaphore* self);
 };
 // 类结构
 struct _Semaphore {

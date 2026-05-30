@@ -5,32 +5,34 @@
 #include "common/rcc.h"
 #include "../log/log.h"
 
+dev_init_override(can_dev_init_impl);
+
 dev_ioctl_override(can_dev_ioctl_impl);
 
 // 析构函数声明
 static void can_destroy(Can* self);
-static bool can_irq_handler_impl(void *arg);
+static bool can_irq_handler_impl(nvic_irq_t *irq_conf);
 // TODO: 初始化数据成员
 static const CanFun can_fun = {
     .destroy = can_destroy,
 };
 // 构造函数实现
-Can* can_create(const can_config_t * conf, const dev_pripority_t *priority) {
+Can* can_create(const device_info_t *info) {
     Can* obj = (Can*)os_malloc(sizeof(Can));
     if (obj) {
         memset(obj, 0, sizeof(Can));
-        can_init(obj, conf, priority);
+        can_init(obj, info);
     }
     return obj;
 }
 
-void can_init(Can* self, const can_config_t * conf, const dev_pripority_t *priority) {
+void can_init(Can* self, const device_info_t *info) {
     // 初始化基类部分
-    device_init(&self->base, priority);
+    device_init(&self->base, info);
     self->fun = &(can_fun);
     // TODO: 初始化派生类特有成员
-    self->conf = conf;
 	def_dev_ioctl(self) = can_dev_ioctl_impl;
+	def_dev_init(self) = can_dev_init_impl;
 }
 
 void can_deinit(Can* self) {
@@ -49,160 +51,19 @@ static void can_destroy(Can* self) {
 dev_ioctl_override(can_dev_ioctl_impl) {
     // TODO: add dev_ioctl method
     Can *can = (Can *)self;
+
     //params , int cmd, void *arg
-    if (!can->conf || can->conf->id >= CAN_MAX) {
-        return;
-    }
 
-    xCAN_TypeDef *can_ctrl = CANx[can->conf->id];
-
-    // 1. 使能时钟
-    if (can->conf->id == CAN_1)
-        rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_CAN1EN);   // APB1 位25 CAN1
-    else
-        rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_CAN2EN);   // APB1 位26 CAN2
-
-    // 2. 配置引脚 (AF9)
-    pin_config_t pins[2] = {
-            {.mode = PIN_MODE_AF,
-              .otype = PIN_OTYPE_PP,
-              .ospeed = PIN_OSPEED_HIGH,
-              .pupd = PIN_PUPD_NONE,
-              .af = can->conf->pins.can_tx },
-            {.mode = PIN_MODE_AF,
-              .otype = PIN_OTYPE_PP,
-              .ospeed = PIN_OSPEED_HIGH,
-              .pupd = PIN_PUPD_NONE,
-              .af =can->conf->pins.can_rx }
-    };
-    if (pinmux_request_group(pins, 2) != PINMUX_SUCCESS) {
-        LOG_DEBUG("can", "init pinmux error!");
-        return;
-    }
-
-    // 3. 进入初始化模式
-    can_ctrl->MCR |= xCAN_MCR_INRQ;
-    while (!(can_ctrl->MSR & xCAN_MSR_INAK));
-
-    // 4. 配置主控制寄存器
-    uint32_t mcr = can_ctrl->MCR;
-    if (can->conf->auto_bus_off) {
-        mcr |= xCAN_MCR_ABOM;
-    } else {
-        mcr &= ~xCAN_MCR_ABOM;
-    }
-    if (can->conf->auto_wakeup) {
-        mcr |= xCAN_MCR_AWUM;
-    } else {
-        mcr &= ~xCAN_MCR_AWUM;
-    }
-    if (can->conf->no_auto_retrans) {
-        mcr |= xCAN_MCR_NART;
-    } else {
-        mcr &= ~xCAN_MCR_NART;
-    }
-    can_ctrl->MCR = mcr;
-
-    // 5. 配置位时序 (以 pclk1 为基准)
-    uint32_t btr = 0;
-    btr |= ((can->conf->sjw - 1) & 0x03) << 24;      // SJW
-    btr |= ((can->conf->bs2 - 1) & 0x07) << 20;      // TS2
-    btr |= ((can->conf->bs1 - 1) & 0x0F) << 16;      // TS1
-    btr |= ((can->conf->prescaler - 1) & 0x3FF) << 0; // BRP
-    // 模式
-    if (can->conf->mode == CAN_MODE_LOOPBACK) {
-        btr |= (1 << 30);   // LBKM
-    } else if (can->conf->mode == CAN_MODE_SILENT) {
-        btr |= (1 << 31);   // SILM
-    } else if (can->conf->mode == CAN_MODE_SILENT_LOOP) {
-        btr |= (1 << 30) | (1 << 31);
-    }
-    can_ctrl->BTR = btr;
-
-    // 6. 配置过滤器
-    if (can->conf->num_filters > 0 && *can->conf->filters) {
-        can_ctrl->FMR |= xCAN_FMR_FINIT;          // 进入过滤器初始化模式
-        for (int i = 0; i < can->conf->num_filters; i++) {
-            const can_filter_config_t *f = can->conf->filters[i];
-            uint8_t bank = f->bank;
-            if (bank >= 28) {
-                continue;
-            }
-
-            // 模式 (屏蔽/列表)
-            if (f->mode == CAN_FILTER_LIST_MODE) {
-                can_ctrl->FM1R |= (1UL << bank);
-            } else {
-                can_ctrl->FM1R &= ~(1UL << bank);
-            }
-            // 位宽
-            if (f->scale == CAN_FILTER_32BIT) {
-                can_ctrl->FS1R |= (1UL << bank);
-            } else {
-                can_ctrl->FS1R &= ~(1UL << bank);
-            }
-            // FIFO 分配
-            if (f->fifo == CAN_FIFO1) {
-                can_ctrl->FFA1R |= (1UL << bank);
-            } else {
-                can_ctrl->FFA1R &= ~(1UL << bank);
-            }
-            // 写入过滤值
-            can_ctrl->FILTER[bank][0] = f->id_high;
-            can_ctrl->FILTER[bank][1] = f->id_low;
-
-            // 激活
-            if (f->active) {
-                can_ctrl->FA1R |= (1UL << bank);
-            } else {
-                can_ctrl->FA1R &= ~(1UL << bank);
-            }
-        }
-        can_ctrl->FMR &= ~xCAN_FMR_FINIT;         // 退出过滤器初始化模式
-    }
-
-    // 7. 配置中断
-    if (can->conf->it_enable) {
-        self->irq_conf.handler = can_irq_handler_impl;
-        //can_callbacks[can->conf->id] = can->conf->callback;
-        uint32_t ier = 0;
-        if (can->conf->it_enable & CAN_IT_TME)  {
-            ier |= xCAN_IER_TMEIE;
-            self->irq_conf.irq_num = CAN1_TX_IRQ + can->conf->id * 4;
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-        if (can->conf->it_enable & CAN_IT_FMP0) {
-            ier |= xCAN_IER_FMPIE0;
-            self->irq_conf.irq_num = CAN1_RX0_IRQ + can->conf->id * 4;
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-        if (can->conf->it_enable & CAN_IT_FMP1) {
-            ier |= xCAN_IER_FMPIE1;
-            self->irq_conf.irq_num = CAN1_RX1_IRQ + can->conf->id * 4;
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-        if (can->conf->it_enable & CAN_IT_ERR)  {
-            ier |= xCAN_IER_ERRIE;
-            self->irq_conf.irq_num = CAN1_SCE_IRQ + can->conf->id * 4;
-            self->fun->attach_irq(self, &self->irq_conf);
-        }
-        can_ctrl->IER = ier;
-    }
-
-    // 8. 退出初始化模式
-    can_ctrl->MCR &= ~xCAN_MCR_INRQ;
-    while (can_ctrl->MSR & xCAN_MSR_INAK);
-
-    //can_inited[can->conf->id] = true;
 }
 
 
-static bool can_irq_handler_impl(void *arg) {
-    Can *can = GET_CAN(arg);
-    if (can->conf->id >= CAN_MAX) {
+static bool can_irq_handler_impl(nvic_irq_t *irq_conf) {
+    Can *can = GET_CAN(irq_conf->arg);
+    const can_config_t *conf = GET_DEVICE(can)->info->conf;
+    if (conf->id >= CAN_MAX) {
         return true;
     }
-    xCAN_TypeDef *can_ctrl = CANx[can->conf->id];
+    xCAN_TypeDef *can_ctrl = CANx[conf->id];
     uint32_t msr = can_ctrl->MSR;
     uint32_t ier = can_ctrl->IER;
 
@@ -349,5 +210,158 @@ int can_wakeup(can_id_t id)
     CANx[id]->MCR &= ~xCAN_MCR_SLEEP;
     while (CANx[id]->MSR & xCAN_MSR_SLAK);
     return 0;
+}
+
+
+// dev_init method
+dev_init_override(can_dev_init_impl) {
+    // TODO: add dev_init method
+    Can *can = (Can *)self;
+    const can_config_t *conf = self->info->conf;
+    //params 
+    if (!conf || conf->id >= CAN_MAX) {
+        return;
+    }
+
+    xCAN_TypeDef *can_ctrl = CANx[conf->id];
+
+    // 1. 使能时钟
+    if (conf->id == CAN_1)
+        rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_CAN1EN);   // APB1 位25 CAN1
+    else
+        rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_CAN2EN);   // APB1 位26 CAN2
+
+    // 2. 配置引脚 (AF9)
+    pin_config_t pins[2] = {
+            {.mode = PIN_MODE_AF,
+                    .otype = PIN_OTYPE_PP,
+                    .ospeed = PIN_OSPEED_HIGH,
+                    .pupd = PIN_PUPD_NONE,
+                    .af = conf->pins.can_tx },
+            {.mode = PIN_MODE_AF,
+                    .otype = PIN_OTYPE_PP,
+                    .ospeed = PIN_OSPEED_HIGH,
+                    .pupd = PIN_PUPD_NONE,
+                    .af =conf->pins.can_rx }
+    };
+    if (pinmux_request_group(pins, 2) != PINMUX_SUCCESS) {
+        LOG_DEBUG("can", "init pinmux error!");
+        return;
+    }
+
+    // 3. 进入初始化模式
+    can_ctrl->MCR |= xCAN_MCR_INRQ;
+    while (!(can_ctrl->MSR & xCAN_MSR_INAK));
+
+    // 4. 配置主控制寄存器
+    uint32_t mcr = can_ctrl->MCR;
+    if (conf->auto_bus_off) {
+        mcr |= xCAN_MCR_ABOM;
+    } else {
+        mcr &= ~xCAN_MCR_ABOM;
+    }
+    if (conf->auto_wakeup) {
+        mcr |= xCAN_MCR_AWUM;
+    } else {
+        mcr &= ~xCAN_MCR_AWUM;
+    }
+    if (conf->no_auto_retrans) {
+        mcr |= xCAN_MCR_NART;
+    } else {
+        mcr &= ~xCAN_MCR_NART;
+    }
+    can_ctrl->MCR = mcr;
+
+    // 5. 配置位时序 (以 pclk1 为基准)
+    uint32_t btr = 0;
+    btr |= ((conf->sjw - 1) & 0x03) << 24;      // SJW
+    btr |= ((conf->bs2 - 1) & 0x07) << 20;      // TS2
+    btr |= ((conf->bs1 - 1) & 0x0F) << 16;      // TS1
+    btr |= ((conf->prescaler - 1) & 0x3FF) << 0; // BRP
+    // 模式
+    if (conf->mode == CAN_MODE_LOOPBACK) {
+        btr |= (1 << 30);   // LBKM
+    } else if (conf->mode == CAN_MODE_SILENT) {
+        btr |= (1 << 31);   // SILM
+    } else if (conf->mode == CAN_MODE_SILENT_LOOP) {
+        btr |= (1 << 30) | (1 << 31);
+    }
+    can_ctrl->BTR = btr;
+
+    // 6. 配置过滤器
+    if (conf->num_filters > 0 && *conf->filters) {
+        can_ctrl->FMR |= xCAN_FMR_FINIT;          // 进入过滤器初始化模式
+        for (int i = 0; i < conf->num_filters; i++) {
+            const can_filter_config_t *f = conf->filters[i];
+            uint8_t bank = f->bank;
+            if (bank >= 28) {
+                continue;
+            }
+
+            // 模式 (屏蔽/列表)
+            if (f->mode == CAN_FILTER_LIST_MODE) {
+                can_ctrl->FM1R |= (1UL << bank);
+            } else {
+                can_ctrl->FM1R &= ~(1UL << bank);
+            }
+            // 位宽
+            if (f->scale == CAN_FILTER_32BIT) {
+                can_ctrl->FS1R |= (1UL << bank);
+            } else {
+                can_ctrl->FS1R &= ~(1UL << bank);
+            }
+            // FIFO 分配
+            if (f->fifo == CAN_FIFO1) {
+                can_ctrl->FFA1R |= (1UL << bank);
+            } else {
+                can_ctrl->FFA1R &= ~(1UL << bank);
+            }
+            // 写入过滤值
+            can_ctrl->FILTER[bank][0] = f->id_high;
+            can_ctrl->FILTER[bank][1] = f->id_low;
+
+            // 激活
+            if (f->active) {
+                can_ctrl->FA1R |= (1UL << bank);
+            } else {
+                can_ctrl->FA1R &= ~(1UL << bank);
+            }
+        }
+        can_ctrl->FMR &= ~xCAN_FMR_FINIT;         // 退出过滤器初始化模式
+    }
+
+    // 7. 配置中断
+    if (conf->it_enable) {
+        self->irq_conf->handler = can_irq_handler_impl;
+        //can_callbacks[conf->id] = conf->callback;
+        uint32_t ier = 0;
+        if (conf->it_enable & CAN_IT_TME)  {
+            ier |= xCAN_IER_TMEIE;
+            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, CAN1_TX_IRQ + conf->id * 4);
+            self->fun->config_irq(self, self->irq_conf);
+        }
+        if (conf->it_enable & CAN_IT_FMP0) {
+            ier |= xCAN_IER_FMPIE0;
+            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, CAN1_RX0_IRQ + conf->id * 4);
+            self->fun->config_irq(self, self->irq_conf);
+        }
+        if (conf->it_enable & CAN_IT_FMP1) {
+            ier |= xCAN_IER_FMPIE1;
+            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, CAN1_RX1_IRQ + conf->id * 4);
+            self->fun->config_irq(self, self->irq_conf);
+        }
+        if (conf->it_enable & CAN_IT_ERR)  {
+            ier |= xCAN_IER_ERRIE;
+            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, CAN1_SCE_IRQ + conf->id * 4);
+            self->fun->config_irq(self, self->irq_conf);
+        }
+        can_ctrl->IER = ier;
+    }
+
+    // 8. 退出初始化模式
+    can_ctrl->MCR &= ~xCAN_MCR_INRQ;
+    while (can_ctrl->MSR & xCAN_MSR_INAK);
+
+    //can_inited[conf->id] = true;
 }
 

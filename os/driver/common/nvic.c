@@ -11,7 +11,7 @@
 /* NVIC 初始化：设置优先级分组 + 批量配置中断 */
 static const nvic_config_t nvic_cfg = {
         .priority_group = SCB_PRIORITY_GROUP_4,  // 4位抢占，0位子优先级
-        .num_irqs       = 2,
+        .num_irqs       = 5,
         .irq_configs    = {&(const nvic_irq_config_t) {
                             .irq = xPendSV_IRQn,
                             .preempt_priority = IRQ_PREEMPT_PRIORITY_LOWEST,
@@ -21,7 +21,22 @@ static const nvic_config_t nvic_cfg = {
                                    .irq = xSVCall_IRQn,
                                    .preempt_priority = IRQ_PREEMPT_PRIORITY_SYSCALL,
                                    .sub_priority = 0,
-                                   .enable = false}
+                                   .enable = false},
+                           &(const nvic_irq_config_t) {
+                                   .irq = xUsageFault_IRQn,
+                                   .preempt_priority = IRQ_PREEMPT_PRIORITY_HIGHEST,
+                                   .sub_priority = 0,      //0011
+                                   .enable = true},
+                           &(const nvic_irq_config_t) {
+                                   .irq = xBusFault_IRQn,
+                                   .preempt_priority = IRQ_PREEMPT_PRIORITY_HIGHEST,
+                                   .sub_priority = 0,      //0011
+                                   .enable = true},
+                           &(const nvic_irq_config_t) {
+                                   .irq = xMemoryManagement_IRQn,
+                                   .preempt_priority = IRQ_PREEMPT_PRIORITY_HIGHEST,
+                                   .sub_priority = 0,
+                                   .enable = true}
         }
 };
 
@@ -114,9 +129,9 @@ static const nvic_irq_type_t IRQx[] = {
 };
 // 构造函数实现
 Nvic* nvic_create() {
-    Nvic* obj = (Nvic*)os_malloc(sizeof(Nvic) + sizeof(nvic_irq_t) * MAX_IRQ);
+    Nvic* obj = (Nvic*)os_malloc(sizeof(Nvic) + sizeof(const nvic_irq_t *) * MAX_IRQ);
     if (obj) {
-        memset(obj, 0, sizeof(Nvic) + sizeof(nvic_irq_t) * MAX_IRQ);
+        memset(obj, 0, sizeof(Nvic) + sizeof(const nvic_irq_t *) * MAX_IRQ);
         nvic_init(obj);
     }
     return obj;
@@ -126,7 +141,6 @@ void nvic_init(Nvic* self) {
     LOG_DEBUG("nvic","nvic_init");
     self->fun = &(nvic_fun);
     // TODO: 初始化数据成员
-    LOG_DEBUG("nvic", "PendSV_IRQn init");
     hal_nvic_init(&nvic_cfg);
     hal_nvic_global_irq_enable();
 }
@@ -145,23 +159,32 @@ static void nvic_destroy(Nvic* self) {
 
 
 // register method
-bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg) {
+bool nvic_register(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg, void *event) {
     if (self == NULL) {
         return false;
     }
     if (irq_num >= MAX_IRQ || handler == NULL) {
         return false;
     }
-    if ((self->irq_table + irq_num)->registered) {
+    nvic_irq_t *select_irq = *(self->irq_table + irq_num);
+    if (select_irq == NULL) {
+        select_irq = os_malloc(sizeof(nvic_irq_t));
+        memset(select_irq, 0, sizeof(nvic_irq_t));
+        *(self->irq_table + irq_num) = select_irq;
+    }
+
+    if (select_irq->registered) {
         return false;
     }
     // 临界区保护（关中断）
     uint32_t key = arch_irq_lock();
-    if ((self->irq_table + irq_num)->handler == NULL) {
-        (self->irq_table + irq_num)->handler = handler;
+    select_irq->id = irq_num;
+    if (select_irq->handler == NULL) {
+        select_irq->handler = handler;
     }
-    (self->irq_table + irq_num)->arg = arg;
-    (self->irq_table + irq_num)->registered = true;
+    select_irq->arg = arg;
+    select_irq->event = event;
+    select_irq->registered = true;
     // 使能 NVIC 对应中断（假设已设置优先级）
     hal_nvic_enable_irq((IRQx + irq_num)->irqn);
     arch_irq_unlock(key);
@@ -175,21 +198,29 @@ void nvic_unregister(Nvic* self, nvic_irq_num irq_num) {
     if (irq_num >= MAX_IRQ) {
         return;
     }
+    nvic_irq_t *select_irq = *(self->irq_table + irq_num);
+    if (select_irq == NULL) {
+        return;
+    }
     uint32_t key = arch_irq_lock();
-    (self->irq_table + irq_num)->handler = NULL;
-    (self->irq_table + irq_num)->arg = NULL;
-    (self->irq_table + irq_num)->bottom_sem = NULL;
-    (self->irq_table + irq_num)->registered = false;
+    select_irq->handler = NULL;
+    select_irq->arg = NULL;
+    select_irq->bottom_task = NULL;
+    select_irq->registered = false;
     // 可选：禁用 NVIC 中断
     hal_nvic_disable_irq((IRQx + irq_num)->irqn);
     arch_irq_unlock(key);
 }
 // attach_semaphore method
-void nvic_attach_semaphore(Nvic* self, nvic_irq_num irq_num, Semaphore *sem) {
-    if (irq_num >= MAX_IRQ || sem == NULL)
+void nvic_attach_task(Nvic* self, nvic_irq_num irq_num, Task *task) {
+    if (irq_num >= MAX_IRQ || task == NULL)
         return;
+    nvic_irq_t *select_irq = *(self->irq_table + irq_num);
+    if (select_irq == NULL) {
+        return;
+    }
     uint32_t key = arch_irq_lock();
-    (self->irq_table + irq_num)->bottom_sem = sem;
+    select_irq->bottom_task = task;
     arch_irq_unlock(key);
 }
 // set_priority method
@@ -211,25 +242,25 @@ void nvic_dispatch(Nvic* self, nvic_irq_num irq_num) {
     }
     if (irq_num >= MAX_IRQ)
         return;
-
-    nvic_irq_t *irq = self->irq_table + irq_num;
-    if (irq == NULL) {
+    nvic_irq_t *select_irq = *(self->irq_table + irq_num);
+    if (select_irq == NULL) {
         return;
     }
+
     // 1. 执行上半部回调
-    while (irq != NULL) {
-        if (irq->handler) {
-            if (irq->handler(irq->arg)) {
+    while (select_irq != NULL) {
+        if (select_irq->handler) {
+            if (select_irq->handler(select_irq)) {
                 // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
-                if (irq->bottom_sem) {
+                if (select_irq->bottom_task) {
                     // 假设你的信号量有 semaphore_give_from_isr 函数
                     // 并根据返回值决定是否需要请求调度
-                    irq->bottom_sem->fun->give(irq->bottom_sem);
+                    select_irq->bottom_task->fun->trigger(select_irq->bottom_task, select_irq->event);
                 }
             }
             break;
         }
-        irq = (nvic_irq_t *)GET_NODE(irq)->next;
+        select_irq = (nvic_irq_t *)GET_NODE(select_irq)->next;
     }
 }
 
@@ -292,8 +323,11 @@ void NMI_Handler(void)
 
 void BusFault_Handler(void)
 {
+    fault_info_t fault;
+    hal_fault_diag_decode(&fault);
     while (1)
     {
+        __WFE();
     }
 }
 

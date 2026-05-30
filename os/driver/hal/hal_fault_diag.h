@@ -78,6 +78,6 @@ int  hal_fault_diag_init();
 void hal_fault_diag_decode(fault_info_t *info);
 
 /* 辅助：将故障信息格式化为简短字符串（用于日志） */
-int  hal_fault_diag_snprint(char *buf, size_t size, const fault_info_t *info);
+int  hal_fault_diag_snprint(const fault_info_t *info);
 
 #endif //STM32F4DISCOVERY_FAULT_DIAG_H

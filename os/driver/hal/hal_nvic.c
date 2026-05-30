@@ -6,6 +6,7 @@
 #include <stddef.h>
 //#include "stm32f4xx.h"
 #include "cmsis_gcc.h"
+#include "../../log/log.h"
 
 /* ───────── NVIC 寄存器结构 (Cortex-M4) ───────── */
 typedef struct {
@@ -91,6 +92,14 @@ void hal_nvic_enable_irq(nvic_irqn_t irq)
         __ASM volatile("":::"memory");
         xNVIC->ISER[(uint32_t)irq >> 5] = (1UL << ((uint32_t)irq & 0x1F));
         __ASM volatile("":::"memory");
+    } else {
+        if (irq == xMemoryManagement_IRQn) {
+            xSCB->SHCSR |= xSCB_SHCSR_MEMFAULTENA_Msk;
+        } else if (irq == xBusFault_IRQn) {
+            xSCB->SHCSR |= xSCB_SHCSR_BUSFAULTENA_Msk;
+        } else if (irq == xUsageFault_IRQn) {
+            xSCB->SHCSR |= xSCB_SHCSR_USGFAULTENA_Msk;
+        }
     }
 }
 
@@ -111,8 +120,31 @@ bool hal_nvic_is_enabled(nvic_irqn_t irq)
     return false;
 }
 
+static inline void hal_nvic_setpriority_line(nvic_irqn_t irq, uint32_t priority)
+{
+    if (irq >= 0)
+    {
+        xNVIC->IP[((uint32_t)irq)]               = (uint8_t)((priority << (0x07 - current_group)) & (uint32_t)0xFFUL);
+    }
+    else
+    {
+        xSCB->SHP[(((uint32_t)irq) & 0xFUL)-4UL] = (uint8_t)((priority << (0x07 - current_group)) & (uint32_t)0xFFUL);
+    }
+}
+
+static inline void write_shp(int irq, uint8_t priority) {
+    uint32_t idx = (((uint32_t)irq) & 0xFUL) - 4UL;
+    *(volatile uint8_t *)(0xE000ED18 + idx) = (uint8_t)(priority << 4);
+}
+
 /* ===================================================================
    优先级配置
+   寄存器所属模块	常见访问宽度要求	安全操作方式
+    SCB (SHP, SHCSR 等)	字节 / 字混合，SHP 必须字节	用 NVIC_* 函数
+    MPU (RBAR, RASR)	字 (32 bit)	CMSIS 结构体，直接 32 位赋值
+    NVIC (ISER, ICER, IP)	字 / 字节混合，IP 必须字节	NVIC_SetPriority / NVIC_EnableIRQ
+    外设 (USART, SPI 等)	视寄存器定义	用 __IO 类型指针，匹配位宽
+    SysTick	字	CMSIS 函数或 32 位赋值
    =================================================================== */
 void hal_nvic_set_priority(nvic_irqn_t irq, nvic_priority_t preempt_priority, uint8_t sub_priority)
 {
@@ -120,19 +152,18 @@ void hal_nvic_set_priority(nvic_irqn_t irq, nvic_priority_t preempt_priority, ui
     uint32_t priority_group = (uint32_t) current_group;
     uint32_t preempt_bits = (0x07 - priority_group);  // 抢占优先级占用的位数
     uint32_t sub_bits = (0x04 - preempt_bits);         // 子优先级占用的位数
-
     /* 确保不超出位宽 */
     preempt_priority &= (1 << preempt_bits) - 1;
     sub_priority &= (1 << sub_bits) - 1;
-
     /* 硬件优先级值 = (抢占优先级 << sub_bits) | 子优先级, 然后放到高4位 */
-    nvic_priority_t priority = ((preempt_priority << sub_bits) | sub_priority) << (8 - 4);
-
+    uint8_t priority = ((preempt_priority << sub_bits) | sub_priority) << 4;
     if (irq < 0) {
-        xSCB->SHP[(((uint32_t) irq) & 0xFUL)-4UL] = priority;
+        //SCB->SHP是uint8_t数组，共12个元素，对应系统异常-12到-1。
+        xSCB->SHP[(((uint32_t)irq) & 0xFUL)-4UL] = priority;
     } else {
         xNVIC->IP[(uint32_t) irq] = priority;
     }
+    LOG_DEBUG("nvic", "init irq %d set_priority %d", irq, preempt_priority);
 }
 
 /* ===================================================================

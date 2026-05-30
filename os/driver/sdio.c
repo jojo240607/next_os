@@ -9,7 +9,7 @@ dev_init_override(sdio_dev_init_impl);
 
 // 析构函数声明
 static void sdio_destroy(Sdio* self);
-static bool sdio_irq_handler_impl(void *arg);
+static bool sdio_irq_handler_impl(nvic_irq_t *irq_conf);
 
 // TODO: 初始化数据成员
 static const SdioFun sdio_fun = {
@@ -20,21 +20,20 @@ static const SdioFun sdio_fun = {
 
 
 // 构造函数实现
-Sdio* sdio_create(const sdio_config_t *conf, const dev_pripority_t *priority) {
+Sdio* sdio_create(const device_info_t *info) {
     Sdio* obj = (Sdio*)os_malloc(sizeof(Sdio));
     if (obj) {
         memset(obj, 0, sizeof(Sdio));
-        sdio_init(obj, conf, priority);
+        sdio_init(obj, info);
     }
     return obj;
 }
 
-void sdio_init(Sdio* self, const sdio_config_t *conf, const dev_pripority_t *priority) {
+void sdio_init(Sdio* self, const device_info_t *info) {
     // 初始化基类部分
-    device_init(&self->base, priority);
+    device_init(&self->base, info);
     self->fun = &(sdio_fun);
     // TODO: 初始化派生类特有成员
-    self->conf = conf;
 	def_dev_init(self) = sdio_dev_init_impl;
 }
 static void sdio_clock_config(const sdio_config_t *cfg)
@@ -178,14 +177,14 @@ int sdio_send_cmd(sdio_cmd_t *cmd)
 static int sdio_data_transfer(Sdio* self, sdio_data_t *data)
 {
     uint32_t i, timeout;
-
-    if (self->conf->dma_cfg && self->conf->dma_cfg->tx_dma && data->dir_to_card) {
+    const sdio_config_t *conf = GET_DEVICE(self)->info->conf;
+    if (conf->dma_cfg && conf->dma_cfg->tx_dma && data->dir_to_card) {
         /* TX DMA: 存储器到外设 */
-        dma_start_transfer(self->conf->dma_cfg->tx_dma, (uint32_t)data->buf, (uint32_t)&xSDIO->FIFO,
+        dma_start_transfer(conf->dma_cfg->tx_dma, (uint32_t)data->buf, (uint32_t)&xSDIO->FIFO,
                            data->len / 4);
-    } else if (self->conf->dma_cfg && self->conf->dma_cfg->rx_dma && !data->dir_to_card) {
+    } else if (conf->dma_cfg && conf->dma_cfg->rx_dma && !data->dir_to_card) {
         /* RX DMA: 外设到存储器 */
-        dma_start_transfer(self->conf->dma_cfg->rx_dma, (uint32_t)&xSDIO->FIFO, (uint32_t)data->buf,
+        dma_start_transfer(conf->dma_cfg->rx_dma, (uint32_t)&xSDIO->FIFO, (uint32_t)data->buf,
                            data->len / 4);
     } else {
         /* 轮询 FIFO */
@@ -266,15 +265,16 @@ static void sdio_destroy(Sdio* self) {
 dev_init_override(sdio_dev_init_impl) {
     // TODO: add dev_init method
     Sdio *sdio = (Sdio *)self;
+    const sdio_config_t *conf = self->info->conf;
     //params 
-    if (!sdio->conf) {
+    if (!conf) {
         return ;
     }
 
     hal_sdio_clock_enable();
 
     /* 2. 初始化引脚 (AF = SDIO = 12) */
-    if (sdio_pins_init(&sdio->conf->pins) != 0) {
+    if (sdio_pins_init(&conf->pins) != 0) {
         return ;
     }
 
@@ -282,31 +282,30 @@ dev_init_override(sdio_dev_init_impl) {
     xSDIO->POWER = xSDIO_POWER_PWRCTRL_ON;
     for (volatile int i = 0; i < 10000; i++);  /* 延时等待 */
     /* 4. 时钟配置 */
-    sdio_clock_config(sdio->conf);
+    sdio_clock_config(conf);
     /* 5. 中断配置 */
     //sdio_interrupt_config(sdio->conf);
 
     /* 配置中断屏蔽 */
-    xSDIO->MASK = sdio->conf->it_enable;
+    xSDIO->MASK = conf->it_enable;
 
     /* 使能 NVIC: SDIO 中断号 = 49 (SDIO_IRQn) */
-    if (sdio->conf->it_enable) {
+    if (conf->it_enable) {
         // nvic_set_priority(SDIO_IRQn, 1, 0);
         // nvic_enable_irq(SDIO_IRQn);
         //self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-        self->irq_conf.handler = sdio_irq_handler_impl;
-        self->irq_conf.semaphore = sem;
-        self->irq_conf.arg = self;
-        self->irq_conf.irq_num = SDIO_IRQ;
-        self->fun->attach_irq(self, &self->irq_conf);
+        self->irq_conf->handler = sdio_irq_handler_impl;
+        self->irq_conf->arg = self;
+        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, SDIO_IRQ);
+        self->fun->config_irq(self, self->irq_conf);
     }
 
     /* 6. DMA 配置 */
-    sdio_dma_enable(sdio->conf);
+    sdio_dma_enable(conf);
 
 }
 
-static bool sdio_irq_handler_impl(void *arg) {
+static bool sdio_irq_handler_impl(nvic_irq_t *irq_conf) {
     uint32_t sta = xSDIO->STA;
 
     if (sta & SDIO_IT_CTIMEOUT) {
@@ -324,5 +323,6 @@ static bool sdio_irq_handler_impl(void *arg) {
 
     /* 清除中断标志 */
     xSDIO->ICR = sta;
+    return true;
 }
 

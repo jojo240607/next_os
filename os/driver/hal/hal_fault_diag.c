@@ -86,36 +86,56 @@ void hal_fault_diag_decode(fault_info_t *info)
     /* 如果未找到具体子故障，但 HFSR 已置 FORCED，则保留为 HardFault */
     if (info->type == FAULT_TYPE_NONE && (hfsr & (1 << 30)))
         info->type = FAULT_TYPE_HARD_FAULT;
-    uint8_t  error_buf[80] = {0};
-    int len = hal_fault_diag_snprint(error_buf, 80, info);
-    log_directly_error(error_buf, len);
+    hal_fault_diag_snprint(info);
 }
 
 /* ===================================================================
    格式化输出（简洁版，不依赖 printf 也可以直接用）
    这里用 snprintf 方便，若不想用可自行拼接
    =================================================================== */
-int hal_fault_diag_snprint(char *buf, size_t size, const fault_info_t *info)
+int hal_fault_diag_snprint(const fault_info_t *info)
 {
-    if (!buf || !info) return -1;
-
+    if (!info) return -1;
     int n = 0;
-    n = snprintf(buf, size, "Fault: ");
-    if (info->forced_hardfault) n += snprintf(buf + n, size - n, "FORCED ");
+    log_directly_error(gloable_log, "task %s Fault: \r\n",  gloable_current_tcb->name);
+    if (info->forced_hardfault) {
+        log_directly_error(gloable_log, "\tFORCED ");
+    }
     switch (info->type) {
-        case FAULT_TYPE_USAGE_FAULT:  n += snprintf(buf + n, size - n, "UsageFault "); break;
-        case FAULT_TYPE_BUS_FAULT:    n += snprintf(buf + n, size - n, "BusFault "); break;
-        case FAULT_TYPE_MEM_MANAGE:   n += snprintf(buf + n, size - n, "MemManage "); break;
-        case FAULT_TYPE_HARD_FAULT:   n += snprintf(buf + n, size - n, "HardFault "); break;
-        default: break;
+        case FAULT_TYPE_USAGE_FAULT:
+            log_directly_error(gloable_log, "\t\tUsageFault \r\n");
+            break;
+        case FAULT_TYPE_BUS_FAULT:
+            log_directly_error(gloable_log, "\t\tBusFault \r\n");
+            break;
+        case FAULT_TYPE_MEM_MANAGE:
+            log_directly_error(gloable_log, "\t\tMemManage \r\n");
+            break;
+        case FAULT_TYPE_HARD_FAULT:
+            log_directly_error(gloable_log, "\t\tHardFault \r\n");
+            break;
+        default:
+            break;
     }
 
-    if (info->ufsr_nocp)        n += snprintf(buf + n, size - n, "[FPU off]");
-    if (info->ufsr_unaligned)   n += snprintf(buf + n, size - n, "[Unaligned]");
-    if (info->ufsr_div_by_zero) n += snprintf(buf + n, size - n, "[Div0]");
-    if (info->bfsr_precise)     n += snprintf(buf + n, size - n, "[BFAR=0x%08lX]", info->bfar);
-    if (info->mmfar)            n += snprintf(buf + n, size - n, "[MMFAR=0x%08lX]", info->mmfar);
-    if (info->fp_exceptions)    n += snprintf(buf + n, size - n, "[FP:0x%02X]", info->fp_exceptions);
+    if (info->ufsr_nocp) {
+        log_directly_error(gloable_log, "\t[FPU off]\r\n");
+    }
+    if (info->ufsr_unaligned)   {
+        log_directly_error(gloable_log, "\t[Unaligned]\r\n");
+    }
+    if (info->ufsr_div_by_zero) {
+        log_directly_error(gloable_log, "\t[Div0]\r\n");
+    }
+    if (info->bfsr_precise)     {
+        log_directly_error(gloable_log, "\t[BFAR=0x%08lX]\r\n", info->bfar);
+    }
+    if (info->mmfar)            {
+        log_directly_error(gloable_log, "\t[MMFAR=0x%08lX]\r\n", info->mmfar);
+    }
+    if (info->fp_exceptions)    {
+        log_directly_error(gloable_log, "\t[FP:0x%02X]\r\n", info->fp_exceptions);
+    }
 
     return n;
 }

@@ -7,28 +7,27 @@ dev_ioctl_override(rtc_dev_ioctl_impl);
 
 // 析构函数声明
 static void rtc_destroy(Rtc* self);
-static bool rtc_irq_handler_impl(void *arg);
+static bool rtc_irq_handler_impl(nvic_irq_t *irq_conf);
 
 // TODO: 初始化数据成员
 static const RtcFun rtc_fun = {
     .destroy = rtc_destroy,
 };
 // 构造函数实现
-Rtc* rtc_create(const rtc_config_t *conf, const dev_pripority_t *priority) {
+Rtc* rtc_create(const device_info_t *info) {
     Rtc* obj = (Rtc*)os_malloc(sizeof(Rtc));
     if (obj) {
         memset(obj, 0, sizeof(Rtc));
-        rtc_init(obj, conf, priority);
+        rtc_init(obj, info);
     }
     return obj;
 }
 
-void rtc_init(Rtc* self, const rtc_config_t *conf, const dev_pripority_t *priority) {
+void rtc_init(Rtc* self, const device_info_t *info) {
     // 初始化基类部分
-    device_init(&self->base, priority);
+    device_init(&self->base, info);
     self->fun = &(rtc_fun);
     // TODO: 初始化派生类特有成员
-    self->conf = conf;
 	def_dev_ioctl(self) = rtc_dev_ioctl_impl;
 }
 
@@ -48,8 +47,9 @@ static void rtc_destroy(Rtc* self) {
 dev_ioctl_override(rtc_dev_ioctl_impl) {
     // TODO: add dev_ioctl method
     Rtc *rtc = (Rtc *)self;
+    const rtc_config_t *conf = self->info->conf;
     //params , int cmd, void *arg
-    if (!rtc->conf) {
+    if (!conf) {
         return;
     }
 
@@ -57,7 +57,7 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
     if (rtc_enable_backup_domain() != 0) return;
 
     // 2. 选择 RTC 时钟源
-    if (rtc_select_clock_source(rtc->conf->clk_src) != 0) return;
+    if (rtc_select_clock_source(conf->clk_src) != 0) return;
 
     // 3. 解锁 RTC 寄存器
     rtc_unlock();
@@ -66,11 +66,11 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
     if (rtc_enter_init_mode() != 0) return;
 
     // 5. 配置预分频器 (产生 1Hz ck_spre)
-    xRTC->PRER = ((rtc->conf->async_prediv & 0x7F) << 16) |
-                ((rtc->conf->sync_prediv & 0x7FFF) << 0);
+    xRTC->PRER = ((conf->async_prediv & 0x7F) << 16) |
+                ((conf->sync_prediv & 0x7FFF) << 0);
 
     // 6. 配置小时格式
-    if (rtc->conf->hour_format == RTC_FORMAT_24H) {
+    if (conf->hour_format == RTC_FORMAT_24H) {
         xRTC->CR &= ~(1 << 6);  // FMT=0
     } else {
         xRTC->CR |= (1 << 6);   // FMT=1
@@ -83,36 +83,36 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
     rtc_wait_sync();
 
     // 9. 中断配置
-    if (rtc->conf->it_enable) {
+    if (conf->it_enable) {
         //rtc_callback = cfg->callback;
         uint32_t cr = xRTC->CR;
-        if (rtc->conf->it_enable & RTC_IT_ALARM_A) {
+        if (conf->it_enable & RTC_IT_ALARM_A) {
             cr |= xRTC_CR_ALRAIE;
         }
-        if (rtc->conf->it_enable & RTC_IT_ALARM_B) {
+        if (conf->it_enable & RTC_IT_ALARM_B) {
             cr |= xRTC_CR_ALRBIE;
         }
-        if (rtc->conf->it_enable & RTC_IT_WAKEUP) {
+        if (conf->it_enable & RTC_IT_WAKEUP) {
             cr |= xRTC_CR_WUTIE;
         }
-        if (rtc->conf->it_enable & RTC_IT_TIMESTAMP) {
+        if (conf->it_enable & RTC_IT_TIMESTAMP) {
             cr |= xRTC_CR_TSIE;
         }
         xRTC->CR = cr;
        // self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
-        self->irq_conf.handler = rtc_irq_handler_impl;
-        self->irq_conf.irq_num = RTC_ALARM_IRQ;
-        self->fun->attach_irq(self, &self->irq_conf);
+        self->irq_conf->handler = rtc_irq_handler_impl;
+        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, RTC_ALARM_IRQ);
+        self->fun->config_irq(self, self->irq_conf);
 
-        self->irq_conf.irq_num = RTC_WKUP_IRQ;
-        self->fun->attach_irq(self, &self->irq_conf);
+        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, RTC_WKUP_IRQ);
+        self->fun->config_irq(self, self->irq_conf);
 
     }
 
     rtc_lock();
 }
 
-static bool rtc_irq_handler_impl(void *arg) {
+static bool rtc_irq_handler_impl(nvic_irq_t *irq_conf) {
     uint32_t isr = xRTC->ISR;
     uint32_t cr  = xRTC->CR;
 

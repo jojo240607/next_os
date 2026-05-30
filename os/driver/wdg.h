@@ -64,12 +64,11 @@ struct _Wdg {
     Device base;  // 基类作为第一个成员
     const WdgFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const iwdg_config_t *conf;
 };
 
 // 构造函数声明
-Wdg* wdg_create(const iwdg_config_t *cfg, const dev_pripority_t *priority);
-void wdg_init(Wdg* self, const iwdg_config_t *cfg, const dev_pripority_t *priority);
+Wdg* wdg_create(const device_info_t *info);
+void wdg_init(Wdg* self, const device_info_t *info);
 
 // 析构函数声明
 void wdg_deinit(Wdg* self);

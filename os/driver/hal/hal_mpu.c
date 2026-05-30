@@ -21,9 +21,9 @@ typedef struct {
 #define xMPU  ((xMPU_TypeDef *)xMPU_BASE)
 
 /* ── CTRL 位 ── */
-#define xMPU_CTRL_ENABLE         (1 << 0)
-#define xMPU_CTRL_HFNMIENA       (1 << 1)
-#define xMPU_CTRL_PRIVDEFENA     (1 << 2)
+#define xMPU_CTRL_ENABLE         (1 << 0)// MPU 总使能位。置 1 开启 MPU，清 0 关闭。
+#define xMPU_CTRL_HFNMIENA       (1 << 1)// 在 HardFault 和 NMI 中是否启用 MPU。调试时建议清 0。
+#define xMPU_CTRL_PRIVDEFENA     (1 << 2)// bit2: 使能特权背景区域
 
 /* ── RBAR 位 ── */
 #define xMPU_RBAR_VALID          (1 << 4)
@@ -66,12 +66,12 @@ int mpu_init(const mpu_config_t *cfg)
 
     /* 2. 配置背景区域 */
     uint32_t ctrl = 0;
-    if (cfg->enable_default_map) {
+    if (cfg->enable_background) {
         ctrl |= xMPU_CTRL_PRIVDEFENA;
     }
 
     /* 3. 逐一配置各个区域 */
-    if (cfg->regions && cfg->num_regions > 0) {
+    if (*cfg->regions && cfg->num_regions > 0) {
         for (uint8_t i = 0; i < cfg->num_regions; i++) {
             if (hal_mpu_region_set(cfg->regions[i]) != 0) {
                 return -1;
@@ -83,7 +83,6 @@ int mpu_init(const mpu_config_t *cfg)
     xMPU->CTRL = ctrl | xMPU_CTRL_ENABLE;
     __DSB();
     __ISB();
-
     //mpu_initialized = true;
     return 0;
 }
@@ -138,12 +137,18 @@ int hal_mpu_region_set(const mpu_region_config_t *region)
     rasr |= ((region->access & 0x07) << xMPU_RASR_AP_Pos);
     /* 设置 TEX/C/B 属性 (简化: 根据 attribute 枚举预设) */
     if (region->attribute == MPU_ATTR_DEVICE) {
-        /* 设备: 强序或设备属性 */
-        rasr |= (0x2 << xMPU_RASR_TEX_Pos); /* 设备模式, 无缓存 */
+        // Device: TEX=0, C=0, B=1 (或者 TEX=1, C=0, B=1 等)
+        rasr |= (0x1 << xMPU_RASR_B_Pos);  // B=1, C=0, TEX=0
+    } else if (region->attribute == MPU_ATTR_STRONGLY_ORDERED) {
+        // Strongly-Ordered: TEX=0, C=0, B=0
+        // 什么都不加，默认即为 TEX=0, C=0, B=0
+        rasr &= ~((0x1 << xMPU_RASR_C_Pos) | (0x1 << xMPU_RASR_B_Pos));
     } else {
-        /* 普通内存: 可缓存、可缓冲 */
+        // Normal Memory
         rasr |= (0x1 << xMPU_RASR_C_Pos) | (0x1 << xMPU_RASR_B_Pos);
     }
+
+
     if (region->execute_never) {
         rasr |= (1 << xMPU_RASR_XN_Pos);
     }
@@ -169,14 +174,27 @@ void hal_mpu_region_disable(uint8_t region_num)
     __ISB();
 }
 
+/*
+ * 区域大小（字节）= 2^(SIZE+1)
+ * !!! MPU 区域的大小必须是 2 的幂次方，且基地址必须与其大小对齐（例如 32 字节区域要求基地址 32 字节对齐）。
+ * */
+
 void mpu_switch_task_stack(uint32_t stack_base, mpu_region_size_t size) {
     const uint8_t STACK_REGION = 7;
     xMPU->RNR = STACK_REGION;
-    xMPU->RBAR = (stack_base & 0xFFFFFFE0) | xMPU_RBAR_VALID | (STACK_REGION & 0xF);
-    xMPU->RASR = xMPU_RASR_ENABLE
-                | ((size & 0x1F) << xMPU_RASR_SIZE_Pos)
-                | (MPU_ACCESS_PRIV_RW_USER_RO << xMPU_RASR_AP_Pos)  // 用户只读，特权读写
-                | (1 << xMPU_RASR_XN_Pos);  // 禁止执行栈内代码
+    uint32_t rbar = (stack_base & 0xFFFFFFE0) | xMPU_RBAR_VALID |
+                    (STACK_REGION & 0xF);
+    xMPU->RBAR = rbar;
+    //LOG_DEBUG("mpu", "protect ram addr 0x%x 32 byte", stack_base);
+    uint32_t rasr = xMPU_RASR_ENABLE
+                    | (((size - 1) & 0x1F) << xMPU_RASR_SIZE_Pos)
+                    | (MPU_ACCESS_NO << xMPU_RASR_AP_Pos)   // 所有模式不可访问
+                    | (1 << xMPU_RASR_XN_Pos);              // 禁止执行
+
+    // 设置 Strongly-Ordered 属性 (TEX=0, C=0, B=0)，强制同步访问，立即触发异常
+    rasr &= ~((0x7 << xMPU_RASR_TEX_Pos) | (1 << xMPU_RASR_C_Pos) | (1 << xMPU_RASR_B_Pos));
+
+    xMPU->RASR = rasr;
     __DSB();
     __ISB();
 }
@@ -218,11 +236,9 @@ void MemManage_Handler(void)
     if ((mmfsr & 0x01) || (mmfsr & 0x02) || (mmfsr & 0x08)) {
         /* 尝试读取当前违规区域编号 (若 RNR 尚未被异常处理覆盖) */
         region = xMPU->RNR & 0x07;
-        //if (fault_cb) {
-        //    fault_cb(mmfar, region);
-        //}
+        log_directly_error(gloable_log, "MemManage HardFault: \r\n");
+        log_directly_error(gloable_log, "\ttask %s region %d, mmfsr 0x%x cfsr 0x%x mmfar 0x%x\r\n", gloable_current_tcb->name, region, mmfsr, cfsr, mmfar);
     } else {
-
         hal_fault_diag_decode(&fault);
     }
 
@@ -314,6 +330,8 @@ const mpu_config_t mpu_cfg = {
 
 void system_mpu_setup(void)
 {
+
     mpu_init(&mpu_cfg);
+    hal_fault_diag_init();
     //mpu_register_fault_callback(my_mpu_fault_handler);
 }

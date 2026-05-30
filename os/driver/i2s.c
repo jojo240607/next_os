@@ -8,31 +8,29 @@ dev_init_override(i2s_dev_init_impl);
 
 // 析构函数声明
 static void i2s_destroy(I2s* self);
-static bool i2s_irq_handler_impl(void *arg);
+static bool i2s_irq_handler_impl(nvic_irq_t *irq_conf);
 
 // TODO: 初始化数据成员
 static const I2sFun i2s_fun = {
     .destroy = i2s_destroy,
 };
 // 构造函数实现
-I2s* i2s_create(const i2s_config_t *conf, const dev_pripority_t *priority) {
+I2s* i2s_create(const device_info_t *info) {
     I2s* obj = (I2s*)os_malloc(sizeof(I2s));
     if (obj) {
         memset(obj, 0, sizeof(I2s));
-        i2s_init(obj, conf, priority);
+        i2s_init(obj, info);
     }
     return obj;
 }
 
-void i2s_init(I2s* self, const i2s_config_t *conf, const dev_pripority_t *priority) {
+void i2s_init(I2s* self, const device_info_t *info) {
     // 初始化基类部分
-    device_init(&self->base, priority);
+    device_init(&self->base, info);
     self->fun = &(i2s_fun);
     // TODO: 初始化派生类特有成员
-    self->conf = conf;
 	def_dev_init(self) = i2s_dev_init_impl;
-    self->i2s_xfer.i2s_rx_sem = semaphore_create(0);
-    self->i2s_xfer.i2s_tx_sem = semaphore_create(0);
+    self->i2s_xfer = NULL;
 }
 
 void i2s_deinit(I2s* self) {
@@ -51,26 +49,27 @@ static void i2s_destroy(I2s* self) {
 dev_init_override(i2s_dev_init_impl) {
     // TODO: add dev_init method
     I2s *i2s = (I2s *)self;
+    const i2s_config_t *conf = self->info->conf;
     //params 
-    if (!i2s->conf || i2s->conf->id >= I2S_MAX) {
+    if (!conf || conf->id >= I2S_MAX) {
         return;
     }
 
     // 1. 使能时钟 (APB1)
-    if (i2s->conf->id == I2S_2) {
+    if (conf->id == I2S_2) {
         rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_I2S2EN);  // /I2S2
     } else {
         rcc_periph_clock_enable(RCC_BUS_APB1, xRCC_APB1ENR_I2S3EN);  // SPI3/I2S3
     }
     // 2. 配置引脚 (AF5)
-    const i2s_pins_t *p = &i2s->conf->pins;
+    const i2s_pins_t *p = &conf->pins;
     pin_config_t pins[4] = {
             { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_NONE, .af = p->sck_pin },
             { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_NONE, .af = p->sd_pin },
             { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_NONE, .af = p->ws_pin },
             { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_NONE, .af = p->mck_pin },
     };
-    if (pinmux_request_group(pins, i2s->conf->enable_mck ? 4 : 3) != 0) {
+    if (pinmux_request_group(pins, conf->enable_mck ? 4 : 3) != 0) {
         return;
     }
 
@@ -78,87 +77,97 @@ dev_init_override(i2s_dev_init_impl) {
     // PLLI2S VCO = HSE / PLLM * PLLI2SN (例: 8MHz / 8 * 258 = 258MHz)
     // I2S_CLK = VCO / PLLI2SR (例: 258MHz / 3 = 86MHz)
     volatile uint32_t *PLLI2SCFGR = (uint32_t*)0x40023884UL;
-    *PLLI2SCFGR = (i2s->conf->plli2s_r & 0x7) << 28 | (i2s->conf->plli2s_n & 0x1FF) << 6;
+    *PLLI2SCFGR = (conf->plli2s_r & 0x7) << 28 | (conf->plli2s_n & 0x1FF) << 6;
     // 使能 PLLI2S
     volatile uint32_t *CR = (uint32_t*)0x40023800UL;
     *CR |= (1 << 26);
     while (!(*CR & (1 << 27)));
 
-    xI2S_TypeDef *i2s_ctrl = I2Sx[i2s->conf->id];
+    xI2S_TypeDef *i2s_ctrl = I2Sx[conf->id];
 
     // 4. 配置 I2S 预分频 (SPI_I2SPR)
     uint32_t i2spr = 0;
-    i2spr |= (i2s->conf->i2s_div & 0xFF) << 0;
-    if (i2s->conf->odd_factor) {
+    i2spr |= (conf->i2s_div & 0xFF) << 0;
+    if (conf->odd_factor) {
         i2spr |= xI2S_I2SPR_ODD;
     }
-    if (i2s->conf->enable_mck) {
+    if (conf->enable_mck) {
         i2spr |= xI2S_I2SPR_MCKOE;
     }
     i2s_ctrl->I2SPR = i2spr;
 
     // 5. 配置 I2S 控制寄存器 (SPI_I2SCFGR)
     uint32_t i2scfgr = xI2S_I2SCFGR_I2SMOD;   // 切换到 I2S 模式
-    i2scfgr |= (i2s->conf->mode & 0x3) << 8;       // I2SCFG
-    i2scfgr |= (i2s->conf->standard & 0x3) << 4;   // I2SSTD
-    if (i2s->conf->standard == xI2S_STANDARD_PCM_LONG) {
+    i2scfgr |= (conf->mode & 0x3) << 8;       // I2SCFG
+    i2scfgr |= (conf->standard & 0x3) << 4;   // I2SSTD
+    if (conf->standard == xI2S_STANDARD_PCM_LONG) {
         i2scfgr |= xI2S_I2SCFGR_PCMSYNC;
     }
-    i2scfgr |= (i2s->conf->clock_polarity & 0x1) << 3;  // CKPOL
-    i2scfgr |= (i2s->conf->data_format & 0x3) << 1;     // DATLEN
-    if (i2s->conf->data_format != I2S_DATA_16BIT) {
+    i2scfgr |= (conf->clock_polarity & 0x1) << 3;  // CKPOL
+    i2scfgr |= (conf->data_format & 0x3) << 1;     // DATLEN
+    if (conf->data_format != I2S_DATA_16BIT) {
         i2scfgr |= xI2S_I2SCFGR_CHLEN;             // 32位通道长度
     }
     i2s_ctrl->I2SCFGR = i2scfgr;
 
     // 6. 中断配置
-    if (i2s->conf->it_enable) {
-        //i2s_callbacks[i2s->conf->id] = i2s->conf->callback;
+    if (conf->it_enable) {
+        //i2s_callbacks[conf->id] = conf->callback;
         uint32_t cr2 = i2s_ctrl->CR2;
-        if (i2s->conf->it_enable & xI2S_IT_TXE)  {
+        if (conf->it_enable & xI2S_IT_TXE)  {
             cr2 |= xI2S_CR2_TXEIE;
         }
-        if (i2s->conf->it_enable & xI2S_IT_RXNE) {
+        if (conf->it_enable & xI2S_IT_RXNE) {
             cr2 |= xI2S_CR2_RXNEIE;
         }
-        if (i2s->conf->it_enable & xI2S_IT_ERR) {
+        if (conf->it_enable & xI2S_IT_ERR) {
             cr2 |= xI2S_CR2_ERRIE;
         }
         i2s_ctrl->CR2 = cr2;
-        self->irq_conf.handler = i2s_irq_handler_impl;
-        self->irq_conf.semaphore = sem;
-        self->irq_conf.arg = self;
-        self->irq_conf.irq_num = SPI2_IRQ + i2s->conf->id;
-        self->fun->attach_irq(self, &self->irq_conf);
+        self->irq_conf->handler = i2s_irq_handler_impl;
+        self->irq_conf->arg = self;
+        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, SPI2_IRQ + conf->id);
+        self->fun->config_irq(self, self->irq_conf);
+
+        if (i2s->i2s_xfer == NULL) {
+            i2s->i2s_xfer = os_malloc(sizeof(i2s_xfer_t));
+            memset(i2s->i2s_xfer, 0, sizeof(i2s_xfer_t));
+            i2s->i2s_xfer->i2s_rx_sem = semaphore_create(0);
+            i2s->i2s_xfer->i2s_tx_sem = semaphore_create(0);
+        }
     }
 
     // 7. DMA 配置
-    if (i2s->conf->dma_cfg && i2s->conf->dma_cfg->tx_dma) {
-        if (dma_stream_request(i2s->conf->dma_cfg->tx_dma) != 0) {
+    if (conf->dma_cfg && conf->dma_cfg->tx_dma) {
+        if (dma_stream_request(conf->dma_cfg->tx_dma) != 0) {
             return;
         }
-        //i2s_tx_dma_i2s->confs[i2s->conf->id] = *i2s->conf->tx_dma_i2s->conf;
-        //i2s_tx_dma_used[i2s->conf->id] = true;
+        //i2s_tx_dma_i2s->confs[conf->id] = *conf->tx_dma_i2s->conf;
+        //i2s_tx_dma_used[conf->id] = true;
         i2s_ctrl->CR2 |= xI2S_CR2_TXDMAEN;
     }
-    if (i2s->conf->dma_cfg && i2s->conf->dma_cfg->rx_dma) {
-        if (dma_stream_request(i2s->conf->dma_cfg->rx_dma) != 0) {
+    if (conf->dma_cfg && conf->dma_cfg->rx_dma) {
+        if (dma_stream_request(conf->dma_cfg->rx_dma) != 0) {
             return ;
         }
-        //i2s_rx_dma_i2s->confs[i2s->conf->id] = *i2s->conf->rx_dma_i2s->conf;
-        //i2s_rx_dma_used[i2s->conf->id] = true;
+        //i2s_rx_dma_i2s->confs[conf->id] = *conf->rx_dma_i2s->conf;
+        //i2s_rx_dma_used[conf->id] = true;
         i2s_ctrl->CR2 |= xI2S_CR2_RXDMAEN;
     }
 }
 
-static bool i2s_irq_handler_impl(void *arg) {
-    I2s *i2s = (I2s *)arg;
-    if (i2s->conf->id >= I2S_MAX) {
+static bool i2s_irq_handler_impl(nvic_irq_t *irq_conf) {
+    I2s *i2s = (I2s *)irq_conf->arg;
+    const i2s_config_t *conf = GET_DEVICE(i2s)->info->conf;
+    if (conf->id >= I2S_MAX) {
         return true;
     }
 
-    xI2S_TypeDef *i2s_ctrl = I2Sx[i2s->conf->id];
-    i2s_xfer_t *x = &i2s->i2s_xfer;
+    xI2S_TypeDef *i2s_ctrl = I2Sx[conf->id];
+    i2s_xfer_t *x = i2s->i2s_xfer;
+    if (!x) {
+        return true;
+    }
     uint16_t sr = i2s_ctrl->SR;
 
     // --- 错误处理 (优先) ---
@@ -197,7 +206,7 @@ static bool i2s_irq_handler_impl(void *arg) {
             i2s_ctrl->CR2 &= ~xI2S_CR2_TXEIE;
             if (x->tx_buf != NULL && x->rx_buf == NULL) {
                 //单纯发送才会用到这个信号量
-                i2s->i2s_xfer.i2s_tx_sem->fun->give(i2s->i2s_xfer.i2s_tx_sem);
+                x->i2s_tx_sem->fun->give(x->i2s_tx_sem);
             }
         }
     }
@@ -212,8 +221,9 @@ static bool i2s_irq_handler_impl(void *arg) {
         i2s_ctrl->CR2 &= ~(xI2S_CR2_TXEIE | xI2S_CR2_RXNEIE);  // 关闭发送和接收中断
         if (x->rx_buf != NULL) {
             //单纯接收，或者收发都会用到这个信号量
-            i2s->i2s_xfer.i2s_rx_sem->fun->give(i2s->i2s_xfer.i2s_rx_sem);
+            x->i2s_rx_sem->fun->give(x->i2s_rx_sem);
         }
     }
+    return true;
 }
 

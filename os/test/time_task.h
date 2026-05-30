@@ -34,8 +34,8 @@ struct _Time_task {
 };
 
 // 构造函数声明
-Time_task* time_task_create();
-void time_task_init(Time_task* self);
+Time_task* time_task_create(const task_into_t *info);
+void time_task_init(Time_task* self, const task_into_t *info);
 
 // 析构函数声明
 void time_task_deinit(Time_task* self);

@@ -5,18 +5,18 @@
 #include "../common/sys_time.h"
 #include "../driver/svc.h"
 
-static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p);
-static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p);
-static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self);
+static inline void thread_scheduler_set_priority_ready(volatile Thread_scheduler* self, uint8_t p);
+static inline void thread_scheduler_clear_priority_ready(volatile Thread_scheduler* self, uint8_t p);
+static inline uint8_t thread_scheduler_get_highest_priority(volatile Thread_scheduler* self);
 
-static void thread_scheduler_delay_ticks(Thread_scheduler* self);
-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected);
+static void thread_scheduler_delay_ticks(volatile Thread_scheduler* self);
+static void thread_scheduler_add_readly_list(volatile Thread_scheduler* self, volatile Tcb_t *tcb, bool protected);
 
-static void thread_scheduler_start(Thread_scheduler* self);
+static void thread_scheduler_start(volatile Thread_scheduler* self);
 
-static Tcb_t * thread_scheduler_create_thread(Thread_scheduler* self, const char *name, Entry_t *entry_s);
+static volatile Tcb_t * thread_scheduler_create_thread(volatile Thread_scheduler* self, const char *name, thread_conf_t *entry_s);
 // 析构函数声明
-static void thread_scheduler_destroy(Thread_scheduler* self);
+static void thread_scheduler_destroy(volatile Thread_scheduler* self);
 static inline void thread_scheduler_thread_exit();
 
 // 当前任务栈指针
@@ -42,12 +42,12 @@ Thread_scheduler* thread_scheduler_create() {
     return obj;
 }
 
-void thread_scheduler_init(Thread_scheduler* self) {
+void thread_scheduler_init(volatile Thread_scheduler* self) {
     LOG_DEBUG("scheduler", "thread_scheduler_init");
     self->fun = &(thread_scheduler_fun);
     // TODO: 初始化数据成员
     self->priority_bitmap = 0;
-    for (uint8_t i = 0; i < MAX_PRIORITY; i++) {
+    for (uint8_t i = 0; i < THREAD_PRIORITY_MAX; i++) {
         self->priority_list[i] = queue_create();
     }
     self->delay_list = queue_create();
@@ -56,11 +56,11 @@ void thread_scheduler_init(Thread_scheduler* self) {
     self->current_thread = NULL;
 }
 
-void thread_scheduler_deinit(Thread_scheduler* self) {
+void thread_scheduler_deinit(volatile Thread_scheduler* self) {
     // TODO: 数据成员申请资源释放
     self->priority_bitmap = 0;
     self->current_thread = NULL;
-    for (uint8_t i = 0; i < MAX_PRIORITY; i++) {
+    for (uint8_t i = 0; i < THREAD_PRIORITY_MAX; i++) {
         if (self->priority_list[i] != NULL) {
             Tcb_t *tcb = GET_TCB_T(self->priority_list[i]->fun->dequeue(self->priority_list[i]));
             while (tcb != NULL) {
@@ -89,7 +89,7 @@ void thread_scheduler_deinit(Thread_scheduler* self) {
 }
 
 // 析构函数实现
-static void thread_scheduler_destroy(Thread_scheduler* self) {
+static void thread_scheduler_destroy(volatile  Thread_scheduler* self) {
     if (self != NULL) {
         thread_scheduler_deinit(self);
         os_free(self);
@@ -97,23 +97,23 @@ static void thread_scheduler_destroy(Thread_scheduler* self) {
 }
 
 // thread_create method
-static Tcb_t *thread_scheduler_create_thread(Thread_scheduler* self, const char *name, Entry_t *entry_s) {
+static volatile Tcb_t *thread_scheduler_create_thread(volatile Thread_scheduler* self, const char *name, thread_conf_t *conf) {
     if (NULL == self) {
         return NULL;
     }
-    entry_s->exit = thread_scheduler_thread_exit;
-    Tcb_t *new_thread = tcb_t_create(name, entry_s, entry_s->stack_size);
+    conf->exit = thread_scheduler_thread_exit;
+    volatile Tcb_t *new_thread = tcb_t_create(name, conf);
     new_thread->tid = self->tid_num++;
     thread_scheduler_add_readly_list(self, new_thread, true);
     return new_thread;
 }
 
 // 调度器：选择下一个任务，更新 pxCurrentTCB
-void thread_scheduler_switch_context(Thread_scheduler* self) {
+void thread_scheduler_switch_context(volatile Thread_scheduler* self) {
     if (NULL == self || self->current_thread == NULL) {
         return;
     }
-    //hal_fpu_save_context(&self->current_thread->fpu_ctx);
+
 #if OS_STACK_DEBUG
     uint16_t left = 0;
     while (*(self->current_thread->stack_ptr + left + 1) == MAGIC_NUM) {
@@ -123,22 +123,18 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
 #endif
     if (*(self->current_thread->stack_ptr + 1) != MAGIC_NUM) {
         while (1) {
-            log_directly_error("stack out of size", 18);
+            log_directly_error(gloable_log, "%s stack out of size, stack size %d", self->current_thread->name, self->current_thread->stack_size);
             LOW_POWER;
-            //LOG_ERROR("scheduler", "%s stack out of bound", self->current_thread->name);
-            //stack out bound
         }
     }
-//    DISABLE_IRQ;
     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {
-        thread_scheduler_add_readly_list(self, self->current_thread, true);
+        thread_scheduler_add_readly_list(self, (Tcb_t *)self->current_thread, true);
     } else if (TCB_STATER_TERMINATED == self->current_thread->state) {
         self->destory_list->fun->enqueue(self->destory_list, GET_NODE(self->current_thread));
     }
 
     uint8_t highest_priority = thread_scheduler_get_highest_priority(self);
     if (highest_priority > 31) {
-//        ENABLE_IRQ;
         return;
     }
     //判断当前优先级的任务队列是否为空，若为空则将标志位清空
@@ -156,22 +152,20 @@ void thread_scheduler_switch_context(Thread_scheduler* self) {
     //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
     //}
     self->current_thread = next_tcb;
-    //hal_fpu_restore_context(&self->current_thread->fpu_ctx);
     if (self->current_thread != NULL) {
 #ifndef USE_CCMRAM
         //如果使用ccm，则不能使用mpu来保护栈内存
-        //mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr, self->current_thread->stack_size);
+        mpu_switch_task_stack((uint32_t)self->current_thread->stack_ptr - PROTECT_STACK_SIZE, MPU_SIZE_32B);//32字节的溢出检测区
 #endif
         self->current_thread->cpu_usage_info.last_reported_time = get_systime_us();
         self->current_thread->state = TCB_STATER_RUNNING;
         gloable_current_tcb = (self->current_thread);
     }
-//    ENABLE_IRQ;
 }
 
 
 // start method
-static void thread_scheduler_start(Thread_scheduler* self) {
+static void thread_scheduler_start(volatile Thread_scheduler* self) {
     LOG_DEBUG("scheduler", "system os start runing");
     if (NULL == self) {
         return;
@@ -181,20 +175,17 @@ static void thread_scheduler_start(Thread_scheduler* self) {
     if (self->current_thread == NULL) {
         return;
     }
-    //hal_nvic_enable_irq(xPendSV_IRQn);
-    //hal_nvic_enable_irq(xSVCall_IRQn);
-    //hal_nvic_global_irq_enable();
     __set_PSP( (uint32_t)self->current_thread->sp );
     // 设置 CONTROL 寄存器，选择使用 PSP
-    __set_CONTROL( __get_CONTROL() | CONTROL_THREAD_PSP_PRIV ); // 线程模式 + 进程堆栈(PSP) + 非特权级 (nPRIV=1, SPSEL=1)
+    //先使用特权级触发任务切换，等真正切到任务之后，再设置成非特权级
+    __set_CONTROL( __get_CONTROL() | CONTROL_THREAD_PSP_PRIV ); // 线程模式 + 进程堆栈(PSP) + 特权级 (nPRIV=1, SPSEL=1)
     // 执行 ISB 指令确保立即生效
     __ISB();
     Trigger_PendSV;
-    //start_pendsv_user();
     // 或者直接使用 svc 指令
     // 注意：永远不会返回到这里
     while(1) {
-            LOW_POWER;
+        LOW_POWER;
     }
 }
 
@@ -209,13 +200,13 @@ static inline void thread_scheduler_thread_exit() {
 }
 
 // delay_ticks method
-static void thread_scheduler_delay_ticks(Thread_scheduler* self) {
+static void thread_scheduler_delay_ticks(volatile Thread_scheduler* self) {
     if (NULL == self) {
         return;
     }
     // 遍历延时队列（或所有任务），将 delay_ticks 减 1
-    Tcb_t *delay_task = GET_TCB_T(self->delay_list->head);
-    Tcb_t *prev = NULL;
+    volatile Tcb_t *delay_task = GET_TCB_T(self->delay_list->head);
+    volatile Tcb_t *prev = NULL;
     uint8_t num = 0;
     while (delay_task != NULL) {
         if (delay_task->delay_ticks > 0) {
@@ -255,7 +246,7 @@ static void thread_scheduler_delay_ticks(Thread_scheduler* self) {
     
 }
 // add_readly_list method
-static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb, bool protected) {
+static void thread_scheduler_add_readly_list(volatile Thread_scheduler* self, volatile Tcb_t *tcb, bool protected) {
     if (NULL == self) {
         return;
     }
@@ -269,7 +260,7 @@ static void thread_scheduler_add_readly_list(Thread_scheduler* self, Tcb_t *tcb,
 }
 
 // set_priority_ready method
-static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, uint8_t p) {
+static inline void thread_scheduler_set_priority_ready(volatile Thread_scheduler* self, uint8_t p) {
     if (NULL == self) {
         return;
     }
@@ -280,7 +271,7 @@ static inline void thread_scheduler_set_priority_ready(Thread_scheduler* self, u
     }
 }
 // clear_priority_ready method
-static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self, uint8_t p) {
+static inline void thread_scheduler_clear_priority_ready(volatile Thread_scheduler* self, uint8_t p) {
     if (NULL == self) {
         return;
     }
@@ -289,7 +280,7 @@ static inline void thread_scheduler_clear_priority_ready(Thread_scheduler* self,
     }
 }
 // get_highest_priority method
-static inline uint8_t thread_scheduler_get_highest_priority(Thread_scheduler* self) {
+static inline uint8_t thread_scheduler_get_highest_priority(volatile Thread_scheduler* self) {
     //用于计算一个无符号整数的前导零个数  优先级31 返回值0， 优先级0 返回31
     return 31 - __builtin_clz(self->priority_bitmap);
 }

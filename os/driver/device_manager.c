@@ -25,40 +25,67 @@ static const Device_managerFun device_manager_fun = {
 };
 
 static const Device_list dev_lists[] = {
-        {.id = DEVICE_SYSTICK, .name = "sys_tick", .config = &sys_tick_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOWEST, .sub_pripority = 0},
+        {.info = &(const device_info_t){.name = "sys_tick",
+                .id = DEVICE_SYSTICK,
+                .priority =  &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOWEST, .sub_pripority = 0},
+                .conf = &sys_tick_conf},
                 .device_create = (Device_create) systick_create},
-        {.id = DEVICE_USART4, .name = "usart4", .config = &usart4_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) usart_create},
-        {.id = DEVICE_USART1, .name = "usart1", .config = &usart1_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) usart_create},
-        {.id = DEVICE_TIME2, .name = "timer2", .config = &time2_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) timer_create},
-        {.id = DEVICE_EXTI, .name = "exti", .config = &exti_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_NORMAL, .sub_pripority = 0},
-                .device_create = (Device_create) exti_create},
-        {.id = DEVICE_ADC1, .name = "adc1", .config = &adc1_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) adc_create},
-        {.id = DEVICE_SPI1, .name = "spi1", .config = &spi1_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) spi_create},
-        {.id = DEVICE_I2C1, .name = "i2c1", .config = &i2c1_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) i2c_create},
-        {.id = DEVICE_WDG, .name = "wdg", .config = &iwdg_conf,
-                .device_create = (Device_create) wdg_create},
-        {.id = DEVICE_CAN, .name = "can1", .config = &can1_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) can_create},
-        {.id = DEVICE_PWM1, .name = "pwm1", .config = &pwm1_conf,
-                .device_create = (Device_create) pwm_create},
-        {.id = DEVICE_I2S2, .name = "i2s2", .config = &i2s2_conf,
-                .irq_pripority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
-                .device_create = (Device_create) i2s_create},
+        {.info =  &(const device_info_t){.name = "usart4",
+                   .id = DEVICE_USART4,
+                   .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                   .conf = &usart4_conf},
+         .device_create = (Device_create) usart_create,},
+        {.info = &(const device_info_t){.name = "usart1",
+                  .id = DEVICE_USART1,
+                  .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                  .conf = &usart1_conf,},
+         .device_create = (Device_create) usart_create,},
+        {.info = &(const device_info_t){.name = "timer2",
+                 .id = DEVICE_TIME2,
+                 .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                 .conf = &time2_conf,},
+         .device_create = (Device_create) timer_create,},
+        {.info = &(const device_info_t){.name = "exti",
+                .id = DEVICE_EXTI,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_NORMAL, .sub_pripority = 0},
+                .conf = &exti_conf,},
+                .device_create = (Device_create) exti_create,},
+        {.info = &(const device_info_t){.name = "adc1",
+                .id = DEVICE_ADC1,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &adc1_conf,},
+                .device_create = (Device_create) adc_create,},
+        {.info = &(const device_info_t){.name = "spi1",
+                .id = DEVICE_SPI1,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &spi1_conf,},
+                .device_create = (Device_create) spi_create,},
+        {.info = &(const device_info_t){.name = "i2c1",
+                .id = DEVICE_I2C1,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &i2c1_conf,},
+                .device_create = (Device_create) i2c_create,},
+        {.info = &(const device_info_t){.name = "wdg",
+                .id = DEVICE_WDG,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &iwdg_conf,},
+                .device_create = (Device_create) wdg_create,},
+        {.info = &(const device_info_t){.name = "can1",
+                .id = DEVICE_CAN,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &can1_conf,},
+                .device_create = (Device_create) can_create,},
+        {.info = &(const device_info_t){.name = "pwm1",
+                .id = DEVICE_PWM1,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &pwm1_conf,},
+                .device_create = (Device_create) pwm_create,},
+        {.info = &(const device_info_t){.name = "i2s2",
+                .id = DEVICE_I2S2,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &i2s2_conf,},
+                .device_create = (Device_create) i2s_create,},
+
 };
 Device_manager *gloable_deviceManager = NULL;
 // 构造函数实现
@@ -105,9 +132,11 @@ static Device* device_manager_dev_open(Device_manager* self, dev_id_t id) {
     if (id < 0 || id >= DEVICE_MAX) {
         return NULL;
     }
-    if (self->dev_tab[id] == NULL) {
-        self->dev_tab[id] = (self->devicelist + id)->device_create((self->devicelist + id)->config, (self->devicelist + id)->irq_pripority);
+    Device **newdevice = self->dev_tab + id;
+    if (*newdevice == NULL) {
+        *newdevice = (self->devicelist + id)->device_create((self->devicelist + id)->info);
+        (*newdevice)->vtable->dev_init(self->dev_tab[id]);
     }
-    return self->dev_tab[id];
+    return *newdevice;
 }
 

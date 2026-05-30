@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include "../common/linear_pool.h"
 #include "../log/log.h"
+#include "../driver/svc.h"
+#include "../driver/device_manager.h"
+
+task_start_override(time_task_task_start_impl);
 
 task_init_override(time_task_task_init_impl);
 task_thread_override(time_task_task_thread_impl);
@@ -15,29 +19,31 @@ static const Time_taskFun time_task_fun = {
     .destroy = time_task_destroy,
 };
 // 构造函数实现
-Time_task* time_task_create() {
+Time_task* time_task_create(const task_into_t *info) {
     Time_task* obj = (Time_task*)os_malloc(sizeof(Time_task));
     if (obj) {
         memset(obj, 0, sizeof(Time_task));
-        time_task_init(obj);
+        time_task_init(obj, info);
     }
     return obj;
 }
 
-void time_task_init(Time_task* self) {
+void time_task_init(Time_task* self, const task_into_t *info) {
     // 初始化基类部分
-    task_init(&self->base);
+    task_init(&self->base, info);
     self->fun = &(time_task_fun);
     // TODO: 初始化派生类特有成员
 
 	def_task_init(self) = time_task_task_init_impl;
 	def_task_thread(self) = time_task_task_thread_impl;
+    def_task_start(self) = time_task_task_start_impl;
     self->timer = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_TIME2);
     self->adc = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ADC1);
     self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
     self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
     self->wdg = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_WDG);
     self->pwm = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_PWM1);
+
 }
 
 void time_task_deinit(Time_task* self) {
@@ -57,19 +63,11 @@ task_init_override(time_task_task_init_impl) {
     // TODO: add task_init method
     Time_task *time_task = (Time_task *)self;
     //params , void *parent
-    //params , void *parent
     if (!time_task) {
         return;
     }
-    virtual_dev_init(time_task->timer, self->task_tcb->semaphore);
-    virtual_dev_init(time_task->adc, NULL);
-    virtual_dev_init(time_task->spi, NULL);
-    virtual_dev_init(time_task->i2c, NULL);
-   // virtual_dev_init(time_task->wdg, NULL);
-    virtual_dev_init(time_task->pwm, NULL);
-    GET_TIMER(time_task->timer)->fun->start(GET_TIMER(time_task->timer));
+    time_task->timer->fun->attach_irq(time_task->timer, self);
 
-    GET_PWM(time_task->pwm)->fun->start(GET_PWM(time_task->pwm));//start pwm
 }
 // task_thread method
 task_thread_override(time_task_task_thread_impl) {
@@ -77,11 +75,11 @@ task_thread_override(time_task_task_thread_impl) {
     Time_task *time_task = (Time_task *)self->parent;
     //params , void *arg
     while (true) {
-        self->semaphore->fun->take(self->semaphore);
+        sem_take_user(self->semaphore);
         uint32_t adc_data = 0;
         uint8_t tx[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
         uint8_t rx[5];
-        time_task->adc->vtable->dev_read(time_task->adc, &adc_data, 2);
+        time_task->adc->fun->read_user(time_task->adc, &adc_data, 2);
         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
         //GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
         //LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
@@ -99,5 +97,16 @@ task_thread_override(time_task_task_thread_impl) {
         //GET_WDG(time_task->wdg)->fun->iwdg_reload();
         //LOG_DEBUG("time_task", "feed watch dog");
     }
+}
+
+
+// task_start method
+task_start_override(time_task_task_start_impl) {
+    // TODO: add task_start method
+    Time_task *time_task = (Time_task *)self;
+    //params 
+    time_task->timer->vtable->dev_ioctl(time_task->timer, DEVICE_START, NULL);
+    time_task->pwm->vtable->dev_ioctl(time_task->pwm, DEVICE_START, NULL);//start pwm
+    //time_task->wdg->vtable->dev_ioctl(time_task->wdg, DEVICE_START, NULL);//watch dog
 }
 

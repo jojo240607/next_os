@@ -15,9 +15,6 @@ typedef struct _SystickFun SystickFun;
 // 类成员函数结构
 struct _SystickFun {
     void (*destroy)(Systick* self);
-	void (*start)(Systick* self);
-
-	void (*stop)(Systick* self);
 
 };
 
@@ -33,15 +30,14 @@ struct _Systick {
     Device base;  // 基类作为第一个成员
     const SystickFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const systick_config_t *conf;
 };
 
 // 构造函数声明
-Systick* systick_create(const systick_config_t *conf, const dev_pripority_t *priority);
-void systick_init(Systick* self, const systick_config_t *conf, const dev_pripority_t *priority);
+Systick* systick_create(const device_info_t *info);
+void systick_init(Systick* self, const device_info_t *info);
 
 // 析构函数声明
 void systick_deinit(Systick* self);
-bool systick_irq_handler_impl(void *arg);
+bool systick_irq_handler_impl(nvic_irq_t *irq_conf);
 
 #endif // SYSTICK_H

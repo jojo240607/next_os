@@ -14,23 +14,22 @@ static const FsmcFun fsmc_fun = {
     .destroy = fsmc_destroy,
 };
 // 构造函数实现
-Fsmc* fsmc_create(const fsmc_lcd_config_t *conf, const dev_pripority_t *priority) {
+Fsmc* fsmc_create(const device_info_t *info) {
     Fsmc* obj = (Fsmc*)os_malloc(sizeof(Fsmc));
     if (obj) {
         memset(obj, 0, sizeof(Fsmc));
-        fsmc_init(obj, conf, priority);
+        fsmc_init(obj, info);
     }
     return obj;
 }
 
-void fsmc_init(Fsmc* self, const fsmc_lcd_config_t *conf, const dev_pripority_t *priority) {
+void fsmc_init(Fsmc* self, const device_info_t *info) {
     // 初始化基类部分
-    device_init(&self->base, priority);
+    device_init(&self->base, info);
     self->fun = &(fsmc_fun);
     // TODO: 初始化派生类特有成员
 
 	def_dev_init(self) = fsmc_dev_init_impl;
-    self->conf = conf;
 }
 
 void fsmc_deinit(Fsmc* self) {
@@ -50,8 +49,8 @@ dev_init_override(fsmc_dev_init_impl) {
     // TODO: add dev_init method
     Fsmc *fsmc = (Fsmc *)self;
     //params 
-    
-    if (!fsmc->conf) {
+    const fsmc_lcd_config_t *conf = self->info->conf;
+    if (!conf) {
         return;
     }
 
@@ -62,22 +61,22 @@ dev_init_override(fsmc_dev_init_impl) {
     // 数据线 D0~D15
     // 控制信号线 (NE, A0, WR, RD, RST, BL)
     pin_config_t data_pins[] = {
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data0_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data1_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data2_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data3_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data4_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data5_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data6_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data7_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data8_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data9_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data10_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data11_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data12_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data13_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data14_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.data15_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data0_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data1_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data2_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data3_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data4_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data5_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data6_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data7_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data8_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data9_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data10_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data11_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data12_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data13_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data14_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.data15_pin },
     };
 
 
@@ -87,13 +86,13 @@ dev_init_override(fsmc_dev_init_impl) {
 
     // 控制信号线 (NE, A0, WR, RD, RST, BL)
     pin_config_t ctrl_pins[] = {
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.ne_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.a_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.wr_pin },
-            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, fsmc->conf->pins.rd_pin },
-            { .port = fsmc->conf->pins.rst_pin.port, .pin = fsmc->conf->pins.rst_pin.pin,
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.ne_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.a_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.wr_pin },
+            { .mode = PIN_MODE_AF, PIN_OTYPE_PP, PIN_OSPEED_VERY_HIGH, PIN_PUPD_NONE, conf->pins.rd_pin },
+            { .port = conf->pins.rst_pin.port, .pin = conf->pins.rst_pin.pin,
               .mode = PIN_MODE_OUTPUT, PIN_OTYPE_PP, PIN_OSPEED_LOW, PIN_PUPD_NONE },
-            { .port = fsmc->conf->pins.bl_pin.port, .pin = fsmc->conf->pins.bl_pin.pin,
+            { .port = conf->pins.bl_pin.port, .pin = conf->pins.bl_pin.pin,
               .mode = PIN_MODE_OUTPUT, PIN_OTYPE_PP, PIN_OSPEED_LOW, PIN_PUPD_NONE }
     };
     if (pinmux_request_group(ctrl_pins, 6) != PINMUX_SUCCESS) {
@@ -108,26 +107,26 @@ dev_init_override(fsmc_dev_init_impl) {
                          (1 << 2);   // MTYP = 01 (SRAM)
 
     // 4. 配置 FSMC Bank1 Region1 读时序
-    xFSMC_Bank1[0].BTR = ((fsmc->conf->address_setup_time & 0x0F) << 0) |
-                        ((fsmc->conf->data_setup_time & 0xFF) << 8) |
-                        ((fsmc->conf->bus_turnaround_time & 0x0F) << 16) |
+    xFSMC_Bank1[0].BTR = ((conf->address_setup_time & 0x0F) << 0) |
+                        ((conf->data_setup_time & 0xFF) << 8) |
+                        ((conf->bus_turnaround_time & 0x0F) << 16) |
                         (0x01 << 28); // ACCMOD = 01 (访问模式A)
 
     // 5. 执行 LCD 特定初始化序列
     // 先复位
-    //GPIOx[fsmc->conf->rst_port]->BSRR = (1 << (fsmc->conf->rst_pin + 16)); // 拉低RST
-    gpio_reset(&fsmc->conf->pins.rst_pin);
+    //GPIOx[conf->rst_port]->BSRR = (1 << (conf->rst_pin + 16)); // 拉低RST
+    gpio_reset(&conf->pins.rst_pin);
 
     for(volatile int i=0; i<100000; i++);
-    //GPIOx[fsmc->conf->rst_port]->BSRR = (1 << fsmc->conf->rst_pin); // 拉高RST
-    gpio_set(&fsmc->conf->pins.rst_pin);
+    //GPIOx[conf->rst_port]->BSRR = (1 << conf->rst_pin); // 拉高RST
+    gpio_set(&conf->pins.rst_pin);
     for(volatile int i=0; i<100000; i++);
 
     // 开背光
-    //GPIOx[fsmc->conf->bl_port]->BSRR = (1 << fsmc->conf->bl_pin);
-    gpio_set(&fsmc->conf->pins.bl_pin);
-    if (fsmc->conf->init_sequence) {
-        fsmc->conf->init_sequence();
+    //GPIOx[conf->bl_port]->BSRR = (1 << conf->bl_pin);
+    gpio_set(&conf->pins.bl_pin);
+    if (conf->init_sequence) {
+        conf->init_sequence();
     }
 
 }
@@ -157,8 +156,9 @@ void fsmc_lcd_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
 }
 
 void fsmc_lcd_fill_screen(Fsmc* self, uint16_t color) {
-    fsmc_lcd_set_window(0, 0, self->conf->width, self->conf->height);
-    for (uint32_t i = 0; i < (uint32_t)self->conf->width * self->conf->height; i++) {
+    const fsmc_lcd_config_t *conf = GET_DEVICE(self)->info->conf;
+    fsmc_lcd_set_window(0, 0, conf->width, conf->height);
+    for (uint32_t i = 0; i < (uint32_t)conf->width * conf->height; i++) {
         fsmc_lcd_write_data(color >> 8);
         fsmc_lcd_write_data(color & 0xFF);
     }
@@ -172,12 +172,13 @@ void fsmc_lcd_fill_screen(Fsmc* self, uint16_t color) {
  */
 int fsmc_lcd_fill_screen_dma(Fsmc* self, uint16_t *buffer, uint32_t len)
 {
+    const fsmc_lcd_config_t *conf = GET_DEVICE(self)->info->conf;
     // 1. 设置LCD显示窗口为全屏
-    fsmc_lcd_set_window(0, 0, self->conf->width, self->conf->height);
+    fsmc_lcd_set_window(0, 0, conf->width, conf->height);
 
     // 3. 启动DMA传输
     // 源地址 = 帧缓冲区；目标地址 = LCD数据寄存器
-    dma_start_transfer(self->conf->dma_cfg,
+    dma_start_transfer(conf->dma_cfg,
                        (uint32_t)buffer,           // 源 (地址自增)
                        (uint32_t)LCD_DATA_ADDR,   // 目标 (地址固定)
                        len);

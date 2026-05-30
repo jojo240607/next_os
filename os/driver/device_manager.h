@@ -6,6 +6,7 @@
 #include <string.h>
 #include "common/device.h"
 #include "../common/util.h"
+#include "hal/hal_svc.h"
 
 #define GET_DEVICE_MANAGER(obj) ((Device_manager *)obj)
 // 类声明
@@ -13,24 +14,11 @@ typedef struct _Device_manager Device_manager;
 typedef struct _Device_managerFun Device_managerFun;
 typedef struct _Device_list Device_list;
 
-typedef Device * (*Device_create)(const void *config, const dev_pripority_t *priority);
+
+
+typedef Device * (*Device_create)(const device_info_t *info);
 // 类成员函数结构
 
-typedef enum : uint8_t {
-    DEVICE_SYSTICK = 0,
-    DEVICE_USART4,
-    DEVICE_USART1,
-    DEVICE_TIME2,
-    DEVICE_EXTI,
-    DEVICE_ADC1,
-    DEVICE_SPI1,
-    DEVICE_I2C1,
-    DEVICE_WDG,
-    DEVICE_CAN,
-    DEVICE_PWM1,
-    DEVICE_I2S2,
-    DEVICE_MAX
-} dev_id_t;
 
 struct _Device_managerFun {
     void (*destroy)(Device_manager* self);
@@ -38,11 +26,8 @@ struct _Device_managerFun {
 
 };
 struct _Device_list {
-    const dev_id_t id;
-    const char *name;
-    const void *config;
-    const dev_pripority_t *irq_pripority;
-    Device_create device_create;
+    const device_info_t *info;
+    const Device_create device_create;
 };
 
 // 类结构

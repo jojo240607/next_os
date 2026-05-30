@@ -9,17 +9,22 @@
 #include "../driver/hal/hal_nvic.h"
 
 #define OS_STACK_DEBUG (1)
-//#define USE_CCMRAM
 #define GET_TASK_MANAGER(obj) ((Task_manager *)obj)
 
 //  __DSB() 确保所有内存访问完成
-#define USE_CCMRAM
+//#define USE_CCMRAM
 
 #ifdef USE_CCMRAM
-#define CCMRAM __attribute__((section(".ccmram")))
+#define STACKRAM __attribute__((section(".ccmram"), aligned(32))) //32字节对齐
+#define TCBRAM __attribute__((section(".ccmram"))) //32字节对齐
+#define PROTECT_STACK_SIZE (0)
+
 #else
-#define CCMRAM  // 在 Renode 模拟器中，宏定义为空，变量将被分配到普通 RAM
+#define STACKRAM  __attribute__((section(".data"), aligned(32)))// 在 Renode 模拟器中，宏定义为空，变量将被分配到普通 RAM 32字节对齐
+#define TCBRAM  __attribute__((section(".data")))
+#define PROTECT_STACK_SIZE (32) //32 byte
 #endif
+
 
 //// 触发 PendSV 中断
 #define PENDSVSET ((1UL << 28U))
@@ -35,10 +40,12 @@
 #define TO_OBJ(type, obj) ((type *)obj)
 #define GET_OBJ_VTAB(type, obj) (*(type##VTable **)obj)
 
-#define DEFAULT_OBJBUF_SIZE (1024 * 10)     //10k 对象池
-#define DEFAULT_CCMRAM_SIZE (1024 * 8)     //6k ccm内存池 给任务栈使用
-#define DEFAULT_STACK_SIZE (11)              //2 ^ 11 = 2048   默认任务栈大小
-#define SYSTEM_TICKS_PER_SEC (1000)         //1000hz / 时间片默认切换周期1ms
+#define MAX_TASK_NUM (32)                           //最大32个任务
+#define DEFAULT_OBJBUF_SIZE (1024 * 10)             //10k 对象池，给对象申请使用
+#define DEFAULT_CCMRAM_SIZE (MAX_TASK_NUM * 80)     //6k ccm内存池 给任务使用 tcb 80 byte *
+#define DEFAULT_STACKRAM_SIZE (1024 * 8)            //8k ccm内存池 给任务栈使用
+#define DEFAULT_STACK_SIZE (11)                     //2 ^ 11 = 2048   默认任务栈大小 MPU_SIZE_2K
+#define SYSTEM_TICKS_PER_SEC (1000)                 //1000hz / 时间片默认切换周期1ms
 
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 #define SYSCALL_IRQ_DEFAULT_PRIO (5 << 4) // IRQ_PREEMPT_PRIORITY_SYSCALL

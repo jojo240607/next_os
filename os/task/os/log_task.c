@@ -1,5 +1,6 @@
 #include "log_task.h"
-#include "../common/linear_pool.h"
+#include "../../common/linear_pool.h"
+#include "../../driver/svc.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,39 +26,33 @@ static const char *level_str[] = {
 };
 
 // 构造函数实现
-Log_task* log_task_create() {
+Log_task* log_task_create(const task_into_t *info) {
     Log_task* obj = (Log_task*)os_malloc(sizeof(Log_task));
     if (obj) {
         memset(obj, 0, sizeof(Log_task));
-        log_task_init(obj);
+        log_task_init(obj, info);
     }
     return obj;
 }
 
-void log_task_init(Log_task* self) {
+void log_task_init(Log_task* self, const task_into_t *info) {
     // 初始化基类部分
-    task_init(&self->base);
+    task_init(&self->base, info);
     self->fun = &(log_task_fun);
     // TODO: 初始化派生类特有成员
 
 	def_task_init(self) = log_task_task_init_impl;
 	def_task_thread(self) = log_task_task_thread_impl;
-    self->log_buf = queue_create();
     self->usart = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
-
+#ifndef LOG_USE_NOCOPY
+    self->entry = os_malloc(sizeof(log_entry_t));
+    memset(self->entry, 0, sizeof(log_entry_t));
+#endif
 }
 
 void log_task_deinit(Log_task* self) {
     task_deinit(GET_TASK(self));
     // TODO: 数据成员申请资源释放
-    if (self->log_buf) {
-        //String *str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));
-        //while (str) {
-        //    str->fun->destroy(str);
-        //    str = GET_STRING(self->log_buf->fun->dequeue(self->log_buf));
-        //}
-        self->log_buf->fun->destroy(self->log_buf);
-    }
 }
 // 析构函数实现
 static void log_task_destroy(Log_task* self) {
@@ -77,31 +72,36 @@ task_init_override(log_task_task_init_impl) {
     if (!log_task) {
         return;
     }
-    virtual_dev_init(log_task->usart, NULL);
-    log_bound_task(GET_TASK(log_task));
+    log_bound_task(gloable_log, self);
 }
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
     // TODO: add task_thread method
     Log_task *log_task = (Log_task *)self->parent;
     //params , void *arg
-    Ring *log_buf = log_buffer();
-    log_entry_t entry;
     while (1) {
-        GET_TASK(log_task)->task_tcb->semaphore->fun->take(GET_TASK(log_task)->task_tcb->semaphore);
+        sem_take_user(GET_TASK(log_task)->task_tcb->semaphore);
         /* 批量处理，直到缓冲区空 */
-        while (log_buf->fun->pop(log_buf, &entry)) {
+#ifndef LOG_USE_NOCOPY
+        while (log_get_data(gloable_log, log_task->entry)) {
+#else
+        log_task->entry = log_get_data_nocpy(gloable_log);
+        while (log_task->entry) {
+#endif
             /* 格式化并发送到串口 */
             int len = snprintf(log_task->line, sizeof(log_task->line),
                                "%08lu %d %s %s: %s",
-                               entry.timestamp,
-                               entry.tid,
-                               level_str[entry.level],
-                               entry.tag,
-                               entry.text);
+                               log_task->entry->timestamp,
+                               log_task->entry->tid,
+                               level_str[log_task->entry->level],
+                               log_task->entry->tag,
+                               log_task->entry->text);
             if (len > 0) {
-                GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)log_task->line, len);
+                log_task->usart->fun->write_user(log_task->usart, (const uint8_t *)log_task->line, len);
             }
+#ifdef LOG_USE_NOCOPY
+            log_task->entry = log_get_data_nocpy(gloable_log);
+#endif
         }
     }
 }

@@ -3,6 +3,8 @@
 #include "linear_pool.h"
 #include "util.h"
 
+static void * ring_pop_nocpy(Ring* self);
+
 static bool ring_push(Ring* self, const void *data);
 static bool ring_pop(Ring* self, void *data);
 
@@ -14,6 +16,7 @@ static const RingFun ring_fun = {
     .destroy = ring_destroy,
 	.push = ring_push,
 	.pop = ring_pop,
+	.pop_nocpy = ring_pop_nocpy,
 };
 // 构造函数实现
 Ring* ring_create(uint32_t capacity, uint32_t size) {
@@ -80,5 +83,19 @@ static bool ring_pop(Ring* self, void *data) {
     self->head = (self->head + 1) % self->capacity;
     self->count--;
     return true;
+}
+
+
+// pop_nocpy method
+static void * ring_pop_nocpy(Ring* self) {
+    if (self->count == 0) {
+        return NULL;
+    }
+
+    char *byte_buffer = ((char *)self->buffer) + self->head * self->elem_size;
+    //memcpy(data, byte_buffer + self->head * self->elem_size, self->elem_size);
+    self->head = (self->head + 1) % self->capacity;
+    self->count--;
+    return byte_buffer;
 }
 

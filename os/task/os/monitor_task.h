@@ -2,7 +2,7 @@
 #define MONITOR_TASK_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "task.h"
+#include "../task.h"
 #include "idle_task.h"
 
 #define GET_MONITOR_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Monitor_taskVTable **)obj)
@@ -20,14 +20,12 @@ struct _Monitor_task {
     Task base;  // 基类作为第一个成员
     const Monitor_taskFun* fun;
     // TODO: 添加派生类特有的数据成员
-    Idle_task *idletask;
     uint32_t last_call;
-    //uint8_t cpu_usage;
 };
 
 // 构造函数声明
-Monitor_task* monitor_task_create();
-void monitor_task_init(Monitor_task* self);
+Monitor_task* monitor_task_create(const task_into_t *info);
+void monitor_task_init(Monitor_task* self, const task_into_t *info);
 
 // 析构函数声明
 void monitor_task_deinit(Monitor_task* self);

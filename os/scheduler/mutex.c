@@ -54,7 +54,7 @@ static void mutex_destroy(Mutex* self) {
 // take method
 static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
     uint32_t key = arch_irq_lock();
-    Tcb_t *curr = global_thread_scheduler->current_thread;
+    volatile Tcb_t *curr = global_thread_scheduler->current_thread;
     // 情况1：互斥量空闲，直接获取
     if (self->owner == NULL) {
         self->owner = curr;
@@ -71,7 +71,7 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
     }
 
     // 情况3：互斥量被其他任务持有 -> 优先级继承
-    Tcb_t *owner = self->owner;
+    volatile Tcb_t *owner = self->owner;
     if (curr->priority > owner->priority) {   // 当前任务优先级更高
         // 提升持有者优先级到当前任务优先级
         // 注意：需要重新插入就绪队列（因为优先级变了）
@@ -116,7 +116,7 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
         LOG_DEBUG("mutex", "wake up %s right", curr->name);
         return 1;
     } else {
-        LOG_ERROR("mutex", "lock fail, state %d", curr->state);
+        LOG_ERROR("mutex", "lock fail, owner %s state %d",owner->name, curr->state);
         // 超时或被中断唤醒
         arch_irq_unlock(key);
         return 0;
@@ -140,7 +140,7 @@ static uint8_t mutex_give(Mutex* self) {
     }
 
     // 恢复所有者原来的优先级（如果曾被提升）
-    Tcb_t *owner = self->owner;
+    volatile Tcb_t *owner = self->owner;
     if (owner->priority != owner->original_priority) {
         owner->priority = owner->original_priority;
         // 重新插入就绪队列
@@ -164,7 +164,7 @@ static uint8_t mutex_give(Mutex* self) {
     self->lock_count = 1;
     self->owner_original_prio = new_owner->priority;
     // 新任务不是当前任务，需要手动插入插入就绪队列
-    LOG_DEBUG("mutex", "unlock %s", new_owner->name);
+    LOG_DEBUG("mutex", "add wait unlock owner %s", new_owner->name);
     global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, new_owner, true);
     // 如果有超时机制，清除该任务的超时定时器
     //os_clear_task_timeout(new_owner);

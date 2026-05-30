@@ -29,8 +29,6 @@ typedef struct {
 // 类成员函数结构
 struct _TimerFun {
     void (*destroy)(Timer* self);
-	void (*start)(Timer* self);
-	void (*stop)(Timer* self);
 	void (*set_pulse)(Timer* self, uint8_t channel, uint32_t pulse);
 	uint32_t (*get_capture)(Timer* self, uint8_t channel);
 	uint32_t (*get_counter)(Timer* self);
@@ -42,12 +40,11 @@ struct _Timer {
     Device base;  // 基类作为第一个成员
     const TimerFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const tim_config_t *conf;
 };
 
 // 构造函数声明
-Timer* timer_create(const tim_config_t *conf, const dev_pripority_t *priority);
-void timer_init(Timer* self, const tim_config_t *conf, const dev_pripority_t *priority);
+Timer* timer_create(const device_info_t *info);
+void timer_init(Timer* self, const device_info_t *info);
 
 // 析构函数声明
 void timer_deinit(Timer* self);

@@ -59,12 +59,11 @@ struct _Can {
     Device base;  // 基类作为第一个成员
     const CanFun* fun;
     // TODO: 添加派生类特有的数据成员
-    const can_config_t * conf;
 };
 
 // 构造函数声明
-Can* can_create(const can_config_t * conf, const dev_pripority_t *priority);
-void can_init(Can* self, const can_config_t * conf, const dev_pripority_t *priority);
+Can* can_create(const device_info_t *info);
+void can_init(Can* self, const device_info_t *info);
 
 // 析构函数声明
 void can_deinit(Can* self);

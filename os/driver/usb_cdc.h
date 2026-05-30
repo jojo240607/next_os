@@ -58,7 +58,7 @@ struct _Usb_cdc {
     const Usb_cdcFun* fun;
     // TODO: 添加派生类特有的数据成员
     const usb_cdc_config_t *conf;
-    usb_cdc_xfer_t usb_cdc_xfer;
+    usb_cdc_xfer_t *usb_cdc_xfer;
 };
 
 // 构造函数声明
