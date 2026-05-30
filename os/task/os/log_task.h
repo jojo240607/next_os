@@ -10,7 +10,7 @@
 
 #define GET_LOG_TASK_VTABLE(obj) GET_BASE_TASK_VTABLE(obj) //(*(Log_taskVTable **)obj)
 #define GET_LOG_TASK(obj) ((Log_task *)obj)
-#define LOG_USE_NOCOPY //零拷贝log打印
+//#define LOG_USE_NOCOPY //零拷贝log打印
 // 派生类声明
 typedef struct _Log_task Log_task;
 typedef struct _Log_taskFun Log_taskFun;

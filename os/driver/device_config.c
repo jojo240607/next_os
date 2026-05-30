@@ -62,7 +62,7 @@ const usart_config_t usart1_conf = {
                 .uart_tx = PA9_REQ_USART1_TX,
                 .uart_rx = PA10_REQ_USART1_RX,
         },
-        .it_enable = xUART_IT_NONE,//xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
         .dma_cfg = NULL,
 };
 

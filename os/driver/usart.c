@@ -122,6 +122,7 @@ dev_init_override(usart_dev_init_impl) {
             if (dma_stream_request(conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
                 // 申请失败，回滚
                 //goto error;
+                LOG_ERROR("usart", "dma request error");
                 return;
             }
             if (conf->dma_cfg->tx_dma->it_enable) {
@@ -154,7 +155,26 @@ dev_read_override(usart_dev_read_impl) {
     Usart *usart = (Usart *)self;
     const usart_config_t *conf = self->info->conf;
     //params , void *buf, size_t count
-    hal_uart_recv(conf->id, (uint8_t *)buf, count);
+    if (conf->dma_cfg) {
+
+    } else if (conf->it_enable) {
+        uart_xfer_t *x = usart->uart_xfer;
+        if (!x) {
+            return;
+        }
+        if (x->rx_active) {
+            return;
+        }
+
+        x->rx_buf = (uint8_t *) buf;
+        x->rx_total = count;
+        x->rx_index = 0;
+        x->rx_active = true;
+        hal_uart_set_it_event(conf->id, xUART_IT_RXNE);// RXNEIE
+        x->uart_rx_sem->fun->take(x->uart_rx_sem);
+    } else {
+        hal_uart_recv(conf->id, (uint8_t *) buf, count);
+    }
 }
 // dev_write method
 dev_write_override(usart_dev_write_impl) {
@@ -163,7 +183,28 @@ dev_write_override(usart_dev_write_impl) {
     const usart_config_t *conf = self->info->conf;
     //params , const void *buf, size_t count
     // 检查发送数据寄存器是否为空 (TXE标志位)
-    hal_uart_send(conf->id, (uint8_t *)buf, count);
+    if (conf->dma_cfg) {
+
+    } else if (conf->it_enable) {
+        uart_xfer_t *x = usart->uart_xfer;
+        if (!x) {
+            return;
+        }
+        if (x->tx_active) {
+            return;   // 上次传输未结束
+        }
+
+        x->tx_buf = (uint8_t *) buf;
+        x->tx_total = count;
+        x->tx_index = 0;
+        x->tx_active = true;
+
+        // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
+        hal_uart_set_it_event(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
+        x->uart_tx_sem->fun->take(x->uart_tx_sem);
+    } else {
+        hal_uart_send(conf->id, (uint8_t *) buf, count);
+    }
 
 }
 // dev_ioctl method
@@ -189,18 +230,18 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
     //params , void *arg
     // 检查SR寄存器的RXNE位，表示接收到了新数据
     uart_xfer_t *x = usart->uart_xfer;
-    if (!x) {
-        return true;
-    }
+    //if (!x) {
+    //    return true;
+    //}
     uint32_t sr = hal_uart_get_it_event(conf->id);
    // uint8_t data;
 
     // --- 接收中断 (RXNE) ---
     if (sr & xUART_FLAG_RXNE) {  // RXNE
-        if (x->rx_active && x->rx_index < x->rx_total) {
+        if (x && x->rx_active && x->rx_index < x->rx_total) {
             x->rx_buf[x->rx_index++] = *hal_uart_data_addr(conf->id);  // 读取数据自动清 RXNE
         }
-        if (x->rx_active && x->rx_index >= x->rx_total) {
+        if (x && x->rx_active && x->rx_index >= x->rx_total) {
             x->rx_active = false;
             hal_uart_clear_it_event(conf->id, xUART_IT_RXNE);// 关闭 RXNE 中断
             x->uart_rx_sem->fun->give(x->uart_rx_sem);
@@ -209,11 +250,15 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
 
     // --- 发送中断 (TXE) ---
     if (sr & xUART_FLAG_TXE) {  // TXE
-        if (x->tx_active && x->tx_index < x->tx_total) {
+        if (x && x->tx_active && x->tx_index < x->tx_total) {
             *hal_uart_data_addr(conf->id) = x->tx_buf[x->tx_index++];
         } else {
             // 缓冲区已空，关闭 TXE 中断，保留 TC 中断用于完成通知
             hal_uart_clear_it_event(conf->id, xUART_IT_TXE);
+            if (x && x->tx_active) {
+                x->tx_active = false;
+                x->uart_tx_sem->fun->give(x->uart_tx_sem);
+            }
         }
     }
 
@@ -222,9 +267,8 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
         // 清除 TC 标志：先读 SR，再写 DR 无效（TC 是软件清除，写0到SR的TC位）
         // 但 USART 的 TC 标志是通过写 0 清？实际上写 0 无效，需要读 SR + 写 DR？不，TC 清法：直接向 SR 的 TC 位写 0 即可（F4手册：通过对 USART_SR 寄存器的 TC 位写 0 来清除）
         hal_uart_clear_it_event(conf->id, xUART_IT_TC);
-        if (x->tx_active && x->tx_index >= x->tx_total) {
+        if (x && x->tx_active && x->tx_index >= x->tx_total) {
             x->tx_active = false;
-            hal_uart_clear_it_event(conf->id, xUART_IT_TC);// 关闭 TCIE
             x->uart_tx_sem->fun->give(x->uart_tx_sem);
         }
     }

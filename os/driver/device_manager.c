@@ -37,7 +37,7 @@ static const Device_list dev_lists[] = {
          .device_create = (Device_create) usart_create,},
         {.info = &(const device_info_t){.name = "usart1",
                   .id = DEVICE_USART1,
-                  .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                  .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_NORMAL, .sub_pripority = 0},
                   .conf = &usart1_conf,},
          .device_create = (Device_create) usart_create,},
         {.info = &(const device_info_t){.name = "timer2",
