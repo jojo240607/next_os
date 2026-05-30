@@ -40,9 +40,9 @@ void log_output(Log *self, log_level_t level, const char * tag, const char *fmt,
     }
 
     log_entry_t entry;
-    entry.timestamp = get_systime_us();
+    entry.timestamp = get_systime_us() ? get_systime_us()->time_us : 0;
     entry.level = (uint8_t)level;
-    entry.tid = global_thread_scheduler == NULL ? 0 : global_thread_scheduler->current_thread->tid;
+    entry.tid = (global_thread_scheduler && global_thread_scheduler->current_thread) ? global_thread_scheduler->current_thread->tid : 0;
     entry.tag = tag;
 
     va_list args;
@@ -69,7 +69,7 @@ void log_directly_error(Log *self, const char *fmt, ...) {
     Log_task *log_task = (Log_task *)self->log_task;
 
     log_entry_t entry;
-    entry.timestamp = get_systime_us();
+    entry.timestamp = get_systime_us()->time_us;
     entry.level = (uint8_t)LOG_LEVEL_ERROR;
     entry.tid = 0;
     entry.tag = "os_error";

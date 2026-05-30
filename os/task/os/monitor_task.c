@@ -70,8 +70,8 @@ task_thread_override(monitor_task_task_thread_impl) {
         mutex_lock_user(gloable_mutex, 0);
         LOG_DEBUG("monitor", "sleep 3s");
         sleep_user(3000);
-        uint32_t now = get_systime_us();
-        uint32_t run_time =  now - monitor_task->last_call;
+        uint64_t now = get_systime_us()->time_us;
+        uint64_t run_time =  now - monitor_task->last_call;
         monitor_task->last_call = now;
         LOG_DEBUG("monitor", "--------------------------------");
         LOG_DEBUG("monitor", "name      cpu     mem     stack");

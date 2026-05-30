@@ -6,6 +6,7 @@
 #include "../common/util.h"
 #include "../scheduler/mutex.h"
 #include "../log/log.h"
+#include "hal/hal_dwt.h"
 
 
 static uint32_t kstart_pendsv(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
@@ -15,6 +16,7 @@ static uint32_t ksem_give(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
 static uint32_t kmutex_lock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
 static uint32_t kmutex_unlock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
 static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
+static uint32_t kget_systime(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4);
 /* 系统调用表 */
 const svc_entry_t svc_entries[] = {
         { SVC_PEND_SVC, kstart_pendsv },
@@ -24,6 +26,7 @@ const svc_entry_t svc_entries[] = {
         { SVC_MUTEX_LOCK,  kmutex_lock },
         { SVC_MUTEX_UNLOCK,  kmutex_unlock },
         { SVC_DEVICE,    kdevice },
+        {SVC_GET_TIME_US, kget_systime },
         // ... 其他系统调用
 };
 
@@ -113,5 +116,9 @@ static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
             break;
     }
     return 1;
+}
+
+static uint32_t kget_systime(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    return (uint32_t) hal_dwt_get_timestamp_us();
 }
 

@@ -45,7 +45,8 @@ static uint64_t overflow_count = 0;          /* CYCCNT 溢出次数 (32位) */
 static uint32_t last_ticks = 0;              /* 上一次读取的 tick 值，用于溢出检测 */
 
 /* ── 系统时间戳 (微秒) 累计 ── */
-static uint64_t timestamp_us = 0;            /* 累计微秒数，低32位对应部分周期 */
+static sys_time_t time_stamp = {0};            /* 累计微秒数，低32位对应部分周期 */
+
 
 /* ===================================================================
    初始化
@@ -70,7 +71,7 @@ int hal_dwt_init()
     /* 4. 初始化溢出跟踪变量 */
     last_ticks = 0;
     overflow_count = 0;
-    timestamp_us = 0;
+    time_stamp.time_us = 0;
     return 0;
 }
 
@@ -128,7 +129,7 @@ uint32_t hal_dwt_elapsed_us(uint32_t start_ticks)
 /* ===================================================================
    获取系统时间戳 (微秒)，累计 64 位
    =================================================================== */
-uint64_t hal_dwt_get_timestamp_us(void)
+sys_time_t *hal_dwt_get_timestamp_us(void)
 {
     uint32_t current = xDWT->CYCCNT;
 
@@ -144,7 +145,7 @@ uint64_t hal_dwt_get_timestamp_us(void)
 
     /* 把 delta 转换为微秒，累加到总时间戳 */
     uint64_t us_delta = ((uint64_t)delta * 1000000ULL) / hal_rcc_get_system_clock();
-    timestamp_us += us_delta;
+    time_stamp.time_us += us_delta;
 
-    return timestamp_us;
+    return &time_stamp;
 }

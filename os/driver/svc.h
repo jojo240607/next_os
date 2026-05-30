@@ -38,9 +38,8 @@ static inline uint32_t device_user(const Device *device, const device_ctrl *ctrl
     return SVC_CALL2(SVC_DEVICE, device, ctrl);
 }
 
-static inline void task_exit_user(void) {
-    SVC_CALL0(SVC_TASK_EXIT);
-    while(1);
+static inline uint32_t get_systime_user() {
+    return SVC_CALL0(SVC_GET_TIME_US);
 }
 
 int system_svc_init(void);

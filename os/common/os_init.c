@@ -105,8 +105,8 @@ void os_init() {
     gloable_taskManager = task_manager_create();
     gloable_nvic = nvic_create();
     system_mpu_setup();
-    gloable_taskManager->fun->boot_init(gloable_taskManager);
     system_svc_init();
+    gloable_taskManager->fun->boot_init(gloable_taskManager);
     global_thread_scheduler->fun->start((Thread_scheduler *)global_thread_scheduler);
 }
 

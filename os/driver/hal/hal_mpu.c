@@ -263,7 +263,7 @@ void MemManage_Handler(void)
 const mpu_config_t mpu_cfg = {
         .enable_default_map = true,      // PRIVDEFENA = 1，特权模式背景区域
         .enable_background  = true,      // 使能背景区域
-        .num_regions        = 6,         // 使用了 6 个静态区域
+        .num_regions        = 7,         // 使用了 7 个静态区域
         .regions            = {
                 &(const mpu_region_config_t){/*区域 0: Flash 代码区 特权/用户只读，可执行*/
                         .region_num       = 0,
@@ -285,8 +285,18 @@ const mpu_config_t mpu_cfg = {
                         .execute_never    = true,            /* 禁止在 SRAM 中执行代码 (防御 ROP) */
                         .subregion_disable = 0
                 },
-                &(const mpu_region_config_t){/* 区域 2: 片内外设区 驱动层—— 特权可读写，用户无访问权限 */
+                &(const mpu_region_config_t){/* 区域 1: CCM RAM (数据区) —— 特权可读写，用户可读写 */
                         .region_num       = 2,
+                        .enable           = true,
+                        .base_address     = 0x10000000,
+                        .size             = MPU_SIZE_64K,  /* 如需保护所有 SRAM (包括可能的后128KB) 可用 MPU_SIZE_256K */
+                        .access           = MPU_ACCESS_FULL, /* MPU_ACCESS_PRIV_RW 特权读写，用户禁止/特权与用户均可读写 */
+                        .attribute        = MPU_ATTR_NORMAL,
+                        .execute_never    = true,            /* 禁止在 SRAM 中执行代码 (防御 ROP) */
+                        .subregion_disable = 0
+                },
+                &(const mpu_region_config_t){/* 区域 2: 片内外设区 驱动层—— 特权可读写，用户无访问权限 */
+                        .region_num       = 3,
                         .enable           = true,
                         .base_address     = 0x40000000,
                         .size             = MPU_SIZE_1M,
@@ -296,7 +306,7 @@ const mpu_config_t mpu_cfg = {
                         .subregion_disable = 0
                 },
                 &(const mpu_region_config_t){/* 区域 3: 外部存储器区 (FSMC) —— 特权可读写，用户可读写 */
-                        .region_num       = 3,
+                        .region_num       = 4,
                         .enable           = true,
                         .base_address     = 0x60000000,
                         .size             = MPU_SIZE_1M,
@@ -306,7 +316,7 @@ const mpu_config_t mpu_cfg = {
                         .subregion_disable = 0
                 },
                 &(const mpu_region_config_t){/* 区域 4: 系统区 (SCB/NVIC/MPU 等) —— 特权可读写，用户不可访问 */
-                        .region_num       = 4,
+                        .region_num       = 5,
                         .enable           = true,
                         .base_address     = 0xE0000000,
                         .size             = MPU_SIZE_1M,
@@ -316,7 +326,7 @@ const mpu_config_t mpu_cfg = {
                         .subregion_disable = 0
                 },
                 &(const mpu_region_config_t){/* 区域 5: 备份 SRAM (可选) —— 若使用备份域则保护 */
-                        .region_num       = 5,
+                        .region_num       = 6,
                         .enable           = true,
                         .base_address     = 0x40024000,
                         .size             = MPU_SIZE_4K,

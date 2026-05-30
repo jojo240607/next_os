@@ -39,11 +39,22 @@ void time_task_init(Time_task* self, const task_into_t *info) {
     def_task_start(self) = time_task_task_start_impl;
     self->timer = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_TIME2);
     self->adc = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ADC1);
-    self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
-    self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
-    self->wdg = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_WDG);
+   // self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
+   // self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
+   // self->wdg = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_WDG);
     self->pwm = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_PWM1);
 
+}
+
+
+// task_start method
+task_start_override(time_task_task_start_impl) {
+    // TODO: add task_start method
+    Time_task *time_task = (Time_task *)self;
+    //params
+    time_task->timer->vtable->dev_ioctl(time_task->timer, DEVICE_START, NULL);
+    time_task->pwm->vtable->dev_ioctl(time_task->pwm, DEVICE_START, NULL);//start pwm
+    //time_task->wdg->vtable->dev_ioctl(time_task->wdg, DEVICE_START, NULL);//watch dog
 }
 
 void time_task_deinit(Time_task* self) {
@@ -81,6 +92,7 @@ task_thread_override(time_task_task_thread_impl) {
         uint8_t rx[5];
         time_task->adc->fun->read_user(time_task->adc, &adc_data, 2);
         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
+        //get_systime_user();
         //GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
         //LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
         //uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
@@ -100,13 +112,4 @@ task_thread_override(time_task_task_thread_impl) {
 }
 
 
-// task_start method
-task_start_override(time_task_task_start_impl) {
-    // TODO: add task_start method
-    Time_task *time_task = (Time_task *)self;
-    //params 
-    time_task->timer->vtable->dev_ioctl(time_task->timer, DEVICE_START, NULL);
-    time_task->pwm->vtable->dev_ioctl(time_task->pwm, DEVICE_START, NULL);//start pwm
-    //time_task->wdg->vtable->dev_ioctl(time_task->wdg, DEVICE_START, NULL);//watch dog
-}
 

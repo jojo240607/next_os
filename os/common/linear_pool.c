@@ -33,7 +33,7 @@ static void linear_stack_allocator_init(linear_allocator_t *alloc) {
 }
 
 // 分配一块内存（不对齐，简单版） alignment 字节对齐
-static void* linear_alloc(linear_allocator_t *alloc, size_t num_bytes, size_t alignment) {
+static void* linear_alloc(linear_allocator_t *alloc, size_t num_bytes, byte_alignment_t alignment) {
     if (num_bytes > alloc->size) {
         noram_error();//没有内存里进入到死循环
         return NULL;   // 内存不足
@@ -68,14 +68,14 @@ void os_pool_init() {
     linear_stack_allocator_init(&gloable_stack_alloc);
 }
 void *os_malloc(size_t num_bytes) {
-    return linear_alloc(&gloable_alloc, num_bytes, 1);
+    return linear_alloc(&gloable_alloc, num_bytes, ALIGNMENT_4BYTE);
 }
 
-void *os_ccm_malloc(size_t num_bytes, size_t alignment) {
+void *os_ccm_malloc(size_t num_bytes, byte_alignment_t alignment) {
     return linear_alloc(&gloable_ccm_alloc, num_bytes, alignment);
 }
 
-void *os_stack_malloc(size_t num_bytes, size_t alignment) {
+void *os_stack_malloc(size_t num_bytes, byte_alignment_t alignment) {
     return linear_alloc(&gloable_stack_alloc, num_bytes, alignment);
 }
 

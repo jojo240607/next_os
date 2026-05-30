@@ -9,6 +9,10 @@
 
 #define ENABLE_CYCLE_COUNTER true
 
+typedef struct {
+    uint64_t time_us;
+} sys_time_t;
+
 /* ========== API ========== */
 int  hal_dwt_init();
 void hal_dwt_deinit(void);
@@ -24,6 +28,6 @@ void hal_dwt_delay_ms(uint32_t ms);
 uint32_t hal_dwt_elapsed_us(uint32_t start_ticks);
 
 /* 获取系统时间戳 (微秒)，基于周期计数器的累计值 (考虑 32 位溢出) */
-uint64_t hal_dwt_get_timestamp_us(void);
+sys_time_t *hal_dwt_get_timestamp_us(void);
 
 #endif //STM32F4DISCOVERY_HAL_DWT_H

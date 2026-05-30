@@ -16,15 +16,7 @@ typedef enum {
     SVC_MUTEX_LOCK    ,
     SVC_MUTEX_UNLOCK  ,
     SVC_DEVICE ,
-    SVC_SPI_TRANSFER  ,
-    SVC_I2C_TRANSFER  ,
-    SVC_DELAY_MS      ,
-    SVC_GET_TICK      ,
-    SVC_TASK_EXIT     ,
-
-    SVC_MPU_PROTECT  ,    // 动态任务栈保护
-    SVC_MALLOC       ,
-    SVC_FREE         ,
+    SVC_GET_TIME_US  ,
     SVC_MAX_ID
 } svc_number_t;
 

@@ -72,6 +72,7 @@ dev_init_override(systick_dev_init_impl) {
     if (!self->fun->config_irq(self, self->irq_conf)) {
         LOG_ERROR("systick", "attach SYSTIC_IRQ error");
     }
+    //gloable_sys_time->time_us = hal_dwt_get_timestamp_us()->time_us;
 }
 
 
@@ -80,7 +81,7 @@ bool systick_irq_handler_impl(nvic_irq_t *irq_conf) {
     // TODO: add irq_handler method
     //Systick *systick = (Systick *)arg;
     //params , void *arg
-    gloable_sys_time->systick++;
+    gloable_sys_time->time_us = hal_dwt_get_timestamp_us()->time_us;
     if (gloable_current_tcb->sp != NULL) {
         global_thread_scheduler->fun->delay_ticks(global_thread_scheduler);
         // 触发 PendSV 中断

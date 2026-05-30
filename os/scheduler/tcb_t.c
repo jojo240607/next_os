@@ -18,7 +18,7 @@ static const Tcb_tFun tcb_t_fun = {
 // 构造函数实现
 Tcb_t* tcb_t_create(const char *name, const thread_conf_t *conf) {
 
-    Tcb_t* obj = (Tcb_t*)os_ccm_malloc(sizeof(Tcb_t), 8);   //8字节对齐
+    Tcb_t* obj = (Tcb_t*)os_ccm_malloc(sizeof(Tcb_t), ALIGNMENT_8BYTE);   //8字节对齐
     if (obj) {
         memset(obj, 0, sizeof(Tcb_t));
         tcb_t_init(obj, name, conf);
@@ -29,7 +29,7 @@ Tcb_t* tcb_t_create(const char *name, const thread_conf_t *conf) {
 void tcb_t_init(Tcb_t* self, const char *name, const thread_conf_t *conf) {
     self->fun = &(tcb_t_fun);
     // TODO: 初始化数据成员
-    self->stack_ptr = os_stack_malloc((1 << conf->stack_size) + PROTECT_STACK_SIZE, 32);//32字节对齐
+    self->stack_ptr = os_stack_malloc((1 << conf->stack_size) + PROTECT_STACK_SIZE, ALIGNMENT_32BYTE);//32字节对齐
     memset(self->stack_ptr, 0, (1 << conf->stack_size) + PROTECT_STACK_SIZE);
     self->stack_ptr += PROTECT_STACK_SIZE >> 2;//32字节栈保护空间
     self->priority = conf->priority;
