@@ -43,6 +43,11 @@ typedef struct {
     Semaphore * uart_tx_sem;
     Semaphore * uart_rx_sem;
 } uart_xfer_t;
+
+typedef struct {
+    Semaphore * uart_tx_sem;
+    Semaphore * uart_rx_sem;
+} dma_sem_t;
 /* USART 引脚描述 */
 typedef struct {
     pin_af uart_tx;
@@ -65,7 +70,7 @@ struct _Usart {
     const UsartFun* fun;
     // TODO: 添加派生类特有的数据成员
     uart_xfer_t *uart_xfer;
-
+    dma_sem_t *dma_sem;
 };
 
 // 构造函数声明

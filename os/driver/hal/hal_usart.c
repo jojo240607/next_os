@@ -5,6 +5,7 @@
 #include "hal_usart.h"
 #include "../common/rcc.h"
 
+
 /* ---------- USART 寄存器 (STM32F4) ---------- */
 typedef struct {
     volatile uint32_t SR;
@@ -141,3 +142,12 @@ volatile uint8_t *hal_uart_data_addr(uart_id_t id) {
     return (volatile uint8_t *)&uart_ctrl->DR;
 }
 
+/* DMA 发送一个数据块 */
+int uart_send_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len)
+{
+    xUSART_TypeDef *uart_ctrl = USARTx[id];
+    // 假设 tx_dma 已经申请并记录在驱动内部（需要存储配置）
+    dma_start_transfer(dma_cfg, (uint32_t)data, (uint32_t)(&uart_ctrl->DR), len);
+   // while (!(uart_ctrl->SR & (1 << 6)));  // 等待 TC
+    return 0;
+}

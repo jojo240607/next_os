@@ -308,6 +308,57 @@ void I2C1_ER_IRQHandler() {
 void SPI1_IRQHandler() {
     nvic_dispatch(gloable_nvic, SPI1_IRQ);
 }
+
+void DMA1_Stream0_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST0_IRQ);
+}
+void DMA1_Stream1_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST1_IRQ);
+}
+void DMA1_Stream2_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST2_IRQ);
+}
+void DMA1_Stream3_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST3_IRQ);
+}
+void DMA1_Stream4_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST4_IRQ);
+}
+void DMA1_Stream5_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST5_IRQ);
+}
+void DMA1_Stream6_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST6_IRQ);
+}
+void DMA1_Stream7_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA1_ST7_IRQ);
+}
+void DMA2_Stream0_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA2_ST0_IRQ);
+}
+void DMA2_Stream1_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA2_ST1_IRQ);
+}
+void DMA2_Stream2_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA2_ST2_IRQ);
+}
+void DMA2_Stream3_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA2_ST3_IRQ);
+}
+void DMA2_Stream4_IRQHandler() {
+    nvic_dispatch(gloable_nvic, DMA2_ST4_IRQ);
+}
+void DMA2_Stream5_IRQHandler(){
+    nvic_dispatch(gloable_nvic, DMA2_ST5_IRQ);
+}
+void DMA2_Stream6_IRQHandler(){
+    nvic_dispatch(gloable_nvic, DMA2_ST6_IRQ);
+}
+void DMA2_Stream7_IRQHandler(){
+    nvic_dispatch(gloable_nvic, DMA2_ST7_IRQ);
+}
+
+
 void OTG_FS_IRQHandler(void)
 {
 

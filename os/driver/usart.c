@@ -102,22 +102,12 @@ dev_init_override(usart_dev_init_impl) {
 
     hal_uart_enable(conf->id);
 
-    // 6. 中断配置
-    if (hal_uart_it_init(conf->id, conf->it_enable)) {
-        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, USART1_IRQ + conf->id);
-        self->irq_conf->handler = usart_irq_handler_impl;
-        self->irq_conf->arg = self;
-        if (!self->fun->config_irq(self, self->irq_conf)) {
-            LOG_ERROR("systick", "attach irq %d error", USART1_IRQ + conf->id);
-        }
-        if (!usart->uart_xfer) {
-            usart->uart_xfer = os_malloc(sizeof(uart_xfer_t));
-            memset(usart->uart_xfer, 0, sizeof(uart_xfer_t));
-            usart->uart_xfer->uart_tx_sem = semaphore_create(0);
-            usart->uart_xfer->uart_rx_sem = semaphore_create(0);
-        }
-    }
+
     if (conf->dma_cfg) {
+        if (!usart->dma_sem) {
+            usart->dma_sem = os_malloc(sizeof(dma_sem_t));
+            memset(usart->dma_sem, 0, sizeof(dma_sem_t));
+        }
         if (conf->dma_cfg->tx_dma) {
             if (dma_stream_request(conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
                 // 申请失败，回滚
@@ -131,21 +121,39 @@ dev_init_override(usart_dev_init_impl) {
                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->tx_dma));
                 self->fun->config_irq(self, self->irq_conf);
             }
+            usart->dma_sem->uart_tx_sem = semaphore_create(0);
         }
         if (conf->dma_cfg->rx_dma) {
             if (dma_stream_request(conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
                 //goto error;
+                LOG_ERROR("usart", "dma request error");
                 return;
             }
             if (conf->dma_cfg->rx_dma->it_enable) {
                 self->irq_conf->handler = usart_rxdma_irq_handler_impl;
                 self->irq_conf->arg = self;
-
                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->rx_dma));
                 self->fun->config_irq(self, self->irq_conf);
             }
+            usart->dma_sem->uart_rx_sem = semaphore_create(0);
         }
         hal_uart_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
+
+
+    } else if (hal_uart_it_init(conf->id, conf->it_enable)) {
+        // 6. 中断配置
+        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, USART1_IRQ + conf->id);
+        self->irq_conf->handler = usart_irq_handler_impl;
+        self->irq_conf->arg = self;
+        if (!self->fun->config_irq(self, self->irq_conf)) {
+            LOG_ERROR("systick", "attach irq %d error", USART1_IRQ + conf->id);
+        }
+        if (!usart->uart_xfer) {
+            usart->uart_xfer = os_malloc(sizeof(uart_xfer_t));
+            memset(usart->uart_xfer, 0, sizeof(uart_xfer_t));
+            usart->uart_xfer->uart_tx_sem = semaphore_create(0);
+            usart->uart_xfer->uart_rx_sem = semaphore_create(0);
+        }
     }
 
 }
@@ -184,7 +192,8 @@ dev_write_override(usart_dev_write_impl) {
     //params , const void *buf, size_t count
     // 检查发送数据寄存器是否为空 (TXE标志位)
     if (conf->dma_cfg) {
-
+        uart_send_dma(conf->id, conf->dma_cfg->tx_dma, (uint8_t *) buf, count);
+        usart->dma_sem->uart_tx_sem->fun->take(usart->dma_sem->uart_tx_sem);
     } else if (conf->it_enable) {
         uart_xfer_t *x = usart->uart_xfer;
         if (!x) {
@@ -230,9 +239,6 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
     //params , void *arg
     // 检查SR寄存器的RXNE位，表示接收到了新数据
     uart_xfer_t *x = usart->uart_xfer;
-    //if (!x) {
-    //    return true;
-    //}
     uint32_t sr = hal_uart_get_it_event(conf->id);
    // uint8_t data;
 
@@ -286,6 +292,7 @@ static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
     dma_clear_flag(conf->dma_cfg->tx_dma);
+    usart->dma_sem->uart_tx_sem->fun->give(usart->dma_sem->uart_tx_sem);
     return true;
 }
 

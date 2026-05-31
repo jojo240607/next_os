@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "stdint.h"
+#include "hal_dma.h"
+#include "../common/dma.h"
 
 #define xUSART1_BASE  0x40011000UL
 #define xUSART2_BASE  0x40004400UL
@@ -82,5 +84,6 @@ uint32_t hal_uart_get_it_event(uart_id_t id);
 void hal_uart_set_it_event(uart_id_t id, uart_it_t it_event);
 void hal_uart_clear_it_event(uart_id_t id, uart_it_t it_event);
 volatile uint8_t *hal_uart_data_addr(uart_id_t id);
+int uart_send_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len);
 
 #endif //STM32F4DISCOVERY_HAL_USART_H

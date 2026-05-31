@@ -14,8 +14,8 @@ static inline xDMA_Stream_TypeDef* DMA_Stream(const dma_stream_config_t *cfg)
 
 /* 全局流占用表 */
 typedef struct {
-    bool                 allocated;
     dma_stream_config_t  config;
+    bool                 allocated;
 } dma_stream_state_t;
 
 static dma_stream_state_t *dma_states[xDMA_CONTROLLER_MAX][8];
@@ -59,13 +59,25 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     /* 设置通道 */
     uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
     /* 方向：注意 bit6=DIR, bit7=DIR 搭配？参考手册：位6/7用于方向控制（双缓冲模式下） */
+    /*  #define DMA_SxCR_DIR_0           (0x1UL << DMA_SxCR_DIR_Pos)                    !< 0x00000040
+        #define DMA_SxCR_DIR_1           (0x2UL << DMA_SxCR_DIR_Pos)                    !< 0x00000080
+     *  #define DMA_PERIPH_TO_MEMORY          0x00000000U                 //!< Peripheral to memory direction
+        #define DMA_MEMORY_TO_PERIPH          ((uint32_t)DMA_SxCR_DIR_0) 1 //!< Memory to peripheral direction
+        #define DMA_MEMORY_TO_MEMORY          ((uint32_t)DMA_SxCR_DIR_1) 2 //!< Memory to memory direction
+     * */
     if (cfg->direction == DMA_DIR_P2M) {
         cr |= (0x00 << 6);   /* 外设到存储器 */
     } else if (cfg->direction == DMA_DIR_M2P) {
-        cr |= (0x02 << 6);   /* 存储器到外设 */
+        cr |= (0x01 << 6);   /* 存储器到外设 */
     } else {
-        cr |= (0x01 << 6);   /* 存储器到存储器 */
+        cr |= (0x02 << 6);   /* 存储器到存储器 */
     }
+    /*
+     * PFCTRL = 0：DMA 控制流（这是你需要的）。DMA 会在传输完设定的所有数据后自动停止。
+     * PFCTRL = 1：外设控制流。
+     *
+     * */
+    cr |= (0x0 << 5);
     /* 优先级 */
     cr |= (cfg->priority & 0x3) << 16;
     /* 数据宽度 */
@@ -138,13 +150,17 @@ int dma_start_transfer(const dma_stream_config_t *cfg,
     /* 停止当前传输 */
     dma->SxCR &= ~(1 << 0);
     /* 清除标志 */
-    dma_clear_flag(cfg);
+    //dma_clear_flag(cfg);
     /* 设置地址和数量 */
     dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
     dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
     dma->SxNDTR = count;
     /* 使能流 */
     dma->SxCR |= 1;
+    // 轮询 TC 标志（例如 DMA2_Stream7）
+    //uint32_t base = DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(cfg->dma_request));
+    //xDMA_Base_TypeDef *dma2 = (xDMA_Base_TypeDef *)base;
+    //while (!(dma2->HISR & (1 << 26))); // TCIF7 位，请根据实际流调整
     return DMA_SUCCESS;
 }
 
@@ -188,7 +204,10 @@ void dma_clear_flag(const dma_stream_config_t *cfg) {
         base->LIFCR = mask;  // 写1清除
     } else {
         uint32_t mask = 0x3F << ((DMA_REQ_GET_STREAM(cfg->dma_request) - 4) * 6 + 0);
-        base->HIFCR = mask;
+        mask |= ( (1 << 26) | (1 << 24) | (1 << 25) );
+        uint32_t flags = base->HISR;  // 读取所有挂起标志
+        base->HIFCR = flags;          // 写 1 清所有对应位
+        //base->HIFCR = 0xFFFFFFFF;//mask;
     }
 }
 

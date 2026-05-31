@@ -63,7 +63,32 @@ const usart_config_t usart1_conf = {
                 .uart_rx = PA10_REQ_USART1_RX,
         },
         .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
-        .dma_cfg = NULL,
+        .dma_cfg = &(const uart_dma_config_t) {
+                .tx_dma = &(const dma_stream_config_t) {
+                        .dma_request    = DMA2_REQ_USART1_TX,
+                        .direction      = DMA_DIR_M2P,
+                        .priority       = xDMA_PRIORITY_HIGH,
+                        .mem_data_size  = DMA_DATA_SIZE_BYTE,
+                        .per_data_size  = DMA_DATA_SIZE_BYTE,
+                        .mem_inc        = 1,
+                        .per_inc        = 0,
+                        .mode           = DMA_MODE_NORMAL,     // 单次发送
+                        .fifo_mode      = DMA_FIFO_DIRECT,
+                        .it_enable      = xDMA_IT_TC,           // 只使能传输完成中断
+                },
+                .rx_dma = &(const dma_stream_config_t) {
+                        .dma_request    = DMA2_REQ_USART1_RX_ST2,
+                        .direction      = DMA_DIR_P2M,
+                        .priority       = xDMA_PRIORITY_HIGH,
+                        .mem_data_size  = DMA_DATA_SIZE_BYTE,
+                        .per_data_size  = DMA_DATA_SIZE_BYTE,
+                        .mem_inc        = 1,
+                        .per_inc        = 0,
+                        .mode           = DMA_MODE_CIRCULAR, // 接收推荐循环模式
+                        .fifo_mode      = DMA_FIFO_DIRECT,
+                        .it_enable      = xDMA_IT_NONE,                 // 直接读取缓冲区则无需中断
+                },
+        },
 };
 
 const usart_config_t usart4_conf = {

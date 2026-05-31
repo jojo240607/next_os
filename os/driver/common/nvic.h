@@ -153,5 +153,24 @@ void EXTI15_10_IRQHandler();
 void I2C1_EV_IRQHandler();
 void I2C1_ER_IRQHandler();
 void SPI1_IRQHandler();
+
+void DMA1_Stream0_IRQHandler();
+void DMA1_Stream1_IRQHandler();
+void DMA1_Stream2_IRQHandler();
+void DMA1_Stream3_IRQHandler();
+void DMA1_Stream4_IRQHandler();
+void DMA1_Stream5_IRQHandler();
+void DMA1_Stream6_IRQHandler();
+void DMA1_Stream7_IRQHandler();
+
+void DMA2_Stream0_IRQHandler();
+void DMA2_Stream1_IRQHandler();
+void DMA2_Stream2_IRQHandler();
+void DMA2_Stream3_IRQHandler();
+void DMA2_Stream4_IRQHandler();
+void DMA2_Stream5_IRQHandler();
+void DMA2_Stream6_IRQHandler();
+void DMA2_Stream7_IRQHandler();
+
 void OTG_FS_IRQHandler(void);
 #endif // NVIC_H
