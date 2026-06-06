@@ -226,6 +226,14 @@ dev_write_override(usart_dev_write_impl) {
     //params , const void *buf, size_t count
     // 检查发送数据寄存器是否为空 (TXE标志位)
     if (conf->dma_cfg) {
+        uart_xfer_t *x = usart->uart_xfer;
+        if (!x) {
+            return;
+        }
+        if (x->tx_user_active) {
+            return;   // 上次传输未结束
+        }
+        x->tx_user_active = true;
         uart_send_dma(conf->id, conf->dma_cfg->tx_dma, (uint8_t *) buf, count);
         usart->uart_xfer->uart_tx_sem->fun->take(usart->uart_xfer->uart_tx_sem);
     } else if (conf->it_enable) {
@@ -360,8 +368,10 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
 
 static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
+    uart_xfer_t *tx = usart->uart_xfer;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
     dma_clear_flag(conf->dma_cfg->tx_dma);
+    tx->tx_user_active = false;
     usart->uart_xfer->uart_tx_sem->fun->give(usart->uart_xfer->uart_tx_sem);
     return true;
 }
@@ -386,9 +396,10 @@ static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf) {
         if (!conf->dma_cfg || !conf->dma_cfg->rx_dma) {
             return true;
         }
+
         uart_xfer_t *rx = usart->uart_xfer;
         hal_uart_clear_idle_flag(conf->id, conf->dma_cfg->rx_dma);
-        uint16_t cur_ndtr = uart_dma_get_rx_ndtr(conf->dma_cfg->rx_dma);
+        volatile uint16_t cur_ndtr = uart_dma_get_rx_ndtr(conf->dma_cfg->rx_dma);
 
         size_t dma_pos = usart->rx_cache_buf->size - cur_ndtr;
         ringbuf_dma_update(usart->rx_cache_buf, dma_pos);

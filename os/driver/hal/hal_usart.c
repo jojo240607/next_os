@@ -206,20 +206,20 @@ void hal_uart_clear_idle_flag(uart_id_t id, const dma_stream_config_t *dma_cfg)
 {
     xUSART_TypeDef *uart = USARTx[id];
 
-    /* 获取 DMA 流寄存器指针 */
-    uint32_t stream_base = (DMA_REQ_GET_CTRL(dma_cfg->dma_request) == DMA_1) ?
-            DMA1_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request)) :
-            DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request));
-    xDMA_Stream_TypeDef *dma = (xDMA_Stream_TypeDef *)stream_base;
+//   /* 获取 DMA 流寄存器指针 */
+//   uint32_t stream_base = (DMA_REQ_GET_CTRL(dma_cfg->dma_request) == DMA_1) ?
+//           DMA1_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request)) :
+//           DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request));
+//   xDMA_Stream_TypeDef *dma = (xDMA_Stream_TypeDef *)stream_base;
 
-    /*
-     * ① 暂停 DMA 流 —— 手册要求先关流再处理 DR
-     *    只清 EN(bit0)，保留所有配置（方向、循环、通道等）
-     *    NDTR 不会重载，保持当前值
-     */
-    uint32_t sxcr_saved = dma->SxCR;
-    dma->SxCR = sxcr_saved & ~1U;
-    __asm volatile ("dsb" ::: "memory");
+//   /*
+//    * ① 暂停 DMA 流 —— 手册要求先关流再处理 DR
+//    *    只清 EN(bit0)，保留所有配置（方向、循环、通道等）
+//    *    NDTR 不会重载，保持当前值
+//    */
+//   uint32_t sxcr_saved = dma->SxCR;
+//   dma->SxCR = sxcr_saved & ~1U;
+//   __asm volatile ("dsb" ::: "memory");
 
     /*
      * ② CPU 独占 DR，安全清除 IDLE
@@ -230,10 +230,10 @@ void hal_uart_clear_idle_flag(uart_id_t id, const dma_stream_config_t *dma_cfg)
     (void)sr_val;
     (void)dr_val;
 
-    /*
-     * ③ 恢复 DMA 流
-     *    SxCR 全部恢复（含 EN=1），NDTR 不变 → DMA 无缝续传
-     */
-    dma->SxCR = sxcr_saved;
-    __asm volatile ("dsb" ::: "memory");
+//   /*
+//    * ③ 恢复 DMA 流
+//    *    SxCR 全部恢复（含 EN=1），NDTR 不变 → DMA 无缝续传
+//    */
+//   dma->SxCR = sxcr_saved;
+//   __asm volatile ("dsb" ::: "memory");
 }

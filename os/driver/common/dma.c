@@ -117,7 +117,7 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     /* FIFO 配置 */
     uint32_t fcr = 0;
     if (cfg->fifo_mode == DMA_FIFO_ENABLE) {
-        fcr |= (1 << 2);        /* DMDIS=0, 使能直接模式？实际手册：FCR bit2 为 DMDIS，置0表示直接模式禁止，即使用FIFO */
+        fcr |= (1 << 2);        /* DMDIS=0, 使能直接模式？实际手册：FCR bit2 为 DMDIS，置0表示直接模式，1禁止，即使用FIFO */
         fcr |= (0x3 << 0);      /* FTH 满阈值，例如 1/2 */
     }
     dma->SxFCR = fcr;

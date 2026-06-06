@@ -12,7 +12,7 @@
 #define GET_TASK_MANAGER(obj) ((Task_manager *)obj)
 
 //  __DSB() 确保所有内存访问完成
-//#define USE_CCMRAM
+#define USE_CCMRAM
 
 #ifdef USE_CCMRAM
 #define STACKRAM __attribute__((section(".ccmram"), aligned(32))) //32字节对齐

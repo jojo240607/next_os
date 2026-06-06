@@ -59,7 +59,7 @@ void uart_dma_test_init(UartDmaTest* self, const task_into_t *info)
     def_task_start(self)  = uart_dma_test_start_impl;
 
     /* 通过设备管理器打开 USART1（会自动完成 DMA TX/RX 初始化） */
-    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
+    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
     self->send_count = 0;
     self->recv_count = 0;
 
@@ -138,7 +138,7 @@ task_thread_override(uart_dma_test_thread_impl)
         LOG_DEBUG("uart_dma", "------------------------------Waiting for DMA receive...");
         //test->usart1->vtable->dev_read(test->usart1, rx_buffer, sizeof(rx_buffer) - 1);
         test->usart4->fun->read_user(test->usart4, test->rx_buffer, sizeof(test->rx_buffer) - 1);
-        LOG_DEBUG("uart_dma","xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxread_user %s", test->rx_buffer);
+        LOG_DEBUG("uart_dma","\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxread_user %s\n\n", test->rx_buffer);
         /* 确保字符串终止 */
         test->rx_buffer[sizeof(test->rx_buffer) - 1] = '\0';
         int rx_len = 0;
@@ -158,16 +158,16 @@ task_thread_override(uart_dma_test_thread_impl)
 
         /* ──── 3. DMA 发送回显 ──── */
         if (rx_len > 0) {
-            char echo_buf[300];
-            int echo_len = snprintf(echo_buf, sizeof(echo_buf),
-                                    "[Echo #%lu] You sent: %s\r\n",
+
+            int echo_len = snprintf(test->echo_buf, sizeof(test->echo_buf),
+                                    "\n\n\n----------------------[Echo #%lu] You sent: %s\r\n",
                                     (unsigned long)test->recv_count, test->rx_buffer);
             //test->usart1->vtable->dev_write(test->usart1, echo_buf, echo_len);
-            test->usart4->fun->write_user(test->usart4, echo_buf, echo_len);
+            test->usart4->fun->write_user(test->usart4, test->echo_buf, echo_len);
             LOG_DEBUG("uart_dma", "Echo reply sent: %d bytes", echo_len);
         }
 
         /* 每秒一轮 */
-        sleep_user(10);
+        sleep_user(1000);
     }
 }

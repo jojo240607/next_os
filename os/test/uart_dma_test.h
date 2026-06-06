@@ -24,6 +24,7 @@ struct _UartDmaTest {
     uint32_t recv_count;     /* 接收计数 */
     char tx_buffer[128];
     char rx_buffer[256];
+    char echo_buf[300];
 };
 
 /* 构造函数声明 */

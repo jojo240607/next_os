@@ -136,21 +136,21 @@ task_thread_override(time_task_task_thread_impl) {
          *   WHO_AM_I (reg 0x00) 读: (0x00 << 1) | 1 = 0x01
          *   响应在第一字节的下一字节 (rx[1])
          */
-        uint8_t data = ICM20948_ReadReg(time_task->spi, 0x00);
-        LOG_DEBUG("time_task", "ICM20948 WHO_AM_I: data=%02x (expect EA)", data);
-        uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
-        uint8_t write_val = 0xA5;
-        uint8_t read_val = 0;
-
-        /* ── ADXL345 I2C 轮询读 DEVID ── */
-        uint8_t adxl_addr = 0x53;
-        time_task->i2c->fun->ioctl_user(time_task->i2c,
-                                         I2C_IOCTL_SET_ADDR, &adxl_addr);
-        uint8_t reg = 0x00;   // DEVID 寄存器
-        time_task->i2c->fun->write_user(time_task->i2c, &reg, 1);
-        uint8_t devid = 0;
-        time_task->i2c->fun->read_user(time_task->i2c, &devid, 1);
-        LOG_DEBUG("time_task", "ADXL345 DEVID: %02x (expect E5)", devid);
+//        uint8_t data = ICM20948_ReadReg(time_task->spi, 0x00);
+//        LOG_DEBUG("time_task", "ICM20948 WHO_AM_I: data=%02x (expect EA)", data);
+//        uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
+//        uint8_t write_val = 0xA5;
+//        uint8_t read_val = 0;
+//
+//        /* ── ADXL345 I2C 轮询读 DEVID ── */
+//        uint8_t adxl_addr = 0x53;
+//        time_task->i2c->fun->ioctl_user(time_task->i2c,
+//                                         I2C_IOCTL_SET_ADDR, &adxl_addr);
+//        uint8_t reg = 0x00;   // DEVID 寄存器
+//        time_task->i2c->fun->write_user(time_task->i2c, &reg, 1);
+//        uint8_t devid = 0;
+//        time_task->i2c->fun->read_user(time_task->i2c, &devid, 1);
+//        LOG_DEBUG("time_task", "ADXL345 DEVID: %02x (expect E5)", devid);
         //GET_WDG(time_task->wdg)->fun->iwdg_reload();
         //LOG_DEBUG("time_task", "feed watch dog");
     }

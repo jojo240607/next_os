@@ -40,7 +40,7 @@ typedef struct {
 typedef struct {
     uart_cache_t *tx_user_buf;
     uart_cache_t *rx_user_buf;
-    bool           tx_user_active;
+    volatile bool  tx_user_active;
     volatile bool  rx_user_active;      /* dev_read 是否在等待 */
     Semaphore * uart_tx_sem;
     Semaphore * uart_rx_sem;

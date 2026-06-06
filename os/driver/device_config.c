@@ -104,7 +104,7 @@ const usart_config_t usart4_conf = {
         },
         .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
         .cache_size = 64,
-        .dma_cfg = NULL/*&(const uart_dma_config_t) {
+        .dma_cfg = &(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
                     .dma_request    = DMA1_REQ_UART4_TX,
                     .direction      = DMA_DIR_M2P,
@@ -129,7 +129,7 @@ const usart_config_t usart4_conf = {
                     .fifo_mode      = DMA_FIFO_DIRECT,
                     .it_enable      = 0,                 // 直接读取缓冲区则无需中断
                 },
-        },*/
+        },
 };
 
 const exti_config_t exti_conf = {
