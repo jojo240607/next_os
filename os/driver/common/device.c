@@ -140,7 +140,9 @@ static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg) {
             .cmd = DEVICE_IOCTL,
             .buf = &trans_conf,
     };
+    mutex_lock_user(self->write_mutex, 1000);     //添加互斥锁，防止多线程调用
     device_user(self, &ctrl);
+    mutex_unlock_user(self->write_mutex);     //添加互斥锁，防止多线程调用
 }
 
 
