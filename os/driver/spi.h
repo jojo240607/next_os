@@ -7,76 +7,86 @@
 #include "common/dma.h"
 #include "common/gpio.h"
 #include "hal/hal_spi.h"
+#include "../common/ringbuf.h"
 
-#define GET_SPI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(SpiVTable **)obj)
 #define GET_SPI(obj) ((Spi *)obj)
-
-// 派生类声明
-typedef struct _Spi Spi;
-typedef struct _SpiFun SpiFun;
 
 /* SPI 引脚描述 */
 typedef struct {
     pin_af sck_pin;
     pin_af miso_pin;
     pin_af mosi_pin;
-    pin_af nss_pin;    /* 若使用软件 NSS 可忽略 */
+    pin_af nss_pin;
+    gpio_t cs_pin;
 } spi_pins_t;
 
 typedef struct {
     const dma_stream_config_t *tx_dma;
     const dma_stream_config_t *rx_dma;
 } spi_dma_config_t;
+
 /* SPI 配置描述符 */
 typedef struct {
     spi_id_t            id;
-    spi_mode_t          mode;           /* SPI_MODE_0..3 */
-    spi_frame_t         frame_format;   /* SPI_FRAME_8BIT / SPI_FRAME_16BIT */
-    spi_br_t            baudrate_div;   /* SPI_BR_DIVx */
-    spi_slave_mode_t    master;         /* SPI_MASTER / SPI_SLAVE */
+    spi_mode_t          mode;
+    spi_frame_t         frame_format;
+    spi_br_t            baudrate_div;
+    spi_slave_mode_t    master;
+    spi_first_bit_t     first_bit;      /* MSB/LSB 优先 */
+    spi_nss_mode_t      nss_mode;       /* 软件/硬件 NSS */
     spi_pins_t          pins;
-    /* 中断配置 (可选) */
-    //如果同时使用了 SPI 的 TX/RX DMA，DMA 本身的中断可以用来通知传输完成。这时 SPI 外设中断通常不需要打开 TXE/RXNE，而是依赖 DMA 的 TC 中断。
-    spi_it_t             it_enable;      // xSPI_IT_TXE | xSPI_IT_RXNE | xSPI_IT_ERR
-    /* DMA 可选 */
-    const spi_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
+    spi_it_t            it_enable;
+    uint16_t            cache_size;
+    const spi_dma_config_t *dma_cfg;
 } spi_config_t;
 
-/* ---------- 中断传输状态 ---------- */
+/* ---------- 传输状态 ---------- */
+typedef struct {
+    uint8_t    *buf;        /* 循环接收缓冲区 */
+    uint16_t    buf_size;   /* 缓冲区总大小 */
+    uint16_t    pos;        /* 实际写入区域大小 */
+} spi_cache_t;
+
+typedef struct {
+    spi_cache_t *tx_user_buf;
+    spi_cache_t *rx_user_buf;
+    bool           active;
+    Semaphore     *spi_sem;          /* 传输完成信号量 (IT/DMA 模式) */
+} spi_xfer_t;
+
+/*
+ * ─── Device VTable 的 override（用户通过 SVC 调用） ───
+ * dev_read(spi, buf, count)  → 从 RX cache 取 dev_write 期间收到的数据
+ * dev_write(spi, buf, count) → SPI 全双工传输（IT/DMA/阻塞），RX→cache
+ * dev_ioctl(spi, cmd, arg)   → 扩展配置
+ */
+//#define SPI_IOCTL_TRANSFER   0x70  /* arg = spi_transfer_args_t*, 直接指定 tx+rx */
+
 typedef struct {
     const uint8_t *tx_buf;
     uint8_t       *rx_buf;
-    uint16_t       total_len;
-    uint16_t       tx_index;
-    uint16_t       rx_index;
-    bool           active;
-    Semaphore * spi_tx_sem;
-    Semaphore * spi_rx_sem;
-} spi_xfer_t;
+    uint16_t       len;
+} spi_transfer_args_t;
 
-// 类成员函数结构
+// 派生类
+typedef struct _Spi Spi;
+typedef struct _SpiFun SpiFun;
+
 struct _SpiFun {
     void (*destroy)(Spi* self);
-	void (*transfer)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
-
-	void (*transfer_dma)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
-
-	void (*transfer_it)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
-
 };
+
 struct _Spi {
-    Device base;  // 基类作为第一个成员
+    Device base;
     const SpiFun* fun;
-    // TODO: 添加派生类特有的数据成员
     spi_xfer_t *spi_xfer;
-
+    //RingBuf *rx_cache_buf;
+    const gpio_t* cs_pin;//软件cs
 };
 
-// 构造函数声明
+/* 构造函数 */
 Spi* spi_create(const device_info_t *info);
 void spi_init(Spi* self, const device_info_t *info);
-
-// 析构函数声明
 void spi_deinit(Spi* self);
 
 #endif // SPI_H

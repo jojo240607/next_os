@@ -4,14 +4,14 @@
 /* ---------- 原子置位/复位 (基于 BSRR) ---------- */
 void gpio_set(const gpio_t *gpio_conf)
 {
-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
+    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
         GPIOx[gpio_conf->port]->BSRR = (1U << gpio_conf->pin);   // 低16位写1置位
     }
 }
 
 void gpio_reset(const gpio_t *gpio_conf)
 {
-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
+    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
         GPIOx[gpio_conf->port]->BSRR = (1U << (gpio_conf->pin + 16)); // 高16位写1复位
     }
 }
@@ -27,7 +27,7 @@ void gpio_write(const gpio_t *gpio_conf, bool value)
 /* ---------- 翻转 (读 ODR 并写回取反) ---------- */
 void gpio_toggle(const gpio_t *gpio_conf)
 {
-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
+    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
         uint32_t odr = GPIOx[gpio_conf->port]->ODR;
         if (odr & (1U << gpio_conf->pin))
             gpio_reset(gpio_conf);

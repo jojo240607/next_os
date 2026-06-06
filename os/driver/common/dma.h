@@ -58,9 +58,6 @@ typedef enum :uint8_t {
 } dma_it_t;
 /* DMA 流配置描述符 */
 typedef struct {
-    //dma_controller_t        controller;  /* DMA1 或 DMA2 */
-    //dma_stream_t            stream;      /* 0..7 */
-    //uint8_t                 channel;     /* 通道 0..7 */
     dma_request_t           dma_request;
     dma_dir                 direction;   /* DMA_DIR_xxx */
     dma_priority            priority;    /* DMA_PRIORITY_xxx */

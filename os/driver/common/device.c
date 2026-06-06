@@ -9,7 +9,7 @@ static bool device_config_irq(Device* self, const irq_config *conf);
 
 static void device_dev_read_user(Device* self, void *buf, size_t count);
 static void device_dev_write_user(Device* self, const void *buf, size_t count);
-static void device_dev_ioctl_user(Device* self, int cmd, void *arg);
+static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg);
 
 static bool device_attach_irq(Device* self, Task *task);
 
@@ -125,10 +125,13 @@ static void device_dev_write_user(Device* self, const void *buf, size_t count) {
     device_user(self, &ctrl);
 }
 // dev_ioctl_user method
-static void device_dev_ioctl_user(Device* self, int cmd, void *arg) {
+static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg) {
+
+    device_transfer_conf_t trans_conf = {.cmd = cmd,
+                                         .conf = arg};
     const device_ctrl ctrl = {
             .cmd = DEVICE_IOCTL,
-            .buf = arg,
+            .buf = &trans_conf,
     };
     device_user(self, &ctrl);
 }

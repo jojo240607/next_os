@@ -15,6 +15,7 @@ flash_controller: MTD.STM32F4_FlashController @ {
 
 usart1: UART.STM32_UART @ sysbus <0x40011000, +0x100>
     -> nvic@37
+    DMARequest -> dma2@2
 
 usart2: UART.STM32_UART @ sysbus <0x40004400, +0x100>
     -> nvic@38
@@ -24,6 +25,7 @@ usart3: UART.STM32_UART @ sysbus <0x40004800, +0x100>
 
 uart4: UART.STM32_UART @ sysbus <0x40004C00, +0x100>
     -> nvic@52
+    DMARequest -> dma1@2
 	
 uart5: UART.STM32_UART @ sysbus <0x40005000, +0x100>
     -> nvic@53
@@ -132,16 +134,22 @@ rom2: Memory.MappedMemory @ sysbus 0x1FFFC400
 
 spi1: SPI.STM32SPI @ sysbus 0x40013000
     IRQ->nvic@35
+    DMARecieve->dma2@2
+    //DMASend->dma2@3
 
 spi2: SPI.STM32SPI @ sysbus 0x40003800
     IRQ->nvic@36
     DMARecieve->dma1@3
+    //            DMAReceive = new GPIO();
+    //              DMASend = new GPIO();
 
 spi3: SPI.STM32SPI @ sysbus 0x40003C00
 
 i2c1: I2C.STM32F4_I2C @ sysbus 0x40005400
     EventInterrupt -> nvic@31
     ErrorInterrupt -> nvic@32
+    TxDMARequest -> dma1@6
+    RxDMARequest -> dma1@0
 
 i2c2: I2C.STM32F4_I2C @ sysbus 0x40005800
     EventInterrupt -> nvic@33

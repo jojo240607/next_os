@@ -6,6 +6,7 @@
 #include "common/pinmux.h"
 #include "common/dma.h"
 #include "hal/hal_usart.h"
+#include "../common/ringbuf.h"
 
 #define GET_USART(obj) ((Usart *)obj)
 #define DEFAULT_RX_BUFFER (256)
@@ -15,10 +16,10 @@ typedef struct _UsartFun UsartFun;
 // 类成员函数结构
 struct _UsartFun {
     void (*destroy)(Usart* self);
-	void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
-	void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
-    void (*send)(Usart* self, const uint8_t *data, uint16_t len);
-    void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
+	//void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
+	//void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
+    //void (*send)(Usart* self, const uint8_t *data, uint16_t len);
+    //void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
 
 };
 
@@ -32,22 +33,19 @@ typedef struct {
 
 /* ---------- 中断传输状态 ---------- */
 typedef struct {
-    const uint8_t *tx_buf;
-    uint8_t       *rx_buf;
-    uint16_t       tx_total;
-    uint16_t       tx_index;
-    uint16_t       rx_total;
-    uint16_t       rx_index;
-    bool           tx_active;
-    bool           rx_active;
+    uint8_t    *buf;        /* 循环接收缓冲区 */
+    uint16_t    buf_size;   /* 缓冲区总大小 */
+    uint16_t    pos;        /* 实际写入区域大小 */
+} uart_cache_t;
+typedef struct {
+    uart_cache_t *tx_user_buf;
+    uart_cache_t *rx_user_buf;
+    bool           tx_user_active;
+    volatile bool  rx_user_active;      /* dev_read 是否在等待 */
     Semaphore * uart_tx_sem;
     Semaphore * uart_rx_sem;
 } uart_xfer_t;
 
-typedef struct {
-    Semaphore * uart_tx_sem;
-    Semaphore * uart_rx_sem;
-} dma_sem_t;
 /* USART 引脚描述 */
 typedef struct {
     pin_af uart_tx;
@@ -61,6 +59,7 @@ typedef struct {
     uart_parity_t     parity;
     uart_pins_t pins;
     uart_it_t it_enable;
+    uint16_t cache_size;
     /* DMA 可选 */
     const uart_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
 } usart_config_t;
@@ -69,8 +68,8 @@ struct _Usart {
     Device base;  // 基类作为第一个成员
     const UsartFun* fun;
     // TODO: 添加派生类特有的数据成员
+    RingBuf *rx_cache_buf;
     uart_xfer_t *uart_xfer;
-    dma_sem_t *dma_sem;
 };
 
 // 构造函数声明

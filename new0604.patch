@@ -1,0 +1,3886 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ec6257c..59bac9a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+         os/scheduler/context_switch.s
+         os/common/queue.c
+         os/common/ring.c
++        os/common/ringbuf.c
+         os/common/list.c
+         os/common/linear_pool.c
+         os/common/os_init.c
+@@ -121,6 +122,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+         os/driver/device_manager.c
+         os/test/task_test1.c
+         os/test/time_task.c
++        os/test/uart_dma_test.c
+ 
+ )
+ 
+diff --git a/Src/main.c b/Src/main.c
+index 8dbb099..74552dc 100644
+--- a/Src/main.c
++++ b/Src/main.c
+@@ -1,3 +1,13 @@
++/**
++ * main.c - 项目入口
++ *
++ * 当前集成的测试功能：
++ *   1. DMA + USART1 发送测试（uart_dma_test 任务）
++ *      - 使用 DMA2 Stream7 Channel4 发送
++ *      - 每秒发送一次 "Hello" 消息
++ *      - USART1 TX: PA9, RX: PA10, 115200 8N1
++ *   2. 其他任务（timer, test1, systick 等）正常调度
++ */
+ #include <stdio.h>
+ #include "../os/common/os_init.h"
+ 
+diff --git a/my_platform.repl b/my_platform.repl
+new file mode 100644
+index 0000000..42dbf39
+--- /dev/null
++++ b/my_platform.repl
+@@ -0,0 +1,10 @@
++//using "./stm32f4.repl"
++
++// ICM20948 9轴IMU，接在 SPI1
++icm20948: Sensors.ICM20948 @ spi1
++
++gpioPortA:
++    4 -> icm20948@0
++
++// ADXL345 三轴加速度计，I2C 地址 0x53
++adxl345: Sensors.ADXL345 @ sysbus
+\ No newline at end of file
+diff --git a/os/common/ring.c b/os/common/ring.c
+index 624b2b1..312bef1 100644
+--- a/os/common/ring.c
++++ b/os/common/ring.c
+@@ -3,6 +3,9 @@
+ #include "linear_pool.h"
+ #include "util.h"
+ 
++static bool ring_push_data(Ring* self, uint8_t data);
++static bool ring_pop_data(Ring* self, uint8_t *addr, uint16_t len);
++
+ static void * ring_pop_nocpy(Ring* self);
+ 
+ static bool ring_push(Ring* self, const void *data);
+diff --git a/os/common/ring.h b/os/common/ring.h
+index 7a3ec1a..aa99eb4 100644
+--- a/os/common/ring.h
++++ b/os/common/ring.h
+@@ -14,7 +14,6 @@ struct _RingFun {
+     void (*destroy)(Ring* self);
+ 	bool (*push)(Ring* self, const void *data);
+ 	bool (*pop)(Ring* self, void *data);
+-
+ 	void * (*pop_nocpy)(Ring* self);
+ 
+ };
+diff --git a/os/common/ringbuf.c b/os/common/ringbuf.c
+new file mode 100644
+index 0000000..ce29238
+--- /dev/null
++++ b/os/common/ringbuf.c
+@@ -0,0 +1,124 @@
++#include "ringbuf.h"
++#include "../common/linear_pool.h"
++
++RingBuf* ringbuf_create(size_t size) {
++    RingBuf* obj = (RingBuf*)os_malloc(sizeof(RingBuf));
++    if (obj) {
++        memset(obj, 0, sizeof(RingBuf));
++        ringbuf_init(obj, size);
++    }
++    return obj;
++}
++
++void ringbuf_init(RingBuf *rb, size_t size)
++{
++    rb->buffer = os_malloc(sizeof(uint8_t) * size);
++    memset(rb->buffer, 0, sizeof(uint8_t) * size);
++    rb->size   = size;
++    rb->head   = 0;
++    rb->tail   = 0;
++    rb->count  = 0;
++    rb->dma_prev = 0;
++}
++
++bool ringbuf_put(RingBuf *rb, uint8_t data)
++{
++    if (rb->count == rb->size) {
++        // 满：丢弃最旧的数据（移动 tail）
++        rb->tail = (rb->tail + 1) % rb->size;
++        rb->count--;  // 减去丢弃的
++        // 可选：设置溢出标志或增加丢弃计数
++    }
++    rb->buffer[rb->head] = data;
++    rb->head = (rb->head + 1) % rb->size;
++    rb->count++;
++    return true;   // 总是成功
++}
++
++//bool ringbuf_get(RingBuf *rb, uint8_t *data)
++//{
++//    if (rb->count == 0) {
++//        /* 缓冲区空 */
++//        return false;
++//    }
++//    *data = rb->buffer[rb->tail];
++//    rb->tail = (rb->tail + 1) % rb->size;
++//    rb->count--;
++//    return true;
++//}
++
++size_t ringbuf_get(RingBuf *rb, uint8_t *data, size_t max_len)
++{
++    if (!data) {
++        return 0;
++    }
++    // 确定实际可读字节数：不超过请求大小，也不超过已有数据
++    size_t bytes = (max_len < rb->count) ? max_len : rb->count;
++    if (bytes == 0) {
++        return 0;
++    }
++
++    size_t tail = rb->tail;
++    size_t size = rb->size;
++
++    // 第一段：从 tail 到缓冲区末尾（或到 bytes 限制）
++    size_t first_part = size - tail;      // 从 tail 到末尾的字节数
++    if (first_part > bytes) {
++        first_part = bytes;               // 不需要读到底就够用
++    }
++    memcpy(data, &rb->buffer[tail], first_part);
++
++    // 第二段：如果还有剩余数据，一定是从缓冲区头部开始
++    size_t second_part = bytes - first_part;
++    if (second_part > 0) {
++        memcpy(data + first_part, rb->buffer, second_part);
++    }
++
++    // 更新读指针和数据计数
++    rb->tail = (tail + bytes) % size;
++    rb->count -= bytes;
++
++    return bytes;   // 返回实际读到的字节数
++}
++
++void ringbuf_dma_update(RingBuf *rb, size_t new_head)
++{
++    size_t prev = rb->head;  // 上一次记录的写指针
++    size_t size = rb->size;
++
++    if (new_head == prev) return;
++
++    size_t new_bytes;
++    if (new_head > prev) {
++        new_bytes = new_head - prev;
++    } else {
++        new_bytes = (size - prev) + new_head;
++    }
++
++    // 更新 count，但要注意覆盖可能溢出
++    if (rb->count + new_bytes > size) {
++        // 发生了覆盖，需要丢弃部分旧数据
++        size_t overflow = (rb->count + new_bytes) - size;
++        rb->tail = (rb->tail + overflow) % size;
++        rb->count -= overflow;
++        // 记录溢出
++    }
++
++    rb->count += new_bytes;
++    rb->head = new_head;
++}
++
++bool ringbuf_is_empty(const RingBuf *rb)
++{
++    return (rb->count == 0);
++}
++
++bool ringbuf_is_full(const RingBuf *rb)
++{
++    return (rb->count == rb->size);
++}
++
++size_t ringbuf_count(const RingBuf *rb)
++{
++    return rb->count;
++}
+diff --git a/os/common/ringbuf.h b/os/common/ringbuf.h
+new file mode 100644
+index 0000000..cfe25a0
+--- /dev/null
++++ b/os/common/ringbuf.h
+@@ -0,0 +1,36 @@
++#ifndef RINGBUF_H
++#define RINGBUF_H
++
++#include <stdint.h>
++#include <stdbool.h>
++#include <stddef.h>
++
++/* 环形缓冲区结构体 */
++typedef struct {
++    uint8_t *buffer;   // 缓冲区内存块
++    size_t   size;     // 缓冲区总容量（字节数）
++    size_t   head;     // 写指针（下一次写入的位置）
++    size_t   tail;     // 读指针（下一次读取的位置）
++    size_t   count;    // 当前已存储的字节数
++    size_t   dma_prev;  // 上一次 DMA 写入的结尾位置（索引）
++} RingBuf;
++
++RingBuf* ringbuf_create(size_t size);
++/* 初始化环形缓冲区 */
++void ringbuf_init(RingBuf *rb, size_t size);
++
++/* 写入一个字节，满时丢弃并返回 false */
++bool ringbuf_put(RingBuf *rb, uint8_t data);
++
++/* 读取一个字节，空时返回 false */
++//bool ringbuf_get(RingBuf *rb, uint8_t *data);
++size_t ringbuf_get(RingBuf *rb, uint8_t *data, size_t max_len);
++void ringbuf_dma_update(RingBuf *rb, size_t new_head);
++/* 查询是否为空 / 为满 */
++bool ringbuf_is_empty(const RingBuf *rb);
++bool ringbuf_is_full(const RingBuf *rb);
++
++/* 获取当前数据数量 */
++size_t ringbuf_count(const RingBuf *rb);
++
++#endif
+diff --git a/os/common/util.h b/os/common/util.h
+index 5eca8d0..fe9c2d4 100644
+--- a/os/common/util.h
++++ b/os/common/util.h
+@@ -12,7 +12,7 @@
+ #define GET_TASK_MANAGER(obj) ((Task_manager *)obj)
+ 
+ //  __DSB() 确保所有内存访问完成
+-#define USE_CCMRAM
++//#define USE_CCMRAM
+ 
+ #ifdef USE_CCMRAM
+ #define STACKRAM __attribute__((section(".ccmram"), aligned(32))) //32字节对齐
+diff --git a/os/driver/adc.c b/os/driver/adc.c
+index 7253f59..05994c2 100644
+--- a/os/driver/adc.c
++++ b/os/driver/adc.c
+@@ -176,7 +176,7 @@ dev_read_override(adc_dev_read_impl) {
+     const adc_config_t *conf = self->info->conf;
+     //params , void *buf, size_t count
+     if (conf->id >= ADC_MAX) {
+-        return;
++        return 0;
+     }
+     xADC_TypeDef *adc_ctrl = ADCx[conf->id];
+     /* 启动转换 */
+@@ -184,7 +184,7 @@ dev_read_override(adc_dev_read_impl) {
+     /* 等待转换结束 */
+     while (!(adc_ctrl->SR & (1 << 1)));  /* EOC */
+     *(uint16_t *)buf = (uint16_t)adc_ctrl->DR;
+-    return;
++    return 0;
+ }
+ 
+ 
+diff --git a/os/driver/common/device.c b/os/driver/common/device.c
+index 6342bf1..6bf1edd 100644
+--- a/os/driver/common/device.c
++++ b/os/driver/common/device.c
+@@ -9,7 +9,7 @@ static bool device_config_irq(Device* self, const irq_config *conf);
+ 
+ static void device_dev_read_user(Device* self, void *buf, size_t count);
+ static void device_dev_write_user(Device* self, const void *buf, size_t count);
+-static void device_dev_ioctl_user(Device* self, int cmd, void *arg);
++static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg);
+ 
+ static bool device_attach_irq(Device* self, Task *task);
+ 
+@@ -125,10 +125,13 @@ static void device_dev_write_user(Device* self, const void *buf, size_t count) {
+     device_user(self, &ctrl);
+ }
+ // dev_ioctl_user method
+-static void device_dev_ioctl_user(Device* self, int cmd, void *arg) {
++static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg) {
++
++    device_transfer_conf_t trans_conf = {.cmd = cmd,
++                                         .conf = arg};
+     const device_ctrl ctrl = {
+             .cmd = DEVICE_IOCTL,
+-            .buf = arg,
++            .buf = &trans_conf,
+     };
+     device_user(self, &ctrl);
+ }
+diff --git a/os/driver/common/device.h b/os/driver/common/device.h
+index 73a2158..f62cc0c 100644
+--- a/os/driver/common/device.h
++++ b/os/driver/common/device.h
+@@ -28,7 +28,7 @@ void dev_ioctl_user(int cmd, void *arg);
+ #define def_dev_init(obj) (GET_DEVICE_VTABLE(obj)->dev_init)
+ #define virtual_dev_init(obj, ...) def_dev_init(obj)(obj, ##__VA_ARGS__)
+ 
+-#define dev_read_override(func_name) static void func_name(Device* self, void *buf, size_t count)
++#define dev_read_override(func_name) static size_t func_name(Device* self, void *buf, size_t count)
+ #define def_dev_read(obj) (GET_DEVICE_VTABLE(obj)->dev_read)
+ #define virtual_dev_read(obj, ...) def_dev_read(obj)(obj, ##__VA_ARGS__)
+ 
+@@ -77,12 +77,13 @@ typedef struct {
+ typedef enum :uint8_t {
+     DEVICE_START = 0x30,
+     DEVICE_STOP,
++    DEVICE_TRANSFER,
+ } ioctl_cmd_t;
+ // 虚函数表结构
+ struct _DeviceVTable {
+     // TODO : 添加其他虚函数
+ 	void (*dev_init)(Device* self);
+-	void (*dev_read)(Device* self, void *buf, size_t count);
++	size_t (*dev_read)(Device* self, void *buf, size_t count);
+ 	void (*dev_write)(Device* self, const void *buf, size_t count);
+ 	void (*dev_ioctl)(Device* self, ioctl_cmd_t cmd, void *arg);
+ };
+@@ -97,9 +98,13 @@ struct _irq_config {
+     void *arg;
+     void *event;
+     nvic_handler_t handler;
+-    const dev_pripority_t *priority;
++    dev_pripority_t *priority;
+ };
+ 
++typedef struct {
++    ioctl_cmd_t cmd;
++    void *conf;
++} device_transfer_conf_t;
+ // 类成员函数结构
+ struct _DeviceFun {
+     void (*destroy)(Device* self);
+@@ -108,7 +113,7 @@ struct _DeviceFun {
+ 
+ 	void (*read_user)(Device* self, void *buf, size_t count);
+ 	void (*write_user)(Device* self, const void *buf, size_t count);
+-	void (*ioctl_user)(Device* self, int cmd, void *arg);
++	void (*ioctl_user)(Device* self, ioctl_cmd_t cmd, void *arg);
+ 
+     bool (*config_irq)(Device* self, const irq_config *conf);
+ 
+diff --git a/os/driver/common/dma.c b/os/driver/common/dma.c
+index 297c60b..766aee3 100644
+--- a/os/driver/common/dma.c
++++ b/os/driver/common/dma.c
+@@ -57,7 +57,15 @@ int dma_stream_request(const dma_stream_config_t *cfg)
+     /* 先关闭流 */
+     dma->SxCR = 0;
+     /* 设置通道 */
+-    uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
++    //  #define DMA_CHANNEL_0                 0x00000000U    /*!< DMA Channel 0 */
++    //  #define DMA_CHANNEL_1                 0x02000000U    /*!< DMA Channel 1 */
++    //  #define DMA_CHANNEL_2                 0x04000000U    /*!< DMA Channel 2 */
++    //  #define DMA_CHANNEL_3                 0x06000000U    /*!< DMA Channel 3 */
++    //  #define DMA_CHANNEL_4                 0x08000000U    /*!< DMA Channel 4 */
++    //  #define DMA_CHANNEL_5                 0x0A000000U    /*!< DMA Channel 5 */
++    //  #define DMA_CHANNEL_6                 0x0C000000U    /*!< DMA Channel 6 */
++    //  #define DMA_CHANNEL_7                 0x0E000000U    /*!< DMA Channel 7 */ 1110 0000
++    volatile uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
+     /* 方向：注意 bit6=DIR, bit7=DIR 搭配？参考手册：位6/7用于方向控制（双缓冲模式下） */
+     /*  #define DMA_SxCR_DIR_0           (0x1UL << DMA_SxCR_DIR_Pos)                    !< 0x00000040
+         #define DMA_SxCR_DIR_1           (0x2UL << DMA_SxCR_DIR_Pos)                    !< 0x00000080
+@@ -92,7 +100,7 @@ int dma_stream_request(const dma_stream_config_t *cfg)
+     }
+     /* 循环模式 */
+     if (cfg->mode == DMA_MODE_CIRCULAR) {
+-        cr |= (1 << 8);
++        cr |= (1 << 8);//#define DMA_SxCR_CIRC_Pos        (8U)
+     }
+     /* 传输完成中断使能（暂时不开，可扩展） */
+     dma->SxCR = cr;
+@@ -150,10 +158,23 @@ int dma_start_transfer(const dma_stream_config_t *cfg,
+     /* 停止当前传输 */
+     dma->SxCR &= ~(1 << 0);
+     /* 清除标志 */
+-    //dma_clear_flag(cfg);
++    dma_clear_flag(cfg);
+     /* 设置地址和数量 */
+-    dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
+-    dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
++    //SxPAR (外设地址寄存器)
++    //SxM0AR (存储器地址 0 寄存器)
++    //外设到存储器 (P2M)：外设是源 (SxPAR 是源地址)，存储器是目标 (SxM0AR 是目标地址)。
++    //存储器到外设 (M2P)：存储器是源 (SxM0AR 是源地址)，外设是目标 (SxPAR 是目标地址)。
++    if (cfg->direction == DMA_DIR_P2M) {
++        dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
++        dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
++    } else if (cfg->direction == DMA_DIR_M2P) {
++        dma->SxPAR  = dst_addr;   /* 根据方向，这里是外设地址 或 源 */
++        dma->SxM0AR = src_addr;   /* 存储器地址 或 目标 */
++    } else {
++        dma->SxPAR  = (uint32_t)dst_addr;   // 目标内存
++        dma->SxM0AR = (uint32_t)src_addr;   // 源内存
++    }
++
+     dma->SxNDTR = count;
+     /* 使能流 */
+     dma->SxCR |= 1;
+@@ -186,6 +207,30 @@ bool dma_is_busy(const dma_stream_config_t *cfg)
+     return (dma->SxNDTR != 0) && (dma->SxCR & 1);
+ }
+ /*
++ * #define DMA_HIFCR_CTCIF7_Pos     (27U)
++ * #define DMA_HIFCR_CFEIF7_Pos     (22U)
++ *
++ * #define DMA_HIFCR_CTCIF6_Pos     (21U)
++ * #define DMA_HIFCR_CFEIF6_Pos     (16U)
++ *
++ * #define DMA_HIFCR_CTCIF5_Pos     (11U)
++ * #define DMA_HIFCR_CFEIF5_Pos     (6U)
++ *
++ * #define DMA_HIFCR_CTCIF4_Pos     (5U)
++ * #define DMA_HIFCR_CFEIF4_Pos     (0U)
++ * -----------------------------------------------
++ * #define DMA_LIFCR_CTCIF3_Pos     (27U)
++ * #define DMA_LIFCR_CFEIF3_Pos     (22U)
++ *
++ * #define DMA_LIFCR_CTCIF2_Pos     (21U)
++ * #define DMA_LIFCR_CFEIF2_Pos     (16U)
++ *
++ * #define DMA_LIFCR_CTCIF1_Pos     (11U)
++ * #define DMA_LIFCR_CFEIF1_Pos     (6U)
++ *
++ * #define DMA_LIFCR_CTCIF0_Pos     (5U)
++ * #define DMA_LIFCR_CFEIF0_Pos     (0U)
++ *
+  *  Bit 0: FEIF4 (流错误中断标志) —— 实际可能是“保留”或 FIFO 错误，不同型号位定义有差异
+     Bit 1: 保留
+     Bit 2: DMEIF4 (直接模式错误中断标志)
+@@ -199,15 +244,15 @@ void dma_clear_flag(const dma_stream_config_t *cfg) {
+     // 清除 TC、HT、TE、DME、FE 标志 (bit5,4,3,2,0); 跳过保留位1
+     //uint32_t mask = (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 0);
+     // 也可以用 0x3D 来涵盖常见位 (bit5,4,3,2,0)
+-    if (DMA_REQ_GET_STREAM(cfg->dma_request) < 4) {
+-        uint32_t mask = 0x3F << (DMA_REQ_GET_STREAM(cfg->dma_request) * 6 + 0); // 具体按手册，简化：清除对应流所有标志
+-        base->LIFCR = mask;  // 写1清除
++    uint32_t it_flags = 0x3F;
++    uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
++    if (stream < 4) {
++        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4); // 具体按手册，简化：清除对应流所有标志
++        base->LIFCR |= mask;  // 写1清除
+     } else {
+-        uint32_t mask = 0x3F << ((DMA_REQ_GET_STREAM(cfg->dma_request) - 4) * 6 + 0);
+-        mask |= ( (1 << 26) | (1 << 24) | (1 << 25) );
+-        uint32_t flags = base->HISR;  // 读取所有挂起标志
+-        base->HIFCR = flags;          // 写 1 清所有对应位
+-        //base->HIFCR = 0xFFFFFFFF;//mask;
++        stream -= 4;
++        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4);
++        base->HIFCR |= mask;          // 写 1 清所有对应位
+     }
+ }
+ 
+diff --git a/os/driver/common/dma.h b/os/driver/common/dma.h
+index 9880e2c..5641c57 100644
+--- a/os/driver/common/dma.h
++++ b/os/driver/common/dma.h
+@@ -58,9 +58,6 @@ typedef enum :uint8_t {
+ } dma_it_t;
+ /* DMA 流配置描述符 */
+ typedef struct {
+-    //dma_controller_t        controller;  /* DMA1 或 DMA2 */
+-    //dma_stream_t            stream;      /* 0..7 */
+-    //uint8_t                 channel;     /* 通道 0..7 */
+     dma_request_t           dma_request;
+     dma_dir                 direction;   /* DMA_DIR_xxx */
+     dma_priority            priority;    /* DMA_PRIORITY_xxx */
+diff --git a/os/driver/common/gpio.c b/os/driver/common/gpio.c
+index acec51c..532cd61 100644
+--- a/os/driver/common/gpio.c
++++ b/os/driver/common/gpio.c
+@@ -4,14 +4,14 @@
+ /* ---------- 原子置位/复位 (基于 BSRR) ---------- */
+ void gpio_set(const gpio_t *gpio_conf)
+ {
+-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
++    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
+         GPIOx[gpio_conf->port]->BSRR = (1U << gpio_conf->pin);   // 低16位写1置位
+     }
+ }
+ 
+ void gpio_reset(const gpio_t *gpio_conf)
+ {
+-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
++    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
+         GPIOx[gpio_conf->port]->BSRR = (1U << (gpio_conf->pin + 16)); // 高16位写1复位
+     }
+ }
+@@ -27,7 +27,7 @@ void gpio_write(const gpio_t *gpio_conf, bool value)
+ /* ---------- 翻转 (读 ODR 并写回取反) ---------- */
+ void gpio_toggle(const gpio_t *gpio_conf)
+ {
+-    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < 16) {
++    if (gpio_conf->port < PORT_MAX && gpio_conf->pin < PIN_MAX) {
+         uint32_t odr = GPIOx[gpio_conf->port]->ODR;
+         if (odr & (1U << gpio_conf->pin))
+             gpio_reset(gpio_conf);
+diff --git a/os/driver/common/gpio.h b/os/driver/common/gpio.h
+index ac66ef4..e87db06 100644
+--- a/os/driver/common/gpio.h
++++ b/os/driver/common/gpio.h
+@@ -10,7 +10,7 @@
+ /* GPIO 引脚描述符 */
+ typedef struct {
+     gpio_port_t port;     // 端口 (PORT_A ~ PORT_I)
+-    uint8_t     pin;      // 引脚号 (0..15)
++    gpio_pin_t    pin;      // 引脚号 (0..15)
+ } gpio_t;
+ 
+ /* API 函数 */
+diff --git a/os/driver/device_config.c b/os/driver/device_config.c
+index 40cecb7..baeadb0 100644
+--- a/os/driver/device_config.c
++++ b/os/driver/device_config.c
+@@ -62,7 +62,8 @@ const usart_config_t usart1_conf = {
+                 .uart_tx = PA9_REQ_USART1_TX,
+                 .uart_rx = PA10_REQ_USART1_RX,
+         },
+-        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
++        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC | xUART_FLAG_IDLE,
++        .cache_size = 64,
+         .dma_cfg = &(const uart_dma_config_t) {
+                 .tx_dma = &(const dma_stream_config_t) {
+                         .dma_request    = DMA2_REQ_USART1_TX,
+@@ -101,8 +102,9 @@ const usart_config_t usart4_conf = {
+                 .uart_tx = PC10_REQ_UART4_TX,
+                 .uart_rx = PC11_REQ_UART4_RX,
+         },
+-        .it_enable = xUART_IT_NONE,//xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+-        .dma_cfg = NULL /*&(const uart_dma_config_t) {
++        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
++        .cache_size = 64,
++        .dma_cfg = NULL/*&(const uart_dma_config_t) {
+                 .tx_dma = &(const dma_stream_config_t) {
+                     .dma_request    = DMA1_REQ_UART4_TX,
+                     .direction      = DMA_DIR_M2P,
+@@ -127,7 +129,7 @@ const usart_config_t usart4_conf = {
+                     .fifo_mode      = DMA_FIFO_DIRECT,
+                     .it_enable      = 0,                 // 直接读取缓冲区则无需中断
+                 },
+-        }*/,
++        },*/
+ };
+ 
+ const exti_config_t exti_conf = {
+@@ -180,43 +182,47 @@ const adc_config_t adc1_conf = {
+ 
+ const spi_config_t spi1_conf = {
+         .id = SPI_1,
+-        .mode = SPI_MODE_0,
++        .mode = SPI_MODE_3,            // ICM20948: CPOL=1, CPHA=1
+         .frame_format = SPI_FRAME_8BIT,
+-        .baudrate_div = SPI_BR_DIV64,   // 84MHz/128 ≈ 656kHz (假设 PCLK=84MHz)
++        .baudrate_div = SPI_BR_DIV64,   // 84MHz/128 ≈ 656kHz
+         .master = SPI_MASTER,
++        .first_bit = SPI_MSB_FIRST,    // MSB 优先
++        .nss_mode  = SPI_NSS_SOFT,     // 软件 NSS → Renode 调试更可靠
++        .cache_size = 64,              // ringbuf 大小
+         .pins = {
+                 .sck_pin  = PA5_REQ_SPI1_SCK,
+                 .miso_pin = PA6_REQ_SPI1_MISO,
+                 .mosi_pin = PA7_REQ_SPI1_MOSI,
+-                .nss_pin  = PA4_REQ_SPI1_NSS   // 硬件 NSS 或软件管理
++                .nss_pin  = PA4_REQ_SPI1_NSS,   // 硬件 NSS 或软件管理
++                .cs_pin = {.port = PORT_A, .pin = PIN_4},//软件 cs
++        },
++        .it_enable = xSPI_IT_TXE | xSPI_IT_RXNE,//xSPI_IT_NONE,
++        .dma_cfg = &(const spi_dma_config_t){
++                .tx_dma = &(const dma_stream_config_t) {
++                        .dma_request = DMA2_REQ_SPI1_TX_ST3,
++                        .direction = DMA_DIR_M2P,
++                        .priority = xDMA_PRIORITY_HIGH,
++                        .mem_data_size = DMA_DATA_SIZE_BYTE,
++                        .per_data_size = DMA_DATA_SIZE_BYTE,
++                        .mem_inc = 1,
++                        .per_inc = 0,
++                        .mode = DMA_MODE_NORMAL,
++                        .fifo_mode = DMA_FIFO_DIRECT,
++                        .it_enable = xDMA_IT_TC,
++                },
++                .rx_dma = &(const dma_stream_config_t) {
++                        .dma_request = DMA2_REQ_SPI1_RX_ST2,
++                        .direction = DMA_DIR_P2M,
++                        .priority = xDMA_PRIORITY_HIGH,
++                        .mem_data_size = DMA_DATA_SIZE_BYTE,
++                        .per_data_size = DMA_DATA_SIZE_BYTE,
++                        .mem_inc = 1,
++                        .per_inc = 0,
++                        .mode = DMA_MODE_NORMAL,
++                        .fifo_mode = DMA_FIFO_DIRECT,
++                        .it_enable = xDMA_IT_NONE,  // 只靠 TX TC 通知完成
++                },
+         },
+-        .it_enable = xSPI_IT_TXE | xSPI_IT_RXNE,
+-        .dma_cfg = NULL/*&(const spi_dma_config_t){
+-            .tx_dma = &(const dma_stream_config_t) {
+-                 .dma_request = DMA2_REQ_SPI1_TX_ST3,
+-                 .direction = DMA_DIR_M2P,
+-                 .priority = xDMA_PRIORITY_HIGH,
+-                 .mem_data_size = DMA_DATA_SIZE_BYTE,
+-                 .per_data_size = DMA_DATA_SIZE_BYTE,
+-                 .mem_inc = 1,
+-                 .per_inc = 0,
+-                 .mode = DMA_MODE_NORMAL,
+-                 .fifo_mode = DMA_FIFO_DIRECT,
+-                 .it_enable = xDMA_IT_TC,
+-            },
+-            .rx_dma = &(const dma_stream_config_t) {
+-                 .dma_request = DMA2_REQ_SPI1_RX_ST2,
+-                 .direction = DMA_DIR_P2M,
+-                 .priority = xDMA_PRIORITY_HIGH,
+-                 .mem_data_size = DMA_DATA_SIZE_BYTE,
+-                 .per_data_size = DMA_DATA_SIZE_BYTE,
+-                 .mem_inc = 1,
+-                 .per_inc = 0,
+-                 .mode = DMA_MODE_NORMAL,
+-                 .fifo_mode = DMA_FIFO_DIRECT,
+-                 .it_enable = xDMA_IT_TC,
+-            },
+-        }*/
+ };
+ 
+ const i2c_config_t i2c1_conf = {
+@@ -229,7 +235,32 @@ const i2c_config_t i2c1_conf = {
+                 .sda_pin = PB7_REQ_I2C1_SDA
+         },
+         .it_enable = xI2C_IT_TXE | xI2C_IT_RXNE,                 // 不使用中断
+-        .dma_cfg = NULL,
++        .dma_cfg = &(const i2c_dma_config_t){
++                .tx_dma = &(const dma_stream_config_t) {
++                        .dma_request = DMA1_REQ_I2C1_TX_ST6,
++                        .direction = DMA_DIR_M2P,
++                        .priority = xDMA_PRIORITY_HIGH,
++                        .mem_data_size = DMA_DATA_SIZE_BYTE,
++                        .per_data_size = DMA_DATA_SIZE_BYTE,
++                        .mem_inc = 1,
++                        .per_inc = 0,
++                        .mode = DMA_MODE_NORMAL,
++                        .fifo_mode = DMA_FIFO_DIRECT,
++                        .it_enable = xDMA_IT_TC,
++                },
++                .rx_dma = &(const dma_stream_config_t) {
++                        .dma_request = DMA1_REQ_I2C1_RX_ST0,
++                        .direction = DMA_DIR_P2M,
++                        .priority = xDMA_PRIORITY_HIGH,
++                        .mem_data_size = DMA_DATA_SIZE_BYTE,
++                        .per_data_size = DMA_DATA_SIZE_BYTE,
++                        .mem_inc = 1,
++                        .per_inc = 0,
++                        .mode = DMA_MODE_NORMAL,
++                        .fifo_mode = DMA_FIFO_DIRECT,
++                        .it_enable = xDMA_IT_NONE,  // 只靠 TX TC 通知完成
++                },
++        },
+ };
+ 
+ const can_config_t can1_conf = {
+diff --git a/os/driver/hal/hal_dma.h b/os/driver/hal/hal_dma.h
+index 0172f86..b4fe233 100644
+--- a/os/driver/hal/hal_dma.h
++++ b/os/driver/hal/hal_dma.h
+@@ -65,7 +65,7 @@ typedef enum : uint16_t {
+     DMA1_REQ_UART5_RX        = DMA_REQ_ENCODE(DMA_1, 0, 4),
+     DMA1_REQ_USART3_RX       = DMA_REQ_ENCODE(DMA_1, 1, 4),
+     DMA1_REQ_UART4_RX        = DMA_REQ_ENCODE(DMA_1, 2, 4),
+-    DMA1_REQ_USART3_TX_ST3       = DMA_REQ_ENCODE(DMA_1, 3, 4),
++    DMA1_REQ_USART3_TX_ST3   = DMA_REQ_ENCODE(DMA_1, 3, 4),
+     DMA1_REQ_UART4_TX        = DMA_REQ_ENCODE(DMA_1, 4, 4),
+     DMA1_REQ_USART2_RX       = DMA_REQ_ENCODE(DMA_1, 5, 4),
+     DMA1_REQ_USART2_TX       = DMA_REQ_ENCODE(DMA_1, 6, 4),
+@@ -185,6 +185,57 @@ typedef enum : uint16_t {
+     DMA2_REQ_TIM8_COM            = DMA_REQ_ENCODE(DMA_2, 7, 7),
+ } dma_request_t;
+ 
++/* 高4流 (HIFCR) */
++#define xDMA_HIFCR_CFEIF4_Pos    (0U)
++#define xDMA_HIFCR_CDMEIF4_Pos   (2U)
++#define xDMA_HIFCR_CTEIF4_Pos    (3U)
++#define xDMA_HIFCR_CHTIF4_Pos    (4U)
++#define xDMA_HIFCR_CTCIF4_Pos    (5U)
++
++#define xDMA_HIFCR_CFEIF5_Pos    (6U)
++#define xDMA_HIFCR_CDMEIF5_Pos   (8U)
++#define xDMA_HIFCR_CTEIF5_Pos    (9U)
++#define xDMA_HIFCR_CHTIF5_Pos    (10U)
++#define xDMA_HIFCR_CTCIF5_Pos    (11U)
++
++#define xDMA_HIFCR_CFEIF6_Pos    (16U)
++#define xDMA_HIFCR_CDMEIF6_Pos   (18U)
++#define xDMA_HIFCR_CTEIF6_Pos    (19U)
++#define xDMA_HIFCR_CHTIF6_Pos    (20U)
++#define xDMA_HIFCR_CTCIF6_Pos    (21U)
++
++#define xDMA_HIFCR_CFEIF7_Pos    (22U)
++#define xDMA_HIFCR_CDMEIF7_Pos   (24U)
++#define xDMA_HIFCR_CTEIF7_Pos    (25U)
++#define xDMA_HIFCR_CHTIF7_Pos    (26U)
++#define xDMA_HIFCR_CTCIF7_Pos    (27U)
++
++/* 低4流 (LIFCR) —— 位分布与高4流相同 */
++#define xDMA_LIFCR_CFEIF0_Pos    (0U)
++#define xDMA_LIFCR_CDMEIF0_Pos   (2U)
++#define xDMA_LIFCR_CTEIF0_Pos    (3U)
++#define xDMA_LIFCR_CHTIF0_Pos    (4U)
++#define xDMA_LIFCR_CTCIF0_Pos    (5U)
++
++#define xDMA_LIFCR_CFEIF1_Pos    (6U)
++#define xDMA_LIFCR_CDMEIF1_Pos   (8U)
++#define xDMA_LIFCR_CTEIF1_Pos    (9U)
++#define xDMA_LIFCR_CHTIF1_Pos    (10U)
++#define xDMA_LIFCR_CTCIF1_Pos    (11U)
++
++#define xDMA_LIFCR_CFEIF2_Pos    (16U)
++#define xDMA_LIFCR_CDMEIF2_Pos   (18U)
++#define xDMA_LIFCR_CTEIF2_Pos    (19U)
++#define xDMA_LIFCR_CHTIF2_Pos    (20U)
++#define xDMA_LIFCR_CTCIF2_Pos    (21U)
++
++#define xDMA_LIFCR_CFEIF3_Pos    (22U)
++#define xDMA_LIFCR_CDMEIF3_Pos   (24U)
++#define xDMA_LIFCR_CTEIF3_Pos    (25U)
++#define xDMA_LIFCR_CHTIF3_Pos    (26U)
++#define xDMA_LIFCR_CTCIF3_Pos    (27U)
++
++
+ /* ---------- DMA 寄存器定义 ---------- */
+ typedef struct {
+     volatile uint32_t LISR;
+@@ -204,7 +255,24 @@ typedef struct {
+ 
+ #define xDMA1_BASE       0x40026000UL
+ #define xDMA2_BASE       0x40026400UL
+-
++/*#define DMA1_BASE             (AHB1PERIPH_BASE + 0x6000UL)
++#define DMA1_Stream0_BASE     (DMA1_BASE + 0x010UL)
++#define DMA1_Stream1_BASE     (DMA1_BASE + 0x028UL)
++#define DMA1_Stream2_BASE     (DMA1_BASE + 0x040UL)
++#define DMA1_Stream3_BASE     (DMA1_BASE + 0x058UL)
++#define DMA1_Stream4_BASE     (DMA1_BASE + 0x070UL)
++#define DMA1_Stream5_BASE     (DMA1_BASE + 0x088UL)
++#define DMA1_Stream6_BASE     (DMA1_BASE + 0x0A0UL)
++#define DMA1_Stream7_BASE     (DMA1_BASE + 0x0B8UL)
++#define DMA2_BASE             (AHB1PERIPH_BASE + 0x6400UL)
++#define DMA2_Stream0_BASE     (DMA2_BASE + 0x010UL)
++#define DMA2_Stream1_BASE     (DMA2_BASE + 0x028UL)
++#define DMA2_Stream2_BASE     (DMA2_BASE + 0x040UL)
++#define DMA2_Stream3_BASE     (DMA2_BASE + 0x058UL)
++#define DMA2_Stream4_BASE     (DMA2_BASE + 0x070UL)
++#define DMA2_Stream5_BASE     (DMA2_BASE + 0x088UL)
++#define DMA2_Stream6_BASE     (DMA2_BASE + 0x0A0UL)
++#define DMA2_Stream7_BASE     (DMA2_BASE + 0x0B8UL)*/
+ #define DMA1_STREAM_BASE(i)  (xDMA1_BASE + 0x10 + (i) * 0x18)  /* Stream i 寄存器起始 */
+ #define DMA2_STREAM_BASE(i)  (xDMA2_BASE + 0x10 + (i) * 0x18)
+ 
+diff --git a/os/driver/hal/hal_spi.c b/os/driver/hal/hal_spi.c
+index 4f93e28..bdb08fe 100644
+--- a/os/driver/hal/hal_spi.c
++++ b/os/driver/hal/hal_spi.c
+@@ -4,6 +4,9 @@
+ 
+ #include "hal_spi.h"
+ #include "../common/rcc.h"
++#include "../common/dma.h"
++#include "../common/gpio.h"
++
+ /* ---------- SPI 寄存器定义 (STM32F4) ---------- */
+ typedef struct {
+     volatile uint32_t CR1;
+@@ -42,8 +45,10 @@ void hal_spi_clock_enable(spi_id_t id)
+     }
+     __asm volatile ("dsb" ::: "memory");
+ }
++// 软件 NSS (SSM=1, SSI=1)：CR1.SSM=1, CR1.SSI=1, CR2.SSOE 无效
++// 硬件 NSS 输出 (SSM=0, SSOE=1)：CR1.SSM=0, CR2.SSOE=1, NSS 引脚自动翻转
+ 
+-void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master) {
++void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master, spi_first_bit_t first_bit, spi_nss_mode_t nss_mode) {
+ 
+     /* 3. 配置 SPI */
+     xSPI_TypeDef *spi_ctrl = SPIx[id];
+@@ -55,8 +60,19 @@ void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br
+     cr1 |= (baudrate_div & 0x7) << 3;              // BR
+     cr1 |= (mode & 0x3) << 0;                      // CPHA, CPOL
+     cr1 |= (frame_format & 0x1) << 11;             // DFF
+-    cr1 |= (1 << 8) | (1 << 9);                         // SSI, SSM (软件 NSS)
+-    cr1 |= (1 << 6);                                    // SPE 最后使能
++    cr1 |= ((uint32_t)(first_bit & 0x1)) << 7;     // LSBFIRST
++
++    if (nss_mode == SPI_NSS_HARD) {
++        /* 硬件 NSS 输出模式：SSM=0, SPI 自动翻转 NSS */
++        // CR1.SSM=0 (bit 9=0), CR1.SSI 无效
++        // CR2.SSOE=1 (bit 2=1) → 主模式下输出 NSS 信号
++        spi_ctrl->CR2 = (1 << 2);  // SSOE #define SPI_CR2_SSOE_Pos            (2U)
++    } else {
++        /* 软件 NSS 模式：SSM=1, SSI=1, 内选始终有效 */
++        cr1 |= (1 << 8) | (1 << 9);                // SSI + SSM
++    }
++
++    cr1 |= (1 << 6);                               // SPE
+     spi_ctrl->CR1 = cr1;
+ }
+ void hal_spi_disable_it(spi_id_t id) {
+@@ -122,4 +138,109 @@ void hal_spi_enable(spi_id_t id) {
+ volatile uint8_t *hal_spi_data_addr(spi_id_t id) {
+     xSPI_TypeDef *spi_ctrl = SPIx[id];
+     return (volatile uint8_t*)&spi_ctrl->DR;
+-}
+\ No newline at end of file
++}
++
++/* DMA 发送一个数据块
++ * M2P 方向：dma_start_transfer(src, dst, len)
++ *   → SxPAR=dst(外设=DR), SxM0AR=src(存储器=data)
++ */
++int hal_spi_send_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len)
++{
++    xSPI_TypeDef *spi_ctrl = SPIx[id];
++    dma_start_transfer(dma_cfg, (uint32_t)data, (uint32_t)(&spi_ctrl->DR), len);
++    return 0;
++}
++
++/* DMA 接收（启动循环 DMA 到环形缓冲区）
++ * P2M 方向：dma_start_transfer(src, dst, len)
++ *   → SxPAR=src(外设=DR), SxM0AR=dst(存储器=buf)
++ */
++int hal_spi_recv_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size)
++{
++    xSPI_TypeDef *spi_ctrl = SPIx[id];
++    dma_start_transfer(dma_cfg, (uint32_t)(&spi_ctrl->DR), (uint32_t)buf, buf_size);
++    return 0;
++}
++
++// 发送 len 个字节，同时收下无用数据并丢弃
++void hal_spi_transmit(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, size_t len)
++{
++    xSPI_TypeDef *spi_ctrl = SPIx[id];
++    if (cs_pin) {
++        gpio_reset(cs_pin);
++    } else {
++        spi_ctrl->CR1 |= SPI_CTL_SPE;
++    }
++    while (len--) {
++        while (!(spi_ctrl->SR & xSPI_IT_TXE));      // 等待发送寄存器空
++        spi_ctrl->DR = *tx_data++;          // 写入要发的字节
++        while (!(spi_ctrl->SR & xSPI_IT_RXNE));     // 等待接收完成
++        (void)spi_ctrl->DR;                 // 读取并丢弃接收到的字节
++    }
++    if (cs_pin) {
++        gpio_set(cs_pin);
++    } else {
++        spi_ctrl->CR1 &= ~SPI_CTL_SPE;   // 临时关 SPE
++    }
++}
++
++// 接收 len 个字节，同时发送 dummy 字节
++void hal_spi_receive(spi_id_t id, const gpio_t* cs_pin, uint8_t *rx_data, size_t len)
++{
++    xSPI_TypeDef *spi_ctrl = SPIx[id];
++    if (cs_pin) {
++        gpio_reset(cs_pin);
++    } else {
++        spi_ctrl->CR1 |= SPI_CTL_SPE;
++    }
++    while (len--) {
++        while (!(spi_ctrl->SR & xSPI_IT_TXE));
++        spi_ctrl->DR = 0xFF;                // 发送 dummy 数据（任意值）
++        while (!(spi_ctrl->SR & xSPI_IT_RXNE));
++        *rx_data++ = spi_ctrl->DR;          // 读出接收到的有效数据
++    }
++    if (cs_pin) {
++        gpio_set(cs_pin);
++    } else {
++        spi_ctrl->CR1 &= ~SPI_CTL_SPE;   // 临时关 SPE
++    }
++}
++
++// 同时收发 len 个字节
++void hal_spi_transfer(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, uint8_t *rx_data, size_t len)
++{
++    xSPI_TypeDef *spi_ctrl = SPIx[id];
++    if (cs_pin) {
++        gpio_reset(cs_pin);
++    } else {
++        spi_ctrl->CR1 |= SPI_CTL_SPE;
++    }
++    while (len--) {
++        while (!(spi_ctrl->SR & xSPI_IT_TXE));
++        spi_ctrl->DR = tx_data ? *tx_data++ : 0xFF;  // 如果只收不发，可送 dummy
++        while (!(spi_ctrl->SR & xSPI_IT_RXNE));
++        uint8_t rx = spi_ctrl->DR;
++        if (rx_data) *rx_data++ = rx;
++    }
++    if (cs_pin) {
++        gpio_set(cs_pin);
++    } else {
++        spi_ctrl->CR1 &= ~SPI_CTL_SPE;   // 临时关 SPE
++    }
++}
++
++//主机每发送一位数据，就会同时从从机接收一位数据，两者严格同步。
++//int hal_spi_write(spi_id_t id, const uint8_t *buf, uint16_t buf_size, uint8_t *recv_buf, uint16_t recv_size) {
++//    xSPI_TypeDef *spi_ctrl = SPIx[id];
++//    if (recv_size < buf_size) {
++//        return -1;
++//    }
++//    /* ─── 阻塞轮询模式 ─── */
++//    for (uint16_t i = 0; i < buf_size; i++) {
++//        while (!(spi_ctrl->SR & xSPI_IT_TXE));
++//        spi_ctrl->DR = buf ? buf[i] : 0xFF;
++//        while (!(spi_ctrl->SR & xSPI_IT_RXNE));
++//        recv_buf[i] =  *(uint8_t*)&spi_ctrl->DR;
++//    }
++//
++//}
+\ No newline at end of file
+diff --git a/os/driver/hal/hal_spi.h b/os/driver/hal/hal_spi.h
+index 4e1aecf..7066cfe 100644
+--- a/os/driver/hal/hal_spi.h
++++ b/os/driver/hal/hal_spi.h
+@@ -7,6 +7,8 @@
+ 
+ #include <stdbool.h>
+ #include "stdint.h"
++#include "../common/dma.h"
++#include "../common/gpio.h"
+ 
+ #define xSPI1_BASE  0x40013000UL
+ #define xSPI2_BASE  0x40003800UL
+@@ -90,8 +92,21 @@ typedef enum : uint16_t {
+ } spi_ctl_t;
+ 
+ 
++/* 帧位序 */
++typedef enum : uint8_t {
++    SPI_MSB_FIRST = 0,   // CR1.LSBFIRST = 0
++    SPI_LSB_FIRST = 1,   // CR1.LSBFIRST = 1
++} spi_first_bit_t;
++
++/* NSS 管理模式 */
++typedef enum : uint8_t {
++    SPI_NSS_SOFT = 0,    // 软件 NSS (SSM=1, SSI=1)，需手动 GPIO 控制 CS
++    SPI_NSS_HARD = 1,    // 硬件 NSS 输出 (SSM=0, SSOE=1)，SPI 外设自动控制 CS
++} spi_nss_mode_t;
++
++
+ void hal_spi_clock_enable(spi_id_t id);
+-void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master);
++void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master, spi_first_bit_t first_bit, spi_nss_mode_t nss_mode);
+ void hal_spi_disable_it(spi_id_t id);
+ bool hal_spi_it_init(spi_id_t id, spi_it_t it_enable);
+ void hal_spi_set_it(spi_id_t id, spi_it_t it_event);
+@@ -102,4 +117,12 @@ void hal_spi_disable(spi_id_t id);
+ void hal_spi_enable(spi_id_t id);
+ volatile uint8_t *hal_spi_data_addr(spi_id_t id);
+ 
++int hal_spi_send_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len);
++int hal_spi_recv_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size);
++
++void hal_spi_transmit(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, size_t len);
++void hal_spi_receive(spi_id_t id, const gpio_t* cs_pin, uint8_t *rx_data, size_t len);
++void hal_spi_transfer(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, uint8_t *rx_data, size_t len);
++//int hal_spi_write(spi_id_t id, const uint8_t *buf, uint16_t buf_size, uint8_t *recv_buf, uint16_t recv_size);
++
+ #endif //STM32F4DISCOVERY_HAL_SPI_H
+diff --git a/os/driver/hal/hal_usart.c b/os/driver/hal/hal_usart.c
+index 5f8feb7..abbf4c0 100644
+--- a/os/driver/hal/hal_usart.c
++++ b/os/driver/hal/hal_usart.c
+@@ -95,30 +95,35 @@ bool hal_uart_it_init(uart_id_t id, uart_it_t it_enable) {
+     }
+     return false;
+ }
+-
++/*
++ * #define USART_CR3_DMAT_Pos            (7U)
++ * #define USART_CR3_DMAR_Pos            (6U)
++ *
++ * */
+ void hal_uart_dma_init(uart_id_t id, bool txdma, bool rxdma) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+     if (txdma) {
+         // 使能 USART 的 DMA 发送位 CR3 bit7 (DMAT)
+-        uart_ctrl->CR3 |= (1 << 7);
++        uart_ctrl->CR3 |= (1 << USART_CR3_DMAT_Pos);
+     }
+     if (rxdma) {
+-        uart_ctrl->CR3 |= (1 << 6); // DMAR
++        uart_ctrl->CR3 |= (1 << USART_CR3_DMAR_Pos); // DMAR
+     }
+ }
+ 
+ void hal_uart_send(uart_id_t id, uint8_t *buf, size_t count) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+     while (count--) {
+-        while (!(uart_ctrl->SR & (1 << 7)));
++        while (!(uart_ctrl->SR & xUART_FLAG_TXE));
+         uart_ctrl->DR = *(char *) buf++;
+     }
+ }
+ 
+-void hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count) {
++size_t hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+-    while(!(uart_ctrl->SR & (1 << 5)));
++    while(!(uart_ctrl->SR & xUART_FLAG_RXNE));
+     *(char *)buf = (char)uart_ctrl->DR;
++    return 1;
+ }
+ 
+ uint32_t hal_uart_get_it_event(uart_id_t id) {
+@@ -127,27 +132,108 @@ uint32_t hal_uart_get_it_event(uart_id_t id) {
+     return sr;
+ }
+ 
+-void hal_uart_set_it_event(uart_id_t id, uart_it_t it_event) {
++void hal_uart_it_enable(uart_id_t id, uart_it_t it_event) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+     uart_ctrl->CR1 |= it_event;   // 关闭 RXNE 中断
+ }
+ 
+-void hal_uart_clear_it_event(uart_id_t id, uart_it_t it_event) {
++void hal_uart_it_disable(uart_id_t id, uart_it_t it_event) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+     uart_ctrl->CR1 &= ~(it_event);   // 关闭 RXNE 中断
+ }
+ 
++void hal_uart_it_clear(uart_id_t id, uart_it_t it_event) {
++    xUSART_TypeDef *uart_ctrl = USARTx[id];
++    uart_ctrl->SR &= ~(it_event);
++}
++
+ volatile uint8_t *hal_uart_data_addr(uart_id_t id) {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+     return (volatile uint8_t *)&uart_ctrl->DR;
+ }
+ 
+-/* DMA 发送一个数据块 */
++/* DMA 发送一个数据块
++ * M2P 方向：dma_start_transfer(src, dst, len)
++ *   → SxPAR=dst(外设=DR), SxM0AR=src(存储器=data)
++ */
+ int uart_send_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len)
+ {
+     xUSART_TypeDef *uart_ctrl = USARTx[id];
+-    // 假设 tx_dma 已经申请并记录在驱动内部（需要存储配置）
++    uart_ctrl->SR &= ~xUART_FLAG_TC;
+     dma_start_transfer(dma_cfg, (uint32_t)data, (uint32_t)(&uart_ctrl->DR), len);
+-   // while (!(uart_ctrl->SR & (1 << 6)));  // 等待 TC
+     return 0;
+ }
++
++/* DMA 接收（启动循环 DMA 到环形缓冲区）
++ * P2M 方向：dma_start_transfer(src, dst, len)
++ *   → SxPAR=src(外设=DR), SxM0AR=dst(存储器=buf)
++ */
++int uart_recv_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size)
++{
++    xUSART_TypeDef *uart_ctrl = USARTx[id];
++    dma_start_transfer(dma_cfg, (uint32_t)(&uart_ctrl->DR), (uint32_t)buf, buf_size);
++    return 0;
++}
++
++/* 获取 DMA 流当前的 NDTR 值（剩余传输数） */
++uint16_t uart_dma_get_rx_ndtr(const dma_stream_config_t *dma_cfg)
++{
++    uint32_t stream_base = (DMA_REQ_GET_CTRL(dma_cfg->dma_request) == DMA_1) ?
++            DMA1_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request)) :
++            DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request));
++    xDMA_Stream_TypeDef *dma = (xDMA_Stream_TypeDef *)stream_base;
++    return (uint16_t)dma->SxNDTR;
++}
++
++/*
++ * 安全清除 USART IDLE 标志（DMA 循环接收模式下使用）
++ *
++ * 问题背景：
++ *   STM32F4 清除 IDLE 标志必须执行 "读 SR → 读 DR" 序列。
++ *   但在 DMA 循环接收模式下，DMA 正持续从 USART_DR 搬运数据到内存。
++ *   此时 CPU 直接读 DR 会与 DMA 争抢外设数据寄存器，导致 DMA 流控被打乱。
++ *
++ * 解决方案（依据 STM32F4 参考手册建议）：
++ *   1. 暂停 DMA 流 (SxCR.EN=0)，DMA 停止访问 DR
++ *   2. CPU 独占 DR，安全执行 SR→DR 读序列清除 IDLE
++ *   3. 恢复 DMA 流 (SxCR.EN=1)，NDTR 保存不变，DMA 从断点继续
++ *
++ * 注意：不要通过操作 DMAR 来避免冲突——
++ *   手册明确警告 "not to clear the DMAR bit without first
++ *   clearing the DMA stream enable bit"。
++ */
++void hal_uart_clear_idle_flag(uart_id_t id, const dma_stream_config_t *dma_cfg)
++{
++    xUSART_TypeDef *uart = USARTx[id];
++
++    /* 获取 DMA 流寄存器指针 */
++    uint32_t stream_base = (DMA_REQ_GET_CTRL(dma_cfg->dma_request) == DMA_1) ?
++            DMA1_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request)) :
++            DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(dma_cfg->dma_request));
++    xDMA_Stream_TypeDef *dma = (xDMA_Stream_TypeDef *)stream_base;
++
++    /*
++     * ① 暂停 DMA 流 —— 手册要求先关流再处理 DR
++     *    只清 EN(bit0)，保留所有配置（方向、循环、通道等）
++     *    NDTR 不会重载，保持当前值
++     */
++    uint32_t sxcr_saved = dma->SxCR;
++    dma->SxCR = sxcr_saved & ~1U;
++    __asm volatile ("dsb" ::: "memory");
++
++    /*
++     * ② CPU 独占 DR，安全清除 IDLE
++     *    此时 DMA 流已停，不会与 CPU 争抢 DR
++     */
++    volatile uint32_t sr_val = uart->SR;
++    volatile uint32_t dr_val = uart->DR;
++    (void)sr_val;
++    (void)dr_val;
++
++    /*
++     * ③ 恢复 DMA 流
++     *    SxCR 全部恢复（含 EN=1），NDTR 不变 → DMA 无缝续传
++     */
++    dma->SxCR = sxcr_saved;
++    __asm volatile ("dsb" ::: "memory");
++}
+diff --git a/os/driver/hal/hal_usart.h b/os/driver/hal/hal_usart.h
+index 0eb40c4..70477dc 100644
+--- a/os/driver/hal/hal_usart.h
++++ b/os/driver/hal/hal_usart.h
+@@ -70,7 +70,8 @@ typedef enum : uint16_t {
+     xUART_FLAG_TXE  = xUART_IT_TXE,
+     xUART_FLAG_TC   = xUART_IT_TC,
+ } uart_it_t;
+-
++#define USART_CR3_DMAT_Pos            (7U)
++#define USART_CR3_DMAR_Pos            (6U)
+ 
+ void hal_uart_clock_enable(uart_id_t id);
+ void hal_uart_set_baudrate(uart_id_t id, uint32_t baudrate);
+@@ -79,11 +80,15 @@ void hal_uart_enable(uart_id_t id);
+ bool hal_uart_it_init(uart_id_t id, uart_it_t it_enable);
+ void hal_uart_dma_init(uart_id_t id, bool txdma, bool rxdma);
+ void hal_uart_send(uart_id_t id, uint8_t *buf, size_t count);
+-void hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count);
++size_t hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count);
+ uint32_t hal_uart_get_it_event(uart_id_t id);
+-void hal_uart_set_it_event(uart_id_t id, uart_it_t it_event);
+-void hal_uart_clear_it_event(uart_id_t id, uart_it_t it_event);
++void hal_uart_it_enable(uart_id_t id, uart_it_t it_event);
++void hal_uart_it_disable(uart_id_t id, uart_it_t it_event);
++void hal_uart_it_clear(uart_id_t id, uart_it_t it_event);
+ volatile uint8_t *hal_uart_data_addr(uart_id_t id);
+ int uart_send_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len);
++int uart_recv_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size);
++uint16_t uart_dma_get_rx_ndtr(const dma_stream_config_t *dma_cfg);
++void hal_uart_clear_idle_flag(uart_id_t id, const dma_stream_config_t *dma_cfg);
+ 
+ #endif //STM32F4DISCOVERY_HAL_USART_H
+diff --git a/os/driver/i2c.c b/os/driver/i2c.c
+index 7cb1f23..791e5af 100644
+--- a/os/driver/i2c.c
++++ b/os/driver/i2c.c
+@@ -1,3 +1,17 @@
++/**
++ * I2C 驱动 — Device VTable + SVC 模式
++ *
++ * 用户接口（通过 SVC 调用）:
++ *   dev_ioctl(i2c, I2C_IOCTL_SET_ADDR, &addr)  → 设置从设备地址
++ *   dev_write(i2c, buf, count)  → I2C 主设备发送 (IT/DMA/阻塞)
++ *   dev_read(i2c, buf, count)   → I2C 主设备接收 (IT/DMA/阻塞)
++ *   dev_ioctl(i2c, I2C_IOCTL_TRANSFER, &args) → 写寄存器地址+读数据组合
++ *
++ * 内部模式选择:
++ *   dma_cfg != NULL → DMA 模式
++ *   dma_cfg == NULL && it_enable → 中断模式
++ *   否则 → 阻塞轮询 (调用 hal 层实现)
++ */
+ #include "i2c.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -6,29 +20,27 @@
+ #include "hal/hal_i2c.h"
+ #include "common/rcc.h"
+ 
+-//static void i2c_transmit_dma(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-static void i2c_receive_it(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+-static void i2c_transmit_it(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-//static void i2c_receive(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+-//static void i2c_transmit(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-
+-dev_init_override(i2c_dev_init_impl);
+ static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf);
+ static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf);
+-// 析构函数声明
+-static void i2c_destroy(I2c* self);
+ 
++/* ── Device VTable override ── */
++dev_init_override(i2c_dev_init_impl);
++dev_read_override(i2c_dev_read_impl);
++dev_write_override(i2c_dev_write_impl);
++dev_ioctl_override(i2c_dev_ioctl_impl);
++
++static void i2c_destroy(I2c* self);
+ 
+-// TODO: 初始化数据成员
+ static const I2cFun i2c_fun = {
+     .destroy = i2c_destroy,
+-//	.transmit = i2c_transmit,
+-//	.receive = i2c_receive,
+-	.transmit_it = i2c_transmit_it,
+-	.receive_it = i2c_receive_it,
+ };
+-// 构造函数实现
+-I2c* i2c_create(const device_info_t *info) {
++
++/* ══════════════════════════════════════════════════════════════
++   构造 / 析构
++   ══════════════════════════════════════════════════════════════ */
++
++I2c* i2c_create(const device_info_t *info)
++{
+     I2c* obj = (I2c*)os_malloc(sizeof(I2c));
+     if (obj) {
+         memset(obj, 0, sizeof(I2c));
+@@ -37,245 +49,297 @@ I2c* i2c_create(const device_info_t *info) {
+     return obj;
+ }
+ 
+-void i2c_init(I2c* self, const device_info_t *info) {
+-    // 初始化基类部分
++void i2c_init(I2c* self, const device_info_t *info)
++{
+     device_init(&self->base, info);
+-    self->fun = &(i2c_fun);
+-    // TODO: 初始化派生类特有成员
+-
+-	def_dev_init(self) = i2c_dev_init_impl;
+-    self->i2c_xfer = NULL;
+-}
++    self->fun = &i2c_fun;
+ 
++    GET_DEVICE_VTABLE(self)->dev_init  = i2c_dev_init_impl;
++    GET_DEVICE_VTABLE(self)->dev_read  = i2c_dev_read_impl;
++    GET_DEVICE_VTABLE(self)->dev_write = i2c_dev_write_impl;
++    GET_DEVICE_VTABLE(self)->dev_ioctl = i2c_dev_ioctl_impl;
+ 
++    self->i2c_xfer  = NULL;
++    self->slave_addr = 0x50;  /* 默认从地址 */
++}
+ 
+-void i2c_deinit(I2c* self) {
++void i2c_deinit(I2c* self)
++{
+     device_deinit(GET_DEVICE(self));
+-    // TODO: 数据成员申请资源释放
+ }
+-// 析构函数实现
+-static void i2c_destroy(I2c* self) {
+-    if (self != NULL) {
+-        i2c_deinit(self);
+-        os_free(self);
+-    }
++
++static void i2c_destroy(I2c* self)
++{
++    if (self) { i2c_deinit(self); os_free(self); }
+ }
+ 
+-// dev_init method
+-dev_init_override(i2c_dev_init_impl) {
+-    LOG_DEBUG("i2c", "i2c init");
+-    // TODO: add dev_init method
++/* ══════════════════════════════════════════════════════════════
++   dev_init — 硬件初始化
++   ══════════════════════════════════════════════════════════════ */
++
++dev_init_override(i2c_dev_init_impl)
++{
+     I2c *i2c = (I2c *)self;
+     const i2c_config_t *conf = self->info->conf;
+-    //params 
+-    if (conf->id >= I2C_MAX) {
+-        return;
+-    }
+ 
+-    /* 1. 通过 PinMux 申请引脚 (AF4) */
++    if (conf->id >= I2C_MAX) return;
++
++    /* 1. PinMux AF4 (开漏) */
+     const i2c_pins_t *p = &conf->pins;
+-    /*
+-     *  I2C1：例如 PB6、PB7 等引脚，复用功能为 AF4。
+-        I2C2：例如 PB10、PB11 等引脚，复用功能为 AF4。
+-        I2C3：例如 PA8、PC9 等引脚，复用功能也为 AF4。
+-        */
+     pin_config_t pins[] = {
+-            {.mode = PIN_MODE_AF,
+-              .otype = PIN_OTYPE_OD,
+-              .ospeed = PIN_OSPEED_HIGH,
+-              .pupd = PIN_PUPD_NONE,
+-              .af = p->scl_pin },
+-            {.mode = PIN_MODE_AF,
+-              .otype = PIN_OTYPE_OD,
+-              .ospeed = PIN_OSPEED_HIGH,
+-              .pupd = PIN_PUPD_NONE,
+-              .af = p->sda_pin }
++        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_OD, .ospeed = PIN_OSPEED_HIGH,
++         .pupd = PIN_PUPD_NONE, .af = p->scl_pin },
++        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_OD, .ospeed = PIN_OSPEED_HIGH,
++         .pupd = PIN_PUPD_NONE, .af = p->sda_pin },
+     };
+     for (int i = 0; i < 2; i++) {
+         if (pinmux_request(&pins[i]) != PINMUX_SUCCESS) {
+-            LOG_ERROR("i2c", "i2c pinmux error");
++            LOG_ERROR("i2c", "pinmux error");
+             return;
+         }
+     }
+-    LOG_DEBUG("i2c", "enable clock");
+-    /* 2. 使能时钟 */
++
++    /* 2. 时钟 + 复位 + 配置 */
+     hal_i2c_clock_enable(conf->id);
+-    /* 3. 复位 I2C */
+     hal_i2c_reset(conf->id);
+-
+-    /* 4. 配置时钟 */
+-
+     hal_i2c_set_clock(conf->id, conf->clock_speed);
+-
+-    /* 5. 配置本机地址 */
+     hal_i2c_set_addr(conf->id, conf->addr_mode, conf->own_address);
+-
+-    /* 6. 使能外设 */
+     hal_i2c_enable(conf->id);
+ 
+-    /* 7. 中断配置 */
+-    if (hal_i2c_it_init(conf->id, conf->it_enable)) {
++    /* 4. DMA 初始化 */
++    if (conf->dma_cfg) {
++        if (!i2c->i2c_xfer) {
++            i2c->i2c_xfer = os_malloc(sizeof(i2c_xfer_state_t));
++            memset(i2c->i2c_xfer, 0, sizeof(i2c_xfer_state_t));
++            i2c->i2c_xfer->i2c_sem = semaphore_create(0);
++        }
++        if (conf->dma_cfg->tx_dma) dma_stream_request(conf->dma_cfg->tx_dma);
++        if (conf->dma_cfg->rx_dma) dma_stream_request(conf->dma_cfg->rx_dma);
++        hal_i2c_dma_init(conf->id, conf->dma_cfg->tx_dma,
++                         conf->dma_cfg->rx_dma);
++    } else if (hal_i2c_it_init(conf->id, conf->it_enable)) {
+         self->irq_conf->arg = self;
++
+         if (conf->it_enable & (xI2C_IT_TXE | xI2C_IT_RXNE)) {
+             self->irq_conf->handler = i2c_irq_handler_impl;
+-            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, I2C1_EV_IRQ + conf->id * 2);
++            self->irq_conf->irq_list->fun->add_int(
++                    self->irq_conf->irq_list, I2C1_EV_IRQ + conf->id * 2);
+             self->fun->config_irq(self, self->irq_conf);
+         }
+         if (conf->it_enable & xI2C_IT_ERR) {
+             self->irq_conf->handler = i2c_irq_err_handler_impl;
+-            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, I2C1_ER_IRQ + conf->id * 2);
++            self->irq_conf->irq_list->fun->add_int(
++                    self->irq_conf->irq_list, I2C1_ER_IRQ + conf->id * 2);
+             self->fun->config_irq(self, self->irq_conf);
+         }
+ 
+         if (!i2c->i2c_xfer) {
+             i2c->i2c_xfer = os_malloc(sizeof(i2c_xfer_state_t));
+             memset(i2c->i2c_xfer, 0, sizeof(i2c_xfer_state_t));
+-            i2c->i2c_xfer->i2c_tx_sem = semaphore_create(0);
+-            i2c->i2c_xfer->i2c_rx_sem = semaphore_create(0);
++            i2c->i2c_xfer->i2c_sem = semaphore_create(0);
+         }
+     }
+ 
+-    if (conf->dma_cfg) {
+-        if (conf->dma_cfg->tx_dma) {
+-            dma_stream_request(conf->dma_cfg->tx_dma);
++    LOG_DEBUG("i2c", "i2c%d init ok", conf->id);
++}
++
++/* ══════════════════════════════════════════════════════════════
++   dev_write — I2C 主设备发送
++   ══════════════════════════════════════════════════════════════ */
++
++dev_write_override(i2c_dev_write_impl)
++{
++    I2c *i2c = (I2c *)self;
++    const i2c_config_t *conf = self->info->conf;
++
++    if (conf->id >= I2C_MAX || count == 0) return;
++
++    i2c_xfer_state_t *s = i2c->i2c_xfer;
++    const uint8_t *data = (const uint8_t *)buf;
++    uint16_t len = (uint16_t)count;
++
++    if (conf->dma_cfg && conf->dma_cfg->tx_dma && conf->dma_cfg->rx_dma) {
++        /* ─── DMA 发送 ─── */
++        i2c_transmit_dma(conf->id, conf->dma_cfg->tx_dma,
++                         i2c->slave_addr, data, len);
++
++    } else if (conf->it_enable) {
++        /* ─── 中断发送 ─── */
++        if (!s || s->active) {
++            return;
++        }
++
++        s->tx_buf    = data;
++        s->total_len = len;
++        s->index     = 0;
++        s->active    = true;
++        s->direction = 0;  /* TX */
++
++        hal_i2c_transmit_it_start(conf->id);
++        s->i2c_sem->fun->take(s->i2c_sem);
++
++    } else {
++        /* ─── 阻塞发送 ─── */
++        i2c_transmit(conf->id, i2c->slave_addr, data, len);
++    }
++}
++
++/* ══════════════════════════════════════════════════════════════
++   dev_read — I2C 主设备接收
++   ══════════════════════════════════════════════════════════════ */
++
++dev_read_override(i2c_dev_read_impl)
++{
++    I2c *i2c = (I2c *)self;
++    const i2c_config_t *conf = self->info->conf;
++
++    if (conf->id >= I2C_MAX || count == 0) return 0;
++
++    i2c_xfer_state_t *s = i2c->i2c_xfer;
++    uint8_t *data = (uint8_t *)buf;
++    uint16_t len = (uint16_t)count;
++
++    if (conf->dma_cfg && conf->dma_cfg->rx_dma) {
++        /* ─── DMA 接收 ── */
++        i2c_transmit_dma(conf->id, conf->dma_cfg->rx_dma,
++                         i2c->slave_addr, NULL, len);  /* TODO: 正确 DMA 接收 */
++
++    } else if (conf->it_enable) {
++        /* ─── 中断接收 ─── */
++        if (!s || s->active) {
++            return 0;
+         }
+-        if (conf->dma_cfg->rx_dma) {
+-            dma_stream_request(conf->dma_cfg->rx_dma);
++
++        s->rx_buf    = data;
++        s->total_len = len;
++        s->index     = 0;
++        s->active    = true;
++        s->direction = 1;  /* RX */
++
++        hal_i2c_receive_it_start(conf->id);
++        s->i2c_sem->fun->take(s->i2c_sem);
++
++    } else {
++        /* ─── 阻塞接收 ─── */
++        i2c_receive(conf->id, i2c->slave_addr, data, len);
++    }
++    return len;
++}
++
++/* ══════════════════════════════════════════════════════════════
++   dev_ioctl — 扩展控制
++   ══════════════════════════════════════════════════════════════ */
++
++dev_ioctl_override(i2c_dev_ioctl_impl)
++{
++    I2c *i2c = (I2c *)self;
++
++    switch (cmd) {
++    case I2C_IOCTL_SET_ADDR:
++        if (arg) i2c->slave_addr = *(uint8_t *)arg;
++        break;
++
++    case I2C_IOCTL_TRANSFER: {
++        /* 写寄存器地址 + 读数据的组合操作 */
++        i2c_transfer_args_t *a = (i2c_transfer_args_t *)arg;
++        if (!a) break;
++        i2c->slave_addr = a->slave_addr;
++        if (a->tx_buf && a->tx_len > 0) {
++            virtual_dev_write(self, a->tx_buf, a->tx_len);
+         }
+-        hal_i2c_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
++        if (a->rx_buf && a->rx_len > 0) {
++            virtual_dev_read(self, a->rx_buf, a->rx_len);
++        }
++        break;
++    }
++    default: break;
+     }
+ }
+ 
++/* ══════════════════════════════════════════════════════════════
++   I2C 中断处理
++   ══════════════════════════════════════════════════════════════ */
+ 
+-static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf) {
++static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf)
++{
+     I2c *i2c = GET_I2C(irq_conf->arg);
+     const i2c_config_t *conf = GET_DEVICE(i2c)->info->conf;
+-   // xI2C_TypeDef *i2c_ctrl = I2Cx[conf->id];
+     i2c_xfer_state_t *s = i2c->i2c_xfer;
+-    if (!s) {
+-        return true;
+-    }
+-    if (!s->active) {
+-        return true;
+-    }
++    if (!s || !s->active) return true;
+ 
+     uint16_t sr1 = hal_i2c_get_it_event(conf->id);
+ 
+-    /* SB: 起始条件已发送 */
++    /* SB: 起始条件已发送 → 发送从设备地址 */
+     if (sr1 & I2C_FLG_SB) {
+-        if (s->direction == 0) {  // TX
+-            *hal_i2c_addr(conf->id) = (s->slave_addr << 1) | 0x00;  // 写地址;
+-        } else {                    // RX
+-            *hal_i2c_addr(conf->id) = (s->slave_addr << 1) | 0x01;  // 读地址
+-        }
++        *hal_i2c_addr(conf->id) = (i2c->slave_addr << 1)
++            | (s->direction ? 0x01 : 0x00);
+         return true;
+     }
+ 
+-    /* ADDR: 地址已发送，读 SR2 清除 ADDR 标志 */
++    /* ADDR: 地址已发送 → 清 ADDR */
+     if (sr1 & I2C_FLG_ADDR) {
+         hal_i2c_clear_addr_flag(conf->id);
+         if (s->direction == 1 && s->total_len == 1) {
+-            // 若只收一个字节，提前关闭 ACK
+             hal_i2c_close_ack(conf->id);
+         }
+         return true;
+     }
+ 
+-    /* TXE: 数据寄存器空，可以继续发送 */
++    /* TXE: 发送下一个字节 */
+     if (sr1 & I2C_FLG_TXE) {
+         if (s->direction == 0 && s->index < s->total_len) {
+             *hal_i2c_addr(conf->id) = s->tx_buf[s->index++];
+-        } else if (s->direction == 0 && s->index >= s->total_len) {
+-            // 发送完成，等 BTF 后发停止
+-            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN); // 关闭 TXE 中断
++        } else if (s->direction == 0) {
++            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN);
+         }
+-        //return true;
+     }
+ 
+-    /* RXNE: 收到数据 */
++    /* RXNE: 收到一个字节 */
+     if (sr1 & I2C_FLG_RXNE) {
+         if (s->direction == 1 && s->index < s->total_len) {
+             s->rx_buf[s->index++] = *hal_i2c_addr(conf->id);
+             if (s->index == s->total_len - 1) {
+-                hal_i2c_close_ack(conf->id);// 最后字节前关 ACK
++                hal_i2c_close_ack(conf->id);
+             }
+             if (s->index >= s->total_len) {
+-                // 接收完成
+-                hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN);
++                hal_i2c_clear_it_event(conf->id,
++                    xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN);
+                 hal_i2c_stop(conf->id);
+                 s->active = false;
+-                s->i2c_rx_sem->fun->give(s->i2c_rx_sem);
++                s->i2c_sem->fun->give(s->i2c_sem);
+             }
+         }
+         return true;
+     }
+ 
+-    /* BTF: 字节传输完成 */
++    /* BTF: 字节传输完成 → 发 STOP */
+     if (sr1 & I2C_FLG_BTF) {
+         if (s->direction == 0 && s->index >= s->total_len) {
+-            hal_i2c_stop(conf->id); // 发 STOP
+-            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);          // ★ 关掉事件中断总开关
+-
++            hal_i2c_stop(conf->id);
++            hal_i2c_clear_it_event(conf->id,
++                xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);
+             s->active = false;
+-            s->i2c_tx_sem->fun->give(s->i2c_tx_sem);
++            s->i2c_sem->fun->give(s->i2c_sem);
+         }
+         return true;
+     }
+ 
++    /* 防御：SR1 == 0 可能是噪声 */
+     if (sr1 == 0) {
+-        hal_i2c_stop(conf->id);                // 发 STOP
+-        hal_i2c_clear_it_event(conf->id, xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);          // ★ 关掉事件中断总开关
++        hal_i2c_stop(conf->id);
++        hal_i2c_clear_it_event(conf->id,
++            xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);
+     }
+     return true;
+ }
+ 
+-static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf) {
++static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf)
++{
++    I2c *i2c = GET_I2C(irq_conf->arg);
+     LOG_ERROR("i2c", "irq error");
+-    return true;
+-}
+-
+-
+-// transmit_it method
+-static void i2c_transmit_it(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len) {
+-    const i2c_config_t *conf = GET_DEVICE(self)->info->conf;
+-    if (conf->id >= I2C_MAX || len == 0) {
+-        return;
+-    }
+-
+-    i2c_xfer_state_t *s = self->i2c_xfer;
+-    s->tx_buf = data;
+-    s->total_len = len;
+-    s->index = 0;
+-    s->active = true;
+-    s->direction = 0;   // TX
+-    s->slave_addr = slave_addr;
+-
+-    hal_i2c_transmit_it_start(conf->id);
+-    if (s->i2c_tx_sem) {
+-        s->i2c_tx_sem->fun->take(s->i2c_tx_sem);
+-    }
+-}
+-
+-
+-// receive_it method
+-static void i2c_receive_it(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len) {
+-    // TODO: add receive_it method
+-    const i2c_config_t *conf = GET_DEVICE(self)->info->conf;
+-    if (conf->id >= I2C_MAX || len == 0) {
+-        return;
+-    }
+-
+-    i2c_xfer_state_t *s = self->i2c_xfer;
+-    s->rx_buf = buffer;
+-    s->total_len = len;
+-    s->index = 0;
+-    s->active = true;
+-    s->direction = 1;   // RX
+-    s->slave_addr = slave_addr;
+-
+-    hal_i2c_receive_it_start(conf->id);
+-    if (self->i2c_xfer->i2c_rx_sem) {
+-        self->i2c_xfer->i2c_rx_sem->fun->take(self->i2c_xfer->i2c_rx_sem);
++    if (i2c->i2c_xfer && i2c->i2c_xfer->active) {
++        i2c->i2c_xfer->active = false;
++        i2c->i2c_xfer->i2c_sem->fun->give(i2c->i2c_xfer->i2c_sem);
+     }
++    return true;
+ }
+-
+diff --git a/os/driver/i2c.h b/os/driver/i2c.h
+index 42b72b3..4ca9d4e 100644
+--- a/os/driver/i2c.h
++++ b/os/driver/i2c.h
+@@ -8,31 +8,8 @@
+ #include "common/gpio.h"
+ #include "hal/hal_i2c.h"
+ 
+-#define GET_I2C_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(I2cVTable **)obj)
+ #define GET_I2C(obj) ((I2c *)obj)
+ 
+-// 派生类声明
+-typedef struct _I2c I2c;
+-typedef struct _I2cFun I2cFun;
+-// 类成员函数结构
+-struct _I2cFun {
+-    void (*destroy)(I2c* self);
+-	//void (*transmit)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-	//void (*receive)(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+-	void (*transmit_it)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-	void (*receive_it)(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+-	//void (*transmit_dma)(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+-};
+-
+-
+-
+-
+-
+-/* 回调事件类型 */
+-#define I2C_EVT_TX_COMPLETE    1
+-#define I2C_EVT_RX_COMPLETE    2
+-#define I2C_EVT_ERROR          3
+-
+ /* I2C 引脚描述 */
+ typedef struct {
+     pin_af scl_pin;
+@@ -47,40 +24,61 @@ typedef struct {
+ /* I2C 配置描述符 */
+ typedef struct {
+     i2c_id_t        id;
+-    uint32_t        clock_speed;    /* 目标频率，如 100000 (标准) 或 400000 (快速) */
+-    i2c_addr_mode_t addr_mode;      /* I2C_ADDR_7BIT / I2C_ADDR_10BIT */
+-    uint8_t         own_address;    /* 本机地址 (从模式使用，忽略可设 0) */
++    uint32_t        clock_speed;
++    i2c_addr_mode_t addr_mode;
++    uint8_t         own_address;
+     i2c_pins_t      pins;
+-    /* 中断配置 (可选) */
+-    i2c_it_t        it_enable;      /* I2C_IT_TXE | I2C_IT_RXNE | I2C_IT_ERR */
+-    /* DMA 可选配置 (预留扩展) */
++    i2c_it_t        it_enable;
+     const i2c_dma_config_t *dma_cfg;
+ } i2c_config_t;
+-/* 中断传输状态 */
++
++/* ── 中断传输状态 ── */
+ typedef struct {
+     const uint8_t *tx_buf;
+-    uint8_t *rx_buf;
+-    uint16_t total_len;
+-    uint16_t index;
+-    bool active;       /* 传输进行中 */
+-    bool direction;    /* 0=TX, 1=RX */
+-    uint8_t slave_addr;
+-    Semaphore * i2c_tx_sem;
+-    Semaphore * i2c_rx_sem;
++    uint8_t       *rx_buf;
++    uint16_t       total_len;
++    uint16_t       index;
++    bool           active;
++    bool           direction;        /* 0=TX, 1=RX */
++    Semaphore     *i2c_sem;          /* 传输完成信号量 */
+ } i2c_xfer_state_t;
+ 
++/*
++ * ─── Device VTable 的 override（用户通过 SVC 调用） ───
++ * 使用前需通过 ioctl 设置从设备地址：
++ *   dev_ioctl(i2c, I2C_IOCTL_SET_ADDR, &slave_addr);
++ *   dev_write(i2c, buf, count)  → I2C 主设备发送
++ *   dev_read(i2c, buf, count)   → I2C 主设备接收
++ */
++#define I2C_IOCTL_SET_ADDR    0x60  /* arg = uint8_t* 从设备地址 */
++#define I2C_IOCTL_TRANSFER    0x61  /* arg = i2c_transfer_args_t* */
++
++typedef struct {
++    uint8_t        slave_addr;
++    const uint8_t *tx_buf;
++    uint8_t       *rx_buf;
++    uint16_t       tx_len;
++    uint16_t       rx_len;
++} i2c_transfer_args_t;
++
++// 派生类
++typedef struct _I2c I2c;
++typedef struct _I2cFun I2cFun;
++
++struct _I2cFun {
++    void (*destroy)(I2c* self);
++};
++
+ struct _I2c {
+-    Device base;  // 基类作为第一个成员
++    Device base;
+     const I2cFun* fun;
+-    // TODO: 添加派生类特有的数据成员
+     i2c_xfer_state_t *i2c_xfer;
++    uint8_t           slave_addr;     /* 当前从设备地址 */
+ };
+ 
+-// 构造函数声明
++/* 构造函数 */
+ I2c* i2c_create(const device_info_t *info);
+ void i2c_init(I2c* self, const device_info_t *info);
+-
+-// 析构函数声明
+ void i2c_deinit(I2c* self);
+ 
+-#endif // I2C_H
+\ No newline at end of file
++#endif // I2C_H
+diff --git a/os/driver/spi.c b/os/driver/spi.c
+index ad157f6..4b12e4c 100644
+--- a/os/driver/spi.c
++++ b/os/driver/spi.c
+@@ -1,3 +1,16 @@
++/**
++ * SPI 驱动 — Device VTable + SVC 模式
++ *
++ * 用户接口（通过 SVC 调用）:
++ *   dev_write(spi, tx_buf, count) → SPI 全双工传输，RX→内部 cache
++ *   dev_read(spi, rx_buf, count)  → 从内部 cache 取最近一次传输的 RX 数据
++ *   dev_ioctl(spi, SPI_IOCTL_TRANSFER, &args) → 直接指定 tx+rx 的传输
++ *
++ * 内部模式选择:
++ *   dma_cfg != NULL → DMA 模式
++ *   dma_cfg == NULL && it_enable → 中断模式
++ *   否则 → 阻塞轮询
++ */
+ #include "spi.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -5,31 +18,30 @@
+ #include "../log/log.h"
+ #include "hal/hal_spi.h"
+ 
+-static void spi_transfer_it(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
+-
+-static void spi_transfer_dma(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
+-
+-static void spi_transfer(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
++/* ── 前向声明 ── */
+ static bool spi_irq_handler_impl(nvic_irq_t *irq_conf);
+ static bool spi_txdma_irq_handler_impl(nvic_irq_t *irq_conf);
+ static bool spi_rxdma_irq_handler_impl(nvic_irq_t *irq_conf);
+ 
++/* ── Device VTable override 宏 ── */
+ dev_init_override(spi_dev_init_impl);
++dev_read_override(spi_dev_read_impl);
++dev_write_override(spi_dev_write_impl);
++dev_ioctl_override(spi_dev_ioctl_impl);
+ 
+-
+-// 析构函数声明
+ static void spi_destroy(Spi* self);
+ 
+-// TODO: 初始化数据成员
++/* ── 虚函数表 ── */
+ static const SpiFun spi_fun = {
+     .destroy = spi_destroy,
+-	.transfer = spi_transfer,
+-	.transfer_dma = spi_transfer_dma,
+-	.transfer_it = spi_transfer_it,
+ };
+ 
+-// 构造函数实现
+-Spi* spi_create(const device_info_t *info) {
++/* ══════════════════════════════════════════════════════════════
++   构造 / 析构
++   ══════════════════════════════════════════════════════════════ */
++
++Spi* spi_create(const device_info_t *info)
++{
+     Spi* obj = (Spi*)os_malloc(sizeof(Spi));
+     if (obj) {
+         memset(obj, 0, sizeof(Spi));
+@@ -38,276 +50,367 @@ Spi* spi_create(const device_info_t *info) {
+     return obj;
+ }
+ 
+-void spi_init(Spi* self, const device_info_t *info) {
+-    // 初始化基类部分
++void spi_init(Spi* self, const device_info_t *info)
++{
+     device_init(&self->base, info);
+-    self->fun = &(spi_fun);
+-    // TODO: 初始化派生类特有成员
+-	def_dev_init(self) = spi_dev_init_impl;
+-    self->spi_xfer = NULL;
+-
++    self->fun = &spi_fun;
++
++    GET_DEVICE_VTABLE(self)->dev_init  = spi_dev_init_impl;
++    GET_DEVICE_VTABLE(self)->dev_read  = spi_dev_read_impl;
++    GET_DEVICE_VTABLE(self)->dev_write = spi_dev_write_impl;
++    GET_DEVICE_VTABLE(self)->dev_ioctl = spi_dev_ioctl_impl;
++    const spi_config_t *conf = info->conf;
++//    self->rx_cache_buf = ringbuf_create(conf->cache_size);
++    if (!self->spi_xfer) {
++        self->spi_xfer = os_malloc(sizeof(spi_xfer_t));
++        memset(self->spi_xfer, 0, sizeof(spi_xfer_t));
++        self->spi_xfer->tx_user_buf = os_malloc(sizeof(spi_cache_t));
++        memset(self->spi_xfer->tx_user_buf, 0, sizeof(spi_cache_t));
++        self->spi_xfer->rx_user_buf = os_malloc(sizeof(spi_cache_t));
++        memset(self->spi_xfer->rx_user_buf, 0, sizeof(spi_cache_t));
++        self->spi_xfer->spi_sem = semaphore_create(0);
++        //self->spi_xfer->uart_rx_sem = semaphore_create(0);
++    }
++    self->cs_pin = NULL;
+ }
+ 
+-
+-void spi_deinit(Spi* self) {
++void spi_deinit(Spi* self)
++{
+     device_deinit(GET_DEVICE(self));
+-    // TODO: 数据成员申请资源释放
+ }
+-// 析构函数实现
+-static void spi_destroy(Spi* self) {
+-    if (self != NULL) {
+-        spi_deinit(self);
+-        os_free(self);
+-    }
++
++static void spi_destroy(Spi* self)
++{
++    if (self) { spi_deinit(self); os_free(self); }
+ }
+ 
+-// dev_init method
+-dev_init_override(spi_dev_init_impl) {
+-    LOG_DEBUG("spi", "spi init");
+-    // TODO: add dev_init method
++/* ══════════════════════════════════════════════════════════════
++   dev_init — 硬件初始化
++   ══════════════════════════════════════════════════════════════ */
++
++dev_init_override(spi_dev_init_impl)
++{
+     Spi *spi = (Spi *)self;
+     const spi_config_t *conf = self->info->conf;
+-    //params 
+-    if (conf->id >= SPI_MAX)
+-        return;
+ 
+-    /* 1. 通过 PinMux 申请引脚 (AF5) */
++    if (conf->id >= SPI_MAX) return;
++
++    /* 1. PinMux AF5 */
+     const spi_pins_t *p = &conf->pins;
+-    /*
+-     *  SPI接口	常用默认引脚	AF配置 (复用功能)	备注
+-        SPI1	PA5-PA7, PA4(NSS)	AF5	我们在示例中使用过
+-        SPI2	PB12-PB15	AF5	我们在示例中使用过
+-        SPI3	PA15, PC10-PC12 等	AF6 (或AF5，取决于引脚)	取决于具体引脚，常见为AF6
+-        SPI4	PE2-PE6, PE14 等	AF5 (或AF6，取决于引脚)	取决于具体引脚，常见为AF5
+-        SPI5	PF7-PF9, PF6(NSS)	AF5 (或AF6，取决于引脚)	取决于具体引脚，常见为AF5
+-        SPI6	PG12-PG14, PG8(NSS)	AF5	通常为AF5 */
+     pin_config_t pins[] = {
+-            {
+-                .mode = PIN_MODE_AF,
+-                .otype = PIN_OTYPE_PP,
+-                .ospeed = PIN_OSPEED_HIGH,
+-                .pupd = PIN_PUPD_NONE,
+-                .af = p->sck_pin },
+-            {
+-                .mode = PIN_MODE_AF,
+-                .otype = PIN_OTYPE_PP,
+-                .ospeed = PIN_OSPEED_HIGH,
+-                .pupd = PIN_PUPD_NONE,
+-                .af = p->mosi_pin },
+-            {
+-                .mode = PIN_MODE_AF,
+-                .otype = PIN_OTYPE_PP,
+-                .ospeed = PIN_OSPEED_HIGH,
+-                .pupd = PIN_PUPD_NONE,
+-                .af = p->miso_pin },
+-            {
+-                .mode = PIN_MODE_AF,
+-                .otype = PIN_OTYPE_PP,
+-                .ospeed = PIN_OSPEED_HIGH,
+-                .pupd = PIN_PUPD_NONE,
+-                .af = p->nss_pin }  // 可选，硬件NSS
++        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH,
++         .pupd = PIN_PUPD_NONE, .af = p->sck_pin },
++        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH,
++         .pupd = PIN_PUPD_NONE, .af = p->mosi_pin },
++        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH,
++         .pupd = PIN_PUPD_NONE, .af = p->miso_pin },
++        /* NSS: 硬件模式用 AF，软件模式用 GPIO output */
++        { .port = p->cs_pin.port, .pin = p->cs_pin.pin,
++          .mode = (conf->nss_mode == SPI_NSS_HARD) ? PIN_MODE_AF : PIN_MODE_OUTPUT,
++          .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP,
++          .af = (conf->nss_mode == SPI_NSS_HARD) ? p->nss_pin : 0 },
+     };
++
+     for (int i = 0; i < 4; i++) {
+-        if (pinmux_request(&pins[i]) != PINMUX_SUCCESS) {
+-            return;
+-        }
++        if (pinmux_request(&pins[i]) != PINMUX_SUCCESS) return;
+     }
+-
+-    /* 2. 使能时钟 */
++    if (conf->nss_mode == SPI_NSS_SOFT) {
++        spi->cs_pin = &p->cs_pin;//AF_REQ_GET_PORT(conf->pins.nss_pin);
++        gpio_set(spi->cs_pin);
++    }
++    /* 2. 时钟 + 配置 */
+     hal_spi_clock_enable(conf->id);
++    hal_spi_init(conf->id, conf->mode, conf->frame_format,
++                 conf->baudrate_div, conf->master, conf->first_bit,
++                 conf->nss_mode);
+ 
+-    /* 3. 配置 SPI */
+-    hal_spi_init(conf->id, conf->mode, conf->frame_format, conf->baudrate_div, conf->master);
+-
+-    /* CR2 */
++    /* 3. 中断初始化 */
++    //spi_xfer_t *x = NULL;
+     hal_spi_disable_it(conf->id);
+-    if (hal_spi_it_init(conf->id, conf->it_enable)) {
+-        self->irq_conf->handler = spi_irq_handler_impl;
+-        self->irq_conf->arg = self;
+-        self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, SPI1_IRQ + conf->id);
+-        self->fun->config_irq(self, self->irq_conf);
+-        if (!spi->spi_xfer) {
+-            spi->spi_xfer = os_malloc(sizeof(spi_xfer_t));
+-            memset(spi->spi_xfer, 0, sizeof(spi_xfer_t));
+-            spi->spi_xfer->spi_rx_sem = semaphore_create(0);
+-            spi->spi_xfer->spi_tx_sem = semaphore_create(0);
+-        }
+-    }
+-    /* 4. 申请 DMA 流 (可选) */
++    /* 4. DMA 初始化 */
+     if (conf->dma_cfg) {
++        //if (!spi->spi_xfer) {
++        //    spi->spi_xfer = os_malloc(sizeof(spi_xfer_t));
++        //    memset(spi->spi_xfer, 0, sizeof(spi_xfer_t));
++        //    spi->spi_xfer->spi_sem = semaphore_create(0);
++        //}
+         if (conf->dma_cfg->tx_dma) {
+-            if (dma_stream_request(conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
+-                return;
+-            }
++            dma_stream_request(conf->dma_cfg->tx_dma);
+             if (conf->dma_cfg->tx_dma->it_enable) {
+                 self->irq_conf->handler = spi_txdma_irq_handler_impl;
+                 self->irq_conf->arg = self;
+-                self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->tx_dma));
++                self->irq_conf->irq_list->fun->add_int(
++                    self->irq_conf->irq_list,
++                    dma_get_irqnum(conf->dma_cfg->tx_dma));
+                 self->fun->config_irq(self, self->irq_conf);
+             }
+         }
+         if (conf->dma_cfg->rx_dma) {
+-            if (dma_stream_request(conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
+-                return;
+-            }
++            dma_stream_request(conf->dma_cfg->rx_dma);
+             if (conf->dma_cfg->rx_dma->it_enable) {
+                 self->irq_conf->handler = spi_rxdma_irq_handler_impl;
+                 self->irq_conf->arg = self;
+-                self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->rx_dma));
++                self->irq_conf->irq_list->fun->add_int(
++                    self->irq_conf->irq_list,
++                    dma_get_irqnum(conf->dma_cfg->rx_dma));
+                 self->fun->config_irq(self, self->irq_conf);
+             }
+         }
+-        hal_spi_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
++        hal_spi_dma_init(conf->id, conf->dma_cfg->tx_dma,
++                         conf->dma_cfg->rx_dma);
++    } else if (hal_spi_it_init(conf->id, conf->it_enable)) {
++        self->irq_conf->handler = spi_irq_handler_impl;
++        self->irq_conf->arg = self;
++        self->irq_conf->irq_list->fun->add_int(
++                self->irq_conf->irq_list, (int) (SPI1_IRQ + conf->id));
++        self->fun->config_irq(self, self->irq_conf);
+ 
++        if (!spi->spi_xfer) {
++            spi->spi_xfer = os_malloc(sizeof(spi_xfer_t));
++            memset(spi->spi_xfer, 0, sizeof(spi_xfer_t));
++            spi->spi_xfer->spi_sem = semaphore_create(0);
++        }
++       // x = spi->spi_xfer;
+     }
++
++    LOG_DEBUG("spi", "spi%d init ok, mode=%s", conf->id,
++              conf->dma_cfg ? "dma" : conf->it_enable ? "it" : "poll");
+ }
+ 
++/* ══════════════════════════════════════════════════════════════
++   dev_read — 从内部 RX cache 取数据
++   ══════════════════════════════════════════════════════════════ */
++
++dev_read_override(spi_dev_read_impl)
++{
++    Spi *spi = (Spi *)self;
++    spi_xfer_t *x = spi->spi_xfer;
++    const spi_config_t *conf = self->info->conf;
++    if (conf->dma_cfg && conf->dma_cfg->tx_dma
++        && conf->dma_cfg->rx_dma) {
++        /* ── DMA 模式: 从 ringbuf 取 dev_write 时 DMA 写入的 RX 数据 ── */
++        //ringbuf_get(spi->rx_cache_buf, (uint8_t *)buf, count);
+ 
+-// transfer method
+-static void spi_transfer(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len) {
+-    // TODO: add transfer method
+-    const spi_config_t *conf = GET_DEVICE(self)->info->conf;
+-    if (conf->id >= SPI_MAX) {
+-        return;
+-    }
+ 
+-    uint32_t sr = hal_spi_get_it_event(conf->id);
+-    for (int i = 0; i < len; i++) {
+-        while (!(sr & xSPI_IT_TXE));      // 等待发送缓冲区空
+-        uint8_t tx_byte = tx_data ? tx_data[i] : 0xFF;   // 发送数据或哑字节
+-        *hal_spi_data_addr(conf->id) = tx_byte;
+-        while (!(sr & xSPI_IT_RXNE));     // 等待接收缓冲区非空
+-        uint8_t rx_byte = *hal_spi_data_addr(conf->id);
+-        if (rx_data) {
+-            rx_data[i] = rx_byte;
++
++    } else if (conf->it_enable) {
++        if (!x || x->active) {
++            return 0;
+         }
++        x->rx_user_buf->buf      = buf;
++        x->rx_user_buf->buf_size = count;
++        x->rx_user_buf->pos      = 0;
++
++        x->tx_user_buf->buf      = NULL;
++        x->tx_user_buf->buf_size = 0;
++        x->tx_user_buf->pos      = 0;
++        x->active                = true;
++        hal_spi_set_it(conf->id, xSPI_IE_TXE | xSPI_IE_RXNE);
++        /* 写入第一个字节触发时钟 */
++        uint8_t first = x->tx_user_buf->buf ? x->tx_user_buf->buf[0] : 0xFF;
++        *hal_spi_data_addr(conf->id) = first;
++        x->tx_user_buf->pos = 1;
++        x->spi_sem->fun->take(x->spi_sem);
++    } else {
++        hal_spi_receive(conf->id, spi->cs_pin, buf, count);
+     }
+-    return;
++    return count;
+ }
+ 
++/* ══════════════════════════════════════════════════════════════
++   dev_write — SPI 全双工传输（IT / DMA / 阻塞）
++   ══════════════════════════════════════════════════════════════ */
+ 
+-// transfer_dma method
+-static void spi_transfer_dma(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len) {
+-    const spi_config_t *conf = GET_DEVICE(self)->info->conf;
+-    if (conf->id >= SPI_MAX) {
+-        return;
+-    }
++dev_write_override(spi_dev_write_impl)
++{
++    Spi *spi = (Spi *)self;
++    const spi_config_t *conf = self->info->conf;
++
++    if (conf->id >= SPI_MAX || count == 0) return;
+ 
+-    /* TX DMA */
+-    if (conf->dma_cfg && conf->dma_cfg->tx_dma && tx_data) {
+-        if (dma_is_busy(conf->dma_cfg->tx_dma)) {
+-            return ;
++    spi_xfer_t *x = spi->spi_xfer;
++
++    if (conf->dma_cfg && conf->dma_cfg->tx_dma
++        && conf->dma_cfg->rx_dma) {
++        /* ─── DMA 模式 ─── */
++        if (!x || dma_is_busy(conf->dma_cfg->tx_dma)) {
++            return;
+         }
+-        dma_start_transfer(conf->dma_cfg->tx_dma, (uint32_t)tx_data, (uint32_t)hal_spi_data_addr(conf->id), len);
+-        //dma_tx_busy[id] = true;
++        x->active = true;
++        /* TX DMA: 内存 → SPI_DR (发送) */
++        hal_spi_send_dma(conf->id, conf->dma_cfg->tx_dma, buf, count);
++        /* RX DMA: SPI_DR → ringbuf buffer (接收) */
++        //hal_spi_recv_dma(conf->id, conf->dma_cfg->rx_dma,
++        //                 spi->rx_cache_buf->buffer, l);
++
++        /* TX TC 中断唤醒 (RX 同步完成，无需单独等待) */
++        x->spi_sem->fun->take(x->spi_sem);
++
++    } else if (conf->it_enable) {
++        /* ─── 中断模式 ─── */
++        if (!x || x->active) {
++            return;
++        }
++        x->rx_user_buf->buf      = NULL;
++        x->rx_user_buf->buf_size = 0;
++        x->rx_user_buf->pos      = 0;
++
++        x->tx_user_buf->buf      = (uint8_t *)buf;
++        x->tx_user_buf->buf_size = count;
++        x->tx_user_buf->pos      = 0;
++        x->active                = true;
++
++        hal_spi_set_it(conf->id, xSPI_IE_TXE | xSPI_IE_RXNE);
++
++        /* 写入第一个字节触发时钟 */
++        uint8_t first = x->tx_user_buf->buf ? x->tx_user_buf->buf[0] : 0xFF;
++        *hal_spi_data_addr(conf->id) = first;
++        x->tx_user_buf->pos = 1;
++        x->spi_sem->fun->take(x->spi_sem);
++    } else {
++        /* ─── 阻塞轮询模式 ─── */
++        hal_spi_transmit(conf->id, spi->cs_pin, buf, count);
+     }
++}
+ 
+-    /* RX DMA */
+-    if (conf->dma_cfg  && conf->dma_cfg->rx_dma && rx_data) {
+-        if (dma_is_busy(conf->dma_cfg->rx_dma)) {
+-            return;
++/* ══════════════════════════════════════════════════════════════
++   dev_ioctl — 扩展控制（直接指定 tx+rx 的传输等）
++   ══════════════════════════════════════════════════════════════ */
++
++dev_ioctl_override(spi_dev_ioctl_impl)
++{
++    Spi *spi = (Spi *)self;
++    const spi_config_t *conf = self->info->conf;
++    spi_xfer_t *x = spi->spi_xfer;
++    if (cmd == DEVICE_TRANSFER && arg) {
++        spi_transfer_args_t *a = (spi_transfer_args_t *)arg;
++        /* 先 dev_write 发送，再 dev_read 取回 */
++        if (conf->dma_cfg && conf->dma_cfg->tx_dma
++            && conf->dma_cfg->rx_dma) {
++            if (spi->cs_pin) {
++                gpio_reset(spi->cs_pin);
++            } else {
++                hal_spi_enable(conf->id);
++            }
++            x->active                = true;
++            hal_spi_send_dma(conf->id, conf->dma_cfg->tx_dma, a->tx_buf, a->len);
++            /* RX DMA: SPI_DR → ringbuf buffer (接收) */
++            hal_spi_recv_dma(conf->id, conf->dma_cfg->rx_dma,
++                             a->rx_buf, a->len);
++
++        } else if (conf->it_enable) {
++            if (spi->cs_pin) {
++                gpio_reset(spi->cs_pin);
++            } else {
++                hal_spi_enable(conf->id);
++            }
++            x->rx_user_buf->buf = a->rx_buf;
++            x->rx_user_buf->buf_size =  a->len;
++            x->rx_user_buf->pos      = 0;
++
++            x->tx_user_buf->buf      = (uint8_t *)a->tx_buf;
++            x->tx_user_buf->buf_size =  a->len;
++            x->tx_user_buf->pos      = 0;
++            x->active                = true;
++
++            hal_spi_set_it(conf->id, xSPI_IE_TXE | xSPI_IE_RXNE);
++
++            /* 写入第一个字节触发时钟 */
++            uint8_t first = a->tx_buf ? a->tx_buf[0] : 0xFF;
++            *hal_spi_data_addr(conf->id) = first;
++            x->tx_user_buf->pos = 1;
++
++            x->spi_sem->fun->take(x->spi_sem);
++
++        } else {
++            hal_spi_transfer(conf->id, spi->cs_pin, a->tx_buf, a->rx_buf, a->len);
+         }
+-        dma_start_transfer(conf->dma_cfg->rx_dma, (uint32_t)hal_spi_data_addr(conf->id), (uint32_t)rx_data, len);
+-        //dma_rx_busy[id] = true;
+     }
+-    return ;
+ }
+ 
+-static bool spi_irq_handler_impl(nvic_irq_t *irq_conf) {
++/* ══════════════════════════════════════════════════════════════
++   SPI 中断处理
++   ══════════════════════════════════════════════════════════════ */
++
++static bool spi_irq_handler_impl(nvic_irq_t *irq_conf)
++{
+     Spi *spi = (Spi *)irq_conf->arg;
+     const spi_config_t *conf = GET_DEVICE(spi)->info->conf;
+     spi_xfer_t *x = spi->spi_xfer;
+     uint16_t sr = hal_spi_get_it_event(conf->id);
+ 
+-    // --- 错误处理 (优先) ---
+-    if (sr & (0x07 << 4)) {   // OVR, MODF, CRCERR, etc.
+-        // 清除错误标志：根据手册，读 SR 后写 DR 可清除某些标志，或直接关 SPE 再开
+-        uint8_t dummy __attribute__((unused)) = *hal_spi_data_addr(conf->id);
+-        (void)dummy;
+-        hal_spi_disable(conf->id); // 临时关 SPE
+-        hal_spi_enable(conf->id);
+-
+-        x->active = false;
+-
+-        hal_spi_clear_it(conf->id, xSPI_IE_ERR | xSPI_IE_TXE | xSPI_IE_RXNE);// 关中断
+-        return true;
++    /* 错误处理 —— Renode 模拟可能产生假 MODF/OVR/CRCERR，只清不中断 */
++    if (sr & (0x07 << 4)) {
++        /* OVR: 读 DR 清除 (读走滞留数据，不影响传输) */
++        if (sr & (1 << 6)) {
++            volatile uint8_t dummy __attribute__((unused)) = *hal_spi_data_addr(conf->id);
++            (void)dummy;
++        }
++        /* MODF: 写 CR1 清除 (不必关 SPE——手册: 读SR后写CR1即可清 MODF) */
++        if (sr & (1 << 5)) {
++            hal_spi_disable(conf->id);
++            hal_spi_enable(conf->id);
++            /* Note: 真机上 SSM=1 不会出 MODF，Renode 假信号忽略即可 */
++        }
++        /* CRCERR: CRC 未使能不应出现，可能是仿真假信号，忽略 */
++        /* 不清除也不影响传输——这些标志本身不会停止 SPI 工作 */
+     }
+ 
+-    // --- 接收中断 (RXNE) ---
+-    if (sr & xSPI_IT_RXNE) {  // RXNE
+-        uint8_t data = *hal_spi_data_addr(conf->id);   // 读 DR 清 RXNE
+-        if (x->rx_buf && x->rx_index < x->total_len) {
+-            x->rx_buf[x->rx_index] = data;
++    /* RXNE */
++    if (sr & xSPI_IT_RXNE) {
++        uint8_t data = *hal_spi_data_addr(conf->id);
++        if (x && x->rx_user_buf->buf) {
++            x->rx_user_buf->buf[x->rx_user_buf->pos] = data;
++            x->rx_user_buf->pos++;
+         }
+-        x->rx_index++;   // 无论是否有缓冲区，都要计数
+     }
+ 
+-    // --- 发送中断 (TXE) ---
+-    if (sr & xSPI_IT_TXE) {  // TXE
+-        if (x->tx_index < x->total_len) {
+-            uint8_t byte = x->tx_buf ? x->tx_buf[x->tx_index] : 0xFF;
++    /* TXE */
++    if (sr & xSPI_IT_TXE) {
++        if (x && x->tx_user_buf->pos < x->tx_user_buf->buf_size) {
++            uint8_t byte = x->tx_user_buf->buf ? x->tx_user_buf->buf[x->tx_user_buf->pos] : 0xFF;
+             *hal_spi_data_addr(conf->id) = byte;
+-            x->tx_index++;
++            x->tx_user_buf->pos++;
+         } else {
+-            // 数据已发完，关闭 TXE 中断
+             hal_spi_clear_it(conf->id, xSPI_IE_TXE);
+         }
+     }
+ 
+-    // --- 传输完成检查 ---
+-    // 当发送和接收都完成（索引达到长度）时，关闭中断并通知
+-    if (x->tx_index >= x->total_len && x->rx_index >= x->total_len && x->active) {
++    /* 传输完成 */
++    if (x && x->tx_user_buf->pos >= x->tx_user_buf->buf_size && x->rx_user_buf->pos >= x->rx_user_buf->buf_size) {
+         x->active = false;
+-        hal_spi_clear_it(conf->id, xSPI_IE_RXNE | xSPI_IE_TXE);// 关闭 TXE/RXNE 中断（ERRIE 可保留或关）
+-        x->spi_tx_sem->fun->give(x->spi_tx_sem);
++        hal_spi_clear_it(conf->id, xSPI_IE_RXNE | xSPI_IE_TXE);
++        if (spi->cs_pin) {
++            gpio_set(spi->cs_pin);
++        } else {
++            hal_spi_disable(conf->id);
++        }
++        x->spi_sem->fun->give(x->spi_sem);
+     }
+     return true;
+ }
+ 
+-static bool spi_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
++static bool spi_txdma_irq_handler_impl(nvic_irq_t *irq_conf)
++{
+     Spi *spi = (Spi *)irq_conf->arg;
+     const spi_config_t *conf = GET_DEVICE(spi)->info->conf;
+     dma_clear_flag(conf->dma_cfg->tx_dma);
++    if (spi->spi_xfer && spi->spi_xfer->active) {
++        spi->spi_xfer->active = false;
++        if (spi->cs_pin) {
++            gpio_set(spi->cs_pin);
++        } else {
++            hal_spi_disable(conf->id);
++        }
++        spi->spi_xfer->spi_sem->fun->give(spi->spi_xfer->spi_sem);
++    }
+     return true;
+ }
+ 
+-static bool spi_rxdma_irq_handler_impl(nvic_irq_t *irq_conf) {
++static bool spi_rxdma_irq_handler_impl(nvic_irq_t *irq_conf)
++{
+     Spi *spi = (Spi *)irq_conf->arg;
+     const spi_config_t *conf = GET_DEVICE(spi)->info->conf;
+     dma_clear_flag(conf->dma_cfg->rx_dma);
+     return true;
+ }
+-
+-
+-
+-// transfer_it method
+-static void spi_transfer_it(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len) {
+-    const spi_config_t *conf = GET_DEVICE(self)->info->conf;
+-    if (conf->id >= SPI_MAX || len == 0) {
+-        LOG_DEBUG("spi", "spi id error");
+-        return;
+-    }
+-    spi_xfer_t *x = self->spi_xfer;
+-    if (x->active) {
+-        LOG_DEBUG("spi", "spi is active");
+-        return;   // 上一次传输未结束
+-    }
+-
+-    x->tx_buf = tx_data;
+-    x->rx_buf = rx_data;
+-    x->total_len = len;
+-    x->tx_index = 0;
+-    x->rx_index = 0;
+-    x->active = true;
+-    hal_spi_set_it(conf->id, xSPI_IE_TXE | xSPI_IE_RXNE);// TXEIE  RXNEIE
+-
+-    // 启动传输：写入第一个字节，这将产生时钟并置 TXE 为低
+-    // 如果是全双工，即使 rx_data 为 NULL 也要发哑字节；如果 tx_data 为 NULL 也要发哑字节（0xFF）
+-    uint8_t first_byte = tx_data ? tx_data[0] : 0xFF;
+-    *hal_spi_data_addr(conf->id) = first_byte;
+-    x->tx_index = 1;
+-    LOG_DEBUG("spi", "spi sem take");
+-    x->spi_tx_sem->fun->take(x->spi_tx_sem);
+-    LOG_DEBUG("spi", "spi recv");
+-}
+-
+diff --git a/os/driver/spi.h b/os/driver/spi.h
+index 074e04e..3b67dc1 100644
+--- a/os/driver/spi.h
++++ b/os/driver/spi.h
+@@ -7,76 +7,86 @@
+ #include "common/dma.h"
+ #include "common/gpio.h"
+ #include "hal/hal_spi.h"
++#include "../common/ringbuf.h"
+ 
+-#define GET_SPI_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(SpiVTable **)obj)
+ #define GET_SPI(obj) ((Spi *)obj)
+ 
+-// 派生类声明
+-typedef struct _Spi Spi;
+-typedef struct _SpiFun SpiFun;
+-
+ /* SPI 引脚描述 */
+ typedef struct {
+     pin_af sck_pin;
+     pin_af miso_pin;
+     pin_af mosi_pin;
+-    pin_af nss_pin;    /* 若使用软件 NSS 可忽略 */
++    pin_af nss_pin;
++    gpio_t cs_pin;
+ } spi_pins_t;
+ 
+ typedef struct {
+     const dma_stream_config_t *tx_dma;
+     const dma_stream_config_t *rx_dma;
+ } spi_dma_config_t;
++
+ /* SPI 配置描述符 */
+ typedef struct {
+     spi_id_t            id;
+-    spi_mode_t          mode;           /* SPI_MODE_0..3 */
+-    spi_frame_t         frame_format;   /* SPI_FRAME_8BIT / SPI_FRAME_16BIT */
+-    spi_br_t            baudrate_div;   /* SPI_BR_DIVx */
+-    spi_slave_mode_t    master;         /* SPI_MASTER / SPI_SLAVE */
++    spi_mode_t          mode;
++    spi_frame_t         frame_format;
++    spi_br_t            baudrate_div;
++    spi_slave_mode_t    master;
++    spi_first_bit_t     first_bit;      /* MSB/LSB 优先 */
++    spi_nss_mode_t      nss_mode;       /* 软件/硬件 NSS */
+     spi_pins_t          pins;
+-    /* 中断配置 (可选) */
+-    //如果同时使用了 SPI 的 TX/RX DMA，DMA 本身的中断可以用来通知传输完成。这时 SPI 外设中断通常不需要打开 TXE/RXNE，而是依赖 DMA 的 TC 中断。
+-    spi_it_t             it_enable;      // xSPI_IT_TXE | xSPI_IT_RXNE | xSPI_IT_ERR
+-    /* DMA 可选 */
+-    const spi_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
++    spi_it_t            it_enable;
++    uint16_t            cache_size;
++    const spi_dma_config_t *dma_cfg;
+ } spi_config_t;
+ 
+-/* ---------- 中断传输状态 ---------- */
++/* ---------- 传输状态 ---------- */
+ typedef struct {
+-    const uint8_t *tx_buf;
+-    uint8_t       *rx_buf;
+-    uint16_t       total_len;
+-    uint16_t       tx_index;
+-    uint16_t       rx_index;
++    uint8_t    *buf;        /* 循环接收缓冲区 */
++    uint16_t    buf_size;   /* 缓冲区总大小 */
++    uint16_t    pos;        /* 实际写入区域大小 */
++} spi_cache_t;
++
++typedef struct {
++    spi_cache_t *tx_user_buf;
++    spi_cache_t *rx_user_buf;
+     bool           active;
+-    Semaphore * spi_tx_sem;
+-    Semaphore * spi_rx_sem;
++    Semaphore     *spi_sem;          /* 传输完成信号量 (IT/DMA 模式) */
+ } spi_xfer_t;
+ 
+-// 类成员函数结构
+-struct _SpiFun {
+-    void (*destroy)(Spi* self);
+-	void (*transfer)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
++/*
++ * ─── Device VTable 的 override（用户通过 SVC 调用） ───
++ * dev_read(spi, buf, count)  → 从 RX cache 取 dev_write 期间收到的数据
++ * dev_write(spi, buf, count) → SPI 全双工传输（IT/DMA/阻塞），RX→cache
++ * dev_ioctl(spi, cmd, arg)   → 扩展配置
++ */
++//#define SPI_IOCTL_TRANSFER   0x70  /* arg = spi_transfer_args_t*, 直接指定 tx+rx */
+ 
+-	void (*transfer_dma)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
++typedef struct {
++    const uint8_t *tx_buf;
++    uint8_t       *rx_buf;
++    uint16_t       len;
++} spi_transfer_args_t;
+ 
+-	void (*transfer_it)(Spi* self, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
++// 派生类
++typedef struct _Spi Spi;
++typedef struct _SpiFun SpiFun;
+ 
++struct _SpiFun {
++    void (*destroy)(Spi* self);
+ };
++
+ struct _Spi {
+-    Device base;  // 基类作为第一个成员
++    Device base;
+     const SpiFun* fun;
+-    // TODO: 添加派生类特有的数据成员
+     spi_xfer_t *spi_xfer;
+-
++    //RingBuf *rx_cache_buf;
++    const gpio_t* cs_pin;//软件cs
+ };
+ 
+-// 构造函数声明
++/* 构造函数 */
+ Spi* spi_create(const device_info_t *info);
+ void spi_init(Spi* self, const device_info_t *info);
+-
+-// 析构函数声明
+ void spi_deinit(Spi* self);
+ 
+-#endif // SPI_H
+\ No newline at end of file
++#endif // SPI_H
+diff --git a/os/driver/svc.c b/os/driver/svc.c
+index 7cb0180..7507e1d 100644
+--- a/os/driver/svc.c
++++ b/os/driver/svc.c
+@@ -94,11 +94,11 @@ static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+     }
+     Device *device = (Device *)a1;
+     const device_ctrl *ctrl = (const device_ctrl *)a2;
+-
++    const device_transfer_conf_t *transfer_conf = ctrl->buf;
+     switch (ctrl->cmd) {
+         case DEVICE_READ:
+             if (device->vtable->dev_read) {
+-                device->vtable->dev_read(device, ctrl->buf, ctrl->count);
++                return device->vtable->dev_read(device, ctrl->buf, ctrl->count);
+             }
+ 
+             break;
+@@ -109,7 +109,7 @@ static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+             break;
+         case DEVICE_IOCTL:
+             if (device->vtable->dev_ioctl) {
+-                //device->vtable->dev_ioctl(device, ctrl->buf, ctrl->count);
++                device->vtable->dev_ioctl(device, transfer_conf->cmd, transfer_conf->conf);
+             }
+             break;
+         default:
+diff --git a/os/driver/systick.c b/os/driver/systick.c
+index 25067aa..e2feef2 100644
+--- a/os/driver/systick.c
++++ b/os/driver/systick.c
+@@ -81,7 +81,11 @@ bool systick_irq_handler_impl(nvic_irq_t *irq_conf) {
+     // TODO: add irq_handler method
+     //Systick *systick = (Systick *)arg;
+     //params , void *arg
++#ifdef USE_CCMRAM
+     gloable_sys_time->time_us = hal_dwt_get_timestamp_us()->time_us;
++#else
++    gloable_sys_time->time_us ++;
++#endif
+     if (gloable_current_tcb->sp != NULL) {
+         global_thread_scheduler->fun->delay_ticks(global_thread_scheduler);
+         // 触发 PendSV 中断
+diff --git a/os/driver/usart.c b/os/driver/usart.c
+index 457d172..c708ad9 100644
+--- a/os/driver/usart.c
++++ b/os/driver/usart.c
+@@ -18,16 +18,18 @@ dev_ioctl_override(usart_dev_ioctl_impl);
+ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf);
+ static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf);
+ static bool usart_rxdma_irq_handler_impl(nvic_irq_t *irq_conf);
++static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf);
++//static void copy2user(Usart *self);
+ // 析构函数声明
+ static void usart_destroy(Usart* self);
+ 
+ // TODO: 初始化数据成员
+ static const UsartFun usart_fun = {
+     .destroy = usart_destroy,
+-	.send_it = usart_send_it,
+-	.recv_it = usart_recv_it,
+-    .send = usart_send,
+-    .recv = usart_recv,
++	//.send_it = usart_send_it,
++	//.recv_it = usart_recv_it,
++    //.send = usart_send,
++    //.recv = usart_recv,
+ };
+ 
+ // 构造函数实现
+@@ -48,12 +50,25 @@ void usart_init(Usart* self, const device_info_t *info) {
+     device_init(&self->base, info);
+     self->fun = &(usart_fun);
+     // TODO: 初始化派生类特有成员
+-
+     GET_DEVICE_VTABLE(self)->dev_init = usart_dev_init_impl;
+     GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
+     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
+     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
+-
++    const usart_config_t *conf = info->conf;
++
++    self->rx_cache_buf = ringbuf_create(conf->cache_size);
++
++    //初始化uart_xfer对象,从用户空间传递发送接收buffer
++    if (!self->uart_xfer) {
++        self->uart_xfer = os_malloc(sizeof(uart_xfer_t));
++        memset(self->uart_xfer, 0, sizeof(uart_xfer_t));
++        self->uart_xfer->tx_user_buf = os_malloc(sizeof(uart_cache_t));
++        memset(self->uart_xfer->tx_user_buf, 0, sizeof(uart_cache_t));
++        self->uart_xfer->rx_user_buf = os_malloc(sizeof(uart_cache_t));
++        memset(self->uart_xfer->rx_user_buf, 0, sizeof(uart_cache_t));
++        self->uart_xfer->uart_tx_sem = semaphore_create(0);
++        self->uart_xfer->uart_rx_sem = semaphore_create(0);
++    }
+ }
+ 
+ void usart_deinit(Usart* self) {
+@@ -99,15 +114,12 @@ dev_init_override(usart_dev_init_impl) {
+     hal_uart_set_baudrate(conf->id, conf->baudrate);
+     // 4. 配置帧格式
+     hal_uart_set_format(conf->id, conf->word_len, conf->stop_bits, conf->parity);
+-
+     hal_uart_enable(conf->id);
+-
+-
+     if (conf->dma_cfg) {
+-        if (!usart->dma_sem) {
+-            usart->dma_sem = os_malloc(sizeof(dma_sem_t));
+-            memset(usart->dma_sem, 0, sizeof(dma_sem_t));
+-        }
++        /*// 正确的初始化顺序
++            dma_stream_request(&rx_dma_cfg);      // 配置 DMA 流
++            USART1->CR3 |= USART_CR3_DMAR;        // 先开 DMAR
++            dma_start_transfer(..., rx_buf, len); // 再启动 DMA（EN=1）*/
+         if (conf->dma_cfg->tx_dma) {
+             if (dma_stream_request(conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
+                 // 申请失败，回滚
+@@ -121,7 +133,6 @@ dev_init_override(usart_dev_init_impl) {
+                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->tx_dma));
+                 self->fun->config_irq(self, self->irq_conf);
+             }
+-            usart->dma_sem->uart_tx_sem = semaphore_create(0);
+         }
+         if (conf->dma_cfg->rx_dma) {
+             if (dma_stream_request(conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
+@@ -135,25 +146,33 @@ dev_init_override(usart_dev_init_impl) {
+                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->rx_dma));
+                 self->fun->config_irq(self, self->irq_conf);
+             }
+-            usart->dma_sem->uart_rx_sem = semaphore_create(0);
++            if (usart->rx_cache_buf) {
++                /* 使能 USART IDLE 中断用于帧边界检测
++             * 注意：直接调用 nvic_register 注册 USART IRQ，
++             * 避免通过 config_irq 重新注册已绑定的 TX DMA IRQ */
++                hal_uart_it_enable(conf->id, xUART_FLAG_IDLE);
++                nvic_register(gloable_nvic, USART1_IRQ + conf->id,
++                              usart_dma_idle_irq_handler_impl, self, NULL);
++                LOG_DEBUG("usart", "DMA RX circular buffer started, size=%d", DEFAULT_RX_BUFFER);
++            } else {
++                LOG_ERROR("usart", "DMA RX buffer alloc failed");
++            }
+         }
+         hal_uart_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
+ 
+-
++        if (conf->dma_cfg->rx_dma) {
++            uart_recv_dma(conf->id, conf->dma_cfg->rx_dma,
++                          usart->rx_cache_buf->buffer, usart->rx_cache_buf->size);
++        }
+     } else if (hal_uart_it_init(conf->id, conf->it_enable)) {
+         // 6. 中断配置
+         self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, USART1_IRQ + conf->id);
+         self->irq_conf->handler = usart_irq_handler_impl;
+         self->irq_conf->arg = self;
+         if (!self->fun->config_irq(self, self->irq_conf)) {
+-            LOG_ERROR("systick", "attach irq %d error", USART1_IRQ + conf->id);
+-        }
+-        if (!usart->uart_xfer) {
+-            usart->uart_xfer = os_malloc(sizeof(uart_xfer_t));
+-            memset(usart->uart_xfer, 0, sizeof(uart_xfer_t));
+-            usart->uart_xfer->uart_tx_sem = semaphore_create(0);
+-            usart->uart_xfer->uart_rx_sem = semaphore_create(0);
++            LOG_ERROR("uart", "attach irq %d error", USART1_IRQ + conf->id);
+         }
++
+     }
+ 
+ }
+@@ -162,24 +181,39 @@ dev_read_override(usart_dev_read_impl) {
+     // TODO: add dev_read method
+     Usart *usart = (Usart *)self;
+     const usart_config_t *conf = self->info->conf;
++    uart_xfer_t *rx = usart->uart_xfer;
++    uint8_t *buf_ptr = (uint8_t *)buf;
++    if (!rx) {
++        return 0;
++    }
+     //params , void *buf, size_t count
+-    if (conf->dma_cfg) {
+-
+-    } else if (conf->it_enable) {
+-        uart_xfer_t *x = usart->uart_xfer;
+-        if (!x) {
+-            return;
++    if (conf->dma_cfg && conf->dma_cfg->rx_dma) {
++        /* ① 先取环形缓冲中的已有数据（上次 dev_read 返回后新来的） */
++        size_t recv_size = ringbuf_get(usart->rx_cache_buf, buf_ptr, count);
++        if (recv_size) {
++            return recv_size;                  /* 已有数据，立即返回 */
++        } else {
++            rx->rx_user_buf->buf = buf_ptr;
++            rx->rx_user_buf->buf_size = (uint16_t) count;
++            rx->rx_user_buf->pos = 0;
++            rx->rx_user_active = true;
++            rx->uart_rx_sem->fun->take(rx->uart_rx_sem);
++            return rx->rx_user_buf->pos;
+         }
+-        if (x->rx_active) {
+-            return;
++    } else if (conf->it_enable) {
++        /* ① 先取环形缓冲中的已有数据（上次 dev_read 返回后新来的） */
++        size_t recv_size = ringbuf_get(usart->rx_cache_buf, buf_ptr, count);
++        if (recv_size) {
++            return recv_size;                  /* 已有数据，立即返回 */
++        } else {
++            rx->rx_user_buf->buf    = buf_ptr;
++            rx->rx_user_buf->buf_size  = (uint16_t)count;
++            rx->rx_user_buf->pos  = 0;
++            rx->rx_user_active = true;
++            hal_uart_it_enable(conf->id, xUART_IT_RXNE | xUART_FLAG_IDLE);
++            rx->uart_rx_sem->fun->take(rx->uart_rx_sem);
++            return rx->rx_user_buf->pos;
+         }
+-
+-        x->rx_buf = (uint8_t *) buf;
+-        x->rx_total = count;
+-        x->rx_index = 0;
+-        x->rx_active = true;
+-        hal_uart_set_it_event(conf->id, xUART_IT_RXNE);// RXNEIE
+-        x->uart_rx_sem->fun->take(x->uart_rx_sem);
+     } else {
+         hal_uart_recv(conf->id, (uint8_t *) buf, count);
+     }
+@@ -193,23 +227,23 @@ dev_write_override(usart_dev_write_impl) {
+     // 检查发送数据寄存器是否为空 (TXE标志位)
+     if (conf->dma_cfg) {
+         uart_send_dma(conf->id, conf->dma_cfg->tx_dma, (uint8_t *) buf, count);
+-        usart->dma_sem->uart_tx_sem->fun->take(usart->dma_sem->uart_tx_sem);
++        usart->uart_xfer->uart_tx_sem->fun->take(usart->uart_xfer->uart_tx_sem);
+     } else if (conf->it_enable) {
+         uart_xfer_t *x = usart->uart_xfer;
+         if (!x) {
+             return;
+         }
+-        if (x->tx_active) {
++        if (x->tx_user_active) {
+             return;   // 上次传输未结束
+         }
+ 
+-        x->tx_buf = (uint8_t *) buf;
+-        x->tx_total = count;
+-        x->tx_index = 0;
+-        x->tx_active = true;
++        x->tx_user_buf->buf = (uint8_t *) buf;
++        x->tx_user_buf->buf_size = count;
++        x->tx_user_buf->pos = 0;
++        x->tx_user_active = true;
+ 
+         // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
+-        hal_uart_set_it_event(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
++        hal_uart_it_enable(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
+         x->uart_tx_sem->fun->take(x->uart_tx_sem);
+     } else {
+         hal_uart_send(conf->id, (uint8_t *) buf, count);
+@@ -237,52 +271,88 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
+     Usart *usart = (Usart *)irq_conf->arg;
+     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
+     //params , void *arg
+-    // 检查SR寄存器的RXNE位，表示接收到了新数据
+     uart_xfer_t *x = usart->uart_xfer;
+     uint32_t sr = hal_uart_get_it_event(conf->id);
+-   // uint8_t data;
+ 
+-    // --- 接收中断 (RXNE) ---
+-    if (sr & xUART_FLAG_RXNE) {  // RXNE
+-        if (x && x->rx_active && x->rx_index < x->rx_total) {
+-            x->rx_buf[x->rx_index++] = *hal_uart_data_addr(conf->id);  // 读取数据自动清 RXNE
++    /*
++     * --- 接收中断 (RXNE) ---
++     *
++     * ISR 永远把 DR 数据推入软件环形缓冲区（类似 DMA 推入硬件环形缓冲）。
++     * RXNEIE 始终开启不关，保证 DR 每次都被读走，
++     * 消除两帧之间的数据遗漏窗口。
++     */
++    if (sr & xUART_FLAG_RXNE) {
++        uint8_t data = *hal_uart_data_addr(conf->id);  /* 无条件读 DR，防锁死 */
++        if (x) {
++            ringbuf_put(usart->rx_cache_buf, data);
+         }
+-        if (x && x->rx_active && x->rx_index >= x->rx_total) {
+-            x->rx_active = false;
+-            hal_uart_clear_it_event(conf->id, xUART_IT_RXNE);// 关闭 RXNE 中断
+-            x->uart_rx_sem->fun->give(x->uart_rx_sem);
++    }
++
++    /*
++     * --- IDLE 中断：帧结束检测 ---
++     *
++     * 清除 IDLE 标志（IT 模式无 DMA，直接 SR→DR 即可）。
++     *
++     * 关键：只有环形缓冲区已有数据时才通知 dev_read。
++     * 系统上电后 RX 线一直空闲 → IDLE 早已置位 →
++     * 若不做判断直接 signal，会使能 IDLEIE 的瞬间假唤醒。
++     * 另一方面，若在 dev_read 中直接 SR→DR 清除 IDLE，
++     * 可能吞掉刚到达 DR 但 ISR 还来不及推入 ring 的字符。
++     * 因此判断逻辑统一放在 ISR 中，以 ring 是否非空为准。
++     */
++    if (sr & xUART_FLAG_IDLE) {
++        volatile uint32_t dr_clear = *hal_uart_data_addr(conf->id);
++        (void)dr_clear;
++
++        /* 环形缓冲有数据才是真正的帧结束 && x->rx_active */
++        if (x && usart->rx_cache_buf->count > 0) {
++            hal_uart_it_disable(conf->id, xUART_FLAG_IDLE);
++            x->rx_user_active = false;
++            if (x->rx_user_buf->buf) {
++                size_t recv_size = ringbuf_get(usart->rx_cache_buf, x->rx_user_buf->buf, x->rx_user_buf->buf_size);
++                x->rx_user_buf->pos = recv_size;
++                x->rx_user_buf->buf = NULL;
++                x->uart_rx_sem->fun->give(x->uart_rx_sem);
++            }
+         }
++        /* ring 为空 → 假 IDLE（线路空闲但无数据），仅清标志，继续等 */
+     }
+ 
+     // --- 发送中断 (TXE) ---
+-    if (sr & xUART_FLAG_TXE) {  // TXE
+-        if (x && x->tx_active && x->tx_index < x->tx_total) {
+-            *hal_uart_data_addr(conf->id) = x->tx_buf[x->tx_index++];
++    if (sr & xUART_FLAG_TXE) {
++        if (x && x->tx_user_active && x->tx_user_buf->pos < x->tx_user_buf->buf_size) {
++            *hal_uart_data_addr(conf->id) = x->tx_user_buf->buf[x->tx_user_buf->pos++];
+         } else {
+-            // 缓冲区已空，关闭 TXE 中断，保留 TC 中断用于完成通知
+-            hal_uart_clear_it_event(conf->id, xUART_IT_TXE);
+-            if (x && x->tx_active) {
+-                x->tx_active = false;
++            hal_uart_it_disable(conf->id, xUART_IT_TXE);
++            if (x && x->tx_user_active) {
++                x->tx_user_active = false;
+                 x->uart_tx_sem->fun->give(x->uart_tx_sem);
+             }
+         }
+     }
+ 
+     // --- 发送完成中断 (TC) ---
+-    if (sr & xUART_FLAG_TC) {  // TC
+-        // 清除 TC 标志：先读 SR，再写 DR 无效（TC 是软件清除，写0到SR的TC位）
+-        // 但 USART 的 TC 标志是通过写 0 清？实际上写 0 无效，需要读 SR + 写 DR？不，TC 清法：直接向 SR 的 TC 位写 0 即可（F4手册：通过对 USART_SR 寄存器的 TC 位写 0 来清除）
+-        hal_uart_clear_it_event(conf->id, xUART_IT_TC);
+-        if (x && x->tx_active && x->tx_index >= x->tx_total) {
+-            x->tx_active = false;
++    if (sr & xUART_FLAG_TC) {
++        hal_uart_it_clear(conf->id, xUART_IT_TC);
++        if (x && x->tx_user_active && x->tx_user_buf->pos >= x->tx_user_buf->buf_size) {
++            x->tx_user_active = false;
+             x->uart_tx_sem->fun->give(x->uart_tx_sem);
+         }
+     }
+ 
+-    // --- 错误处理 ---
+-    if (sr & xUART_FLAG_PE || sr & xUART_FLAG_FE || sr & xUART_FLAG_NE || sr & xUART_FLAG_ORE) {
+-        // PE, FE, NF, ORE 等
+-        uint32_t dr = *hal_uart_data_addr(conf->id);  // 读 DR 可清除部分错误标志
++    /*
++     * --- 溢出错误处理 (ORE) ---
++     * ORE 清除序列：读 SR（ISR 入口已做），再读 DR。
++     * 必须独立处理——ORE 在 USART 中单独触发，不与 RXNE 重叠。
++     */
++    if (sr & xUART_FLAG_ORE) {
++        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
++        (void)dr;
++    }
++
++    // --- 其他错误处理 ---
++    if (sr & (xUART_FLAG_PE | xUART_FLAG_FE | xUART_FLAG_NE)) {
++        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
+         (void)dr;
+     }
+     return true;
+@@ -292,7 +362,7 @@ static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
+     Usart *usart = (Usart *)irq_conf->arg;
+     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
+     dma_clear_flag(conf->dma_cfg->tx_dma);
+-    usart->dma_sem->uart_tx_sem->fun->give(usart->dma_sem->uart_tx_sem);
++    usart->uart_xfer->uart_tx_sem->fun->give(usart->uart_xfer->uart_tx_sem);
+     return true;
+ }
+ 
+@@ -302,6 +372,44 @@ static bool usart_rxdma_irq_handler_impl(nvic_irq_t *irq_conf) {
+     dma_clear_flag(conf->dma_cfg->rx_dma);
+     return true;
+ }
++/*
++ * USART IDLE 中断处理（DMA 接收模式）
++ * IDLE 帧表示一帧数据接收完毕，通过 NDTR 计算实际接收字节数，
++ * 从 DMA 环形缓冲区拷贝到用户缓冲区，然后释放信号量。
++ */
++static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf) {
++    Usart *usart = (Usart *)irq_conf->arg;
++    const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
++    uint32_t sr = hal_uart_get_it_event(conf->id);
++    /* --- IDLE 中断：检测到帧空闲 --- */
++    if (sr & xUART_FLAG_IDLE) {
++        if (!conf->dma_cfg || !conf->dma_cfg->rx_dma) {
++            return true;
++        }
++        uart_xfer_t *rx = usart->uart_xfer;
++        hal_uart_clear_idle_flag(conf->id, conf->dma_cfg->rx_dma);
++        uint16_t cur_ndtr = uart_dma_get_rx_ndtr(conf->dma_cfg->rx_dma);
++
++        size_t dma_pos = usart->rx_cache_buf->size - cur_ndtr;
++        ringbuf_dma_update(usart->rx_cache_buf, dma_pos);
++        rx->rx_user_active = false;
++        /* 如果 dev_read 在等待，拷贝数据到用户缓冲区 */
++        if (rx->rx_user_buf->buf) {
++            size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf, rx->rx_user_buf->buf_size);
++            rx->rx_user_buf->pos = recv_size;
++            rx->rx_user_buf->buf = NULL;
++            rx->uart_rx_sem->fun->give(rx->uart_rx_sem);
++        }
++    }
++
++    /* --- 溢出错误处理 --- */
++    if (sr & xUART_FLAG_ORE) {
++        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
++        (void)dr;
++    }
++
++    return true;
++}
+ 
+ // send_it method
+ static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
+@@ -313,17 +421,17 @@ static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
+     if (!x) {
+         return;
+     }
+-    if (x->tx_active) {
++    if (x->tx_user_active) {
+         return;   // 上次传输未结束
+     }
+ 
+-    x->tx_buf = data;
+-    x->tx_total = len;
+-    x->tx_index = 0;
+-    x->tx_active = true;
++    x->tx_user_buf->buf = data;
++    x->tx_user_buf->buf_size = len;
++    x->tx_user_buf->pos = 0;
++    x->tx_user_active = true;
+ 
+     // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
+-    hal_uart_set_it_event(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
++    hal_uart_it_enable(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
+     //self->uart_tx_sem->fun->take(self->uart_tx_sem);
+ }
+ 
+@@ -338,15 +446,15 @@ static void usart_recv_it(Usart* self, uint8_t *buffer, uint16_t len) {
+     if (!x) {
+         return;
+     }
+-    if (x->rx_active) {
++    if (x->rx_user_active) {
+         return;
+     }
+ 
+-    x->rx_buf = buffer;
+-    x->rx_total = len;
+-    x->rx_index = 0;
+-    x->rx_active = true;
+-    hal_uart_set_it_event(conf->id, xUART_IT_RXNE);// RXNEIE
++    x->rx_user_buf->buf = buffer;
++    x->rx_user_buf->buf_size = len;
++    x->rx_user_buf->pos = 0;
++    x->rx_user_active = true;
++    hal_uart_it_enable(conf->id, xUART_IT_RXNE);// RXNEIE
+     x->uart_rx_sem->fun->take(x->uart_rx_sem);
+ }
+ 
+diff --git a/os/driver/usart.h b/os/driver/usart.h
+index 3ed7cd5..caad054 100644
+--- a/os/driver/usart.h
++++ b/os/driver/usart.h
+@@ -6,6 +6,7 @@
+ #include "common/pinmux.h"
+ #include "common/dma.h"
+ #include "hal/hal_usart.h"
++#include "../common/ringbuf.h"
+ 
+ #define GET_USART(obj) ((Usart *)obj)
+ #define DEFAULT_RX_BUFFER (256)
+@@ -15,10 +16,10 @@ typedef struct _UsartFun UsartFun;
+ // 类成员函数结构
+ struct _UsartFun {
+     void (*destroy)(Usart* self);
+-	void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
+-	void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
+-    void (*send)(Usart* self, const uint8_t *data, uint16_t len);
+-    void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
++	//void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
++	//void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
++    //void (*send)(Usart* self, const uint8_t *data, uint16_t len);
++    //void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
+ 
+ };
+ 
+@@ -32,22 +33,19 @@ typedef struct {
+ 
+ /* ---------- 中断传输状态 ---------- */
+ typedef struct {
+-    const uint8_t *tx_buf;
+-    uint8_t       *rx_buf;
+-    uint16_t       tx_total;
+-    uint16_t       tx_index;
+-    uint16_t       rx_total;
+-    uint16_t       rx_index;
+-    bool           tx_active;
+-    bool           rx_active;
++    uint8_t    *buf;        /* 循环接收缓冲区 */
++    uint16_t    buf_size;   /* 缓冲区总大小 */
++    uint16_t    pos;        /* 实际写入区域大小 */
++} uart_cache_t;
++typedef struct {
++    uart_cache_t *tx_user_buf;
++    uart_cache_t *rx_user_buf;
++    bool           tx_user_active;
++    volatile bool  rx_user_active;      /* dev_read 是否在等待 */
+     Semaphore * uart_tx_sem;
+     Semaphore * uart_rx_sem;
+ } uart_xfer_t;
+ 
+-typedef struct {
+-    Semaphore * uart_tx_sem;
+-    Semaphore * uart_rx_sem;
+-} dma_sem_t;
+ /* USART 引脚描述 */
+ typedef struct {
+     pin_af uart_tx;
+@@ -61,6 +59,7 @@ typedef struct {
+     uart_parity_t     parity;
+     uart_pins_t pins;
+     uart_it_t it_enable;
++    uint16_t cache_size;
+     /* DMA 可选 */
+     const uart_dma_config_t *dma_cfg;   /* 为 NULL 则表示不使用 DMA */
+ } usart_config_t;
+@@ -69,8 +68,8 @@ struct _Usart {
+     Device base;  // 基类作为第一个成员
+     const UsartFun* fun;
+     // TODO: 添加派生类特有的数据成员
++    RingBuf *rx_cache_buf;
+     uart_xfer_t *uart_xfer;
+-    dma_sem_t *dma_sem;
+ };
+ 
+ // 构造函数声明
+diff --git a/os/log/log.c b/os/log/log.c
+index 54c52dc..c329f95 100644
+--- a/os/log/log.c
++++ b/os/log/log.c
+@@ -78,7 +78,8 @@ void log_directly_error(Log *self, const char *fmt, ...) {
+     va_start(args, fmt);
+     int len = vsnprintf(entry.text, LOG_MSG_MAX_LEN, fmt, args);
+     va_end(args);
+-    GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)entry.text, len);
++    log_task->usart->vtable->dev_write(log_task->usart, (const uint8_t *)entry.text, len);
++    //GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)entry.text, len);
+ }
+ 
+ 
+diff --git a/os/task/os/log_task.c b/os/task/os/log_task.c
+index a8f4c71..a99c988 100644
+--- a/os/task/os/log_task.c
++++ b/os/task/os/log_task.c
+@@ -74,6 +74,7 @@ task_init_override(log_task_task_init_impl) {
+     }
+     log_bound_task(gloable_log, self);
+ }
++//char test[] = "ssssdddd";
+ // task_thread method
+ task_thread_override(log_task_task_thread_impl) {
+     // TODO: add task_thread method
+@@ -97,6 +98,8 @@ task_thread_override(log_task_task_thread_impl) {
+                                log_task->entry->tag,
+                                log_task->entry->text);
+             if (len > 0) {
++
++  //              log_task->usart->fun->write_user(log_task->usart, (const uint8_t *)test, 8);
+                 log_task->usart->fun->write_user(log_task->usart, (const uint8_t *)log_task->line, len);
+             }
+ #ifdef LOG_USE_NOCOPY
+diff --git a/os/task/task_config.c b/os/task/task_config.c
+index 3a61003..4d8b56f 100644
+--- a/os/task/task_config.c
++++ b/os/task/task_config.c
+@@ -10,6 +10,7 @@
+ #include "../task/os/log_task.h"
+ #include "../test/time_task.h"
+ #include "../test/task_test1.h"
++#include "../test/uart_dma_test.h"
+ 
+ static const task_into_t systick_task_info = {
+         .name = "systick",
+@@ -60,6 +61,13 @@ static const task_into_t test1_task_info = {
+         .create = (Task_create)task_test1_create
+ };
+ 
++static const task_into_t uart_dma_task_info = {
++        .name = "uart_dma",
++        .priority = THREAD_PRIORITY_2,
++        .stack_size = MPU_SIZE_2K,
++        .create = (Task_create)uart_dma_test_create
++};
++
+ const task_into_t * const task_lists[] = {
+         (const task_into_t *)(&os_cb_task_info),
+         (const task_into_t *)(&idle_task_info),
+@@ -68,6 +76,7 @@ const task_into_t * const task_lists[] = {
+         (const task_into_t *)(&test1_task_info),
+         (const task_into_t *)(&time_task_info),
+         (const task_into_t *)(&systick_task_info),
++        (const task_into_t *)(&uart_dma_task_info),
+ };
+ 
+ const size_t totel_task = ARRAY_SIZE(task_lists);
+diff --git a/os/test/time_task.c b/os/test/time_task.c
+index a40569b..4b32f6a 100644
+--- a/os/test/time_task.c
++++ b/os/test/time_task.c
+@@ -39,8 +39,8 @@ void time_task_init(Time_task* self, const task_into_t *info) {
+     def_task_start(self) = time_task_task_start_impl;
+     self->timer = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_TIME2);
+     self->adc = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ADC1);
+-   // self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
+-   // self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
++    self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
++    self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
+    // self->wdg = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_WDG);
+     self->pwm = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_PWM1);
+ 
+@@ -80,6 +80,45 @@ task_init_override(time_task_task_init_impl) {
+     time_task->timer->fun->attach_irq(time_task->timer, self);
+ 
+ }
++
++#pragma pack(push, 1)
++typedef struct {
++    uint8_t cmd;
++    uint8_t data;
++} icm20948_data_t;
++#pragma pack(pop)        // 恢复之前的对齐值
++
++// 向 ICM-20948 的寄存器写入一个字节
++void ICM20948_WriteReg(Device *spi, uint8_t reg, uint8_t data) {
++    //uint8_t cmd = reg & 0x7F;       // 确保最高位为 0 (写操作)
++    icm20948_data_t regdata = {.cmd = reg & 0x7F,
++                            .data = data};
++
++   spi->fun->write_user(spi, &regdata, 2);
++
++}
++
++// 从 ICM-20948 的寄存器读取一个字节
++// ICM20948 要求命令和响应在**同一 SPI 事务**内完成，
++// 不能用 write+read 两次独立事务（响应会在第二次事务中丢失）。
++uint8_t ICM20948_ReadReg(Device *spi, uint8_t reg) {
++    uint8_t rx[2] = {0};
++    icm20948_data_t regdata = {.cmd = reg | 0x80 ,
++            .data = 0x00};// 读 WHO_AM_I + dummy
++
++    spi_transfer_args_t args = {.rx_buf = rx,
++            .tx_buf = (uint8_t *)&regdata,
++            .len = 2};
++    spi->fun->ioctl_user(spi, DEVICE_TRANSFER, &args);
++
++ //   uint8_t tx[2] = {reg | 0x80, 0x00};   // 读命令 + dummy
++ //
++ //   spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = rx, .len = 2};
++ //   spi->fun->ioctl_user(spi, DEVICE_TRANSFER, &args);
++    return rx[1];   // 响应在第 2 字节
++}
++
++
+ // task_thread method
+ task_thread_override(time_task_task_thread_impl) {
+     // TODO: add task_thread method
+@@ -88,24 +127,30 @@ task_thread_override(time_task_task_thread_impl) {
+     while (true) {
+         sem_take_user(self->semaphore);
+         uint32_t adc_data = 0;
+-        uint8_t tx[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
+-        uint8_t rx[5];
++
+         time_task->adc->fun->read_user(time_task->adc, &adc_data, 2);
+         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
+-        //get_systime_user();
+-        //GET_SPI(time_task->spi)->fun->transfer_it(GET_SPI(time_task->spi), tx, rx, 5);
+-        //LOG_DEBUG("time_task", "----- timer on ----- read spi %x %x %x %x %x", rx[0], rx[1], rx[2], rx[3], rx[4]);
+-        //uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
+-        //uint8_t write_val = 0xA5;
+-        //uint8_t read_val = 0;
+-////
+-        ////// 向从机地址 0x50 的寄存器 0x10 写入 0xA5
+-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);
+-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &write_val, 1);
+-        ////// 从同一设备地址 0x50 读取一个字节
+-        //GET_I2C(time_task->i2c)->fun->transmit_it(GET_I2C(time_task->i2c), 0x50, &reg_addr, 1);// 先发寄存器地址
+-        //GET_I2C(time_task->i2c)->fun->receive_it(GET_I2C(time_task->i2c), 0x50, &read_val, 1);// 再读回
+-        //LOG_DEBUG("time_task", "----- timer on ----- i2c read addr %x %x", reg_addr, read_val);
++        /*
++         * ICM20948 SPI 地址格式: {register[6:0], R/W#}
++         *   R/W# = 1 → 读, R/W# = 0 → 写
++         *   WHO_AM_I (reg 0x00) 读: (0x00 << 1) | 1 = 0x01
++         *   响应在第一字节的下一字节 (rx[1])
++         */
++        uint8_t data = ICM20948_ReadReg(time_task->spi, 0x00);
++        LOG_DEBUG("time_task", "ICM20948 WHO_AM_I: data=%02x (expect EA)", data);
++        uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
++        uint8_t write_val = 0xA5;
++        uint8_t read_val = 0;
++
++        /* ── ADXL345 I2C 轮询读 DEVID ── */
++        uint8_t adxl_addr = 0x53;
++        time_task->i2c->fun->ioctl_user(time_task->i2c,
++                                         I2C_IOCTL_SET_ADDR, &adxl_addr);
++        uint8_t reg = 0x00;   // DEVID 寄存器
++        time_task->i2c->fun->write_user(time_task->i2c, &reg, 1);
++        uint8_t devid = 0;
++        time_task->i2c->fun->read_user(time_task->i2c, &devid, 1);
++        LOG_DEBUG("time_task", "ADXL345 DEVID: %02x (expect E5)", devid);
+         //GET_WDG(time_task->wdg)->fun->iwdg_reload();
+         //LOG_DEBUG("time_task", "feed watch dog");
+     }
+diff --git a/os/test/uart_dma_test.c b/os/test/uart_dma_test.c
+new file mode 100644
+index 0000000..ad483d7
+--- /dev/null
++++ b/os/test/uart_dma_test.c
+@@ -0,0 +1,173 @@
++/**
++ * UART DMA 发送/接收测试任务
++ *
++ * 功能：
++ *   1. 每秒通过 USART1 DMA 发送测试数据
++ *   2. 使用 USART1 DMA 循环接收，收到数据后回显
++ *
++ * 硬件连接：
++ *   - USART1 TX: PA9  (AF7)
++ *   - USART1 RX: PA10 (AF7)
++ *   - 波特率: 115200, 8N1
++ *
++ * DMA 配置（已在 device_config.c 中定义）：
++ *   - TX: DMA2 Stream7 Channel4 (DMA2_REQ_USART1_TX)
++ *         M2P, 字节宽度, 存储器自增, 单次模式, TC 中断
++ *   - RX: DMA2 Stream2 Channel4 (DMA2_REQ_USART1_RX_ST2)
++ *         P2M, 字节宽度, 存储器自增, 循环模式, IDLE 中断
++ */
++
++#include "uart_dma_test.h"
++#include "../common/linear_pool.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include "../log/log.h"
++#include "../driver/svc.h"
++#include "../driver/device_manager.h"
++
++/* 虚函数实现 */
++task_init_override(uart_dma_test_init_impl);
++task_thread_override(uart_dma_test_thread_impl);
++task_start_override(uart_dma_test_start_impl);
++
++/* 析构函数声明 */
++static void uart_dma_test_destroy(UartDmaTest* self);
++
++static const UartDmaTestFun uart_dma_test_fun = {
++    .destroy = uart_dma_test_destroy,
++};
++
++/* 构造函数 */
++UartDmaTest* uart_dma_test_create(const task_into_t *info)
++{
++    UartDmaTest* obj = (UartDmaTest*)os_malloc(sizeof(UartDmaTest));
++    if (obj) {
++        memset(obj, 0, sizeof(UartDmaTest));
++        uart_dma_test_init(obj, info);
++    }
++    return obj;
++}
++
++void uart_dma_test_init(UartDmaTest* self, const task_into_t *info)
++{
++    task_init(&self->base, info);
++    self->fun = &(uart_dma_test_fun);
++
++    /* 挂载虚函数 */
++    def_task_init(self)   = uart_dma_test_init_impl;
++    def_task_thread(self) = uart_dma_test_thread_impl;
++    def_task_start(self)  = uart_dma_test_start_impl;
++
++    /* 通过设备管理器打开 USART1（会自动完成 DMA TX/RX 初始化） */
++    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
++    self->send_count = 0;
++    self->recv_count = 0;
++
++    if (self->usart4) {
++        LOG_DEBUG("uart_dma", "USART1 device opened successfully");
++    } else {
++        LOG_ERROR("uart_dma", "Failed to open USART1 device");
++    }
++}
++
++void uart_dma_test_deinit(UartDmaTest* self)
++{
++    task_deinit(GET_TASK(self));
++}
++
++static void uart_dma_test_destroy(UartDmaTest* self)
++{
++    if (self != NULL) {
++        uart_dma_test_deinit(self);
++        os_free(self);
++    }
++}
++
++/* task_init 虚函数实现 */
++task_init_override(uart_dma_test_init_impl)
++{
++    UartDmaTest *test = (UartDmaTest *)self;
++    LOG_DEBUG("uart_dma", "uart_dma_test init, task=%s",
++              self->task_tcb ? self->task_tcb->name : "unknown");
++    (void)test;
++}
++
++/* task_start 虚函数实现 */
++task_start_override(uart_dma_test_start_impl)
++{
++    UartDmaTest *test = (UartDmaTest *)self;
++    LOG_DEBUG("uart_dma", "uart_dma_test started");
++    (void)test;
++}
++
++/* task_thread 虚函数实现 —— 发送 + 接收回显 */
++task_thread_override(uart_dma_test_thread_impl)
++{
++    UartDmaTest *test = (UartDmaTest *)self->parent;
++
++    /* 等待设备初始化完成 */
++    sleep_user(100);
++
++    if (!test->usart4) {
++        LOG_ERROR("uart_dma", "USART4 device not available, task exit");
++        while (1) { sleep_user(1000); }
++    }
++
++    LOG_DEBUG("uart_dma", "===== UART DMA send+recv test started =====");
++
++    while (true) {
++        test->send_count++;
++
++        /* ──── 1. DMA 发送测试数据 ──── */
++
++        int len = snprintf(test->tx_buffer, sizeof(test->tx_buffer),
++                           "[%lu] DMA+USART1 Hello! Send a line and I'll echo it back.\r\n",
++                           (unsigned long)test->send_count);
++
++        LOG_DEBUG("uart_dma", "DMA send: %d bytes (count=%lu)",
++                  len, (unsigned long)test->send_count);
++
++        //test->usart1->vtable->dev_write(test->usart1, tx_buffer, len);
++        test->usart4->fun->write_user(test->usart4, test->tx_buffer, len);
++        LOG_DEBUG("uart_dma", "DMA send complete!");
++
++        /* ──── 2. DMA 接收回显（等待上位机发送一行数据） ──── */
++
++        memset(test->rx_buffer, 0, sizeof(test->rx_buffer));
++
++        LOG_DEBUG("uart_dma", "------------------------------Waiting for DMA receive...");
++        //test->usart1->vtable->dev_read(test->usart1, rx_buffer, sizeof(rx_buffer) - 1);
++        test->usart4->fun->read_user(test->usart4, test->rx_buffer, sizeof(test->rx_buffer) - 1);
++        LOG_DEBUG("uart_dma","xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxread_user %s", test->rx_buffer);
++        /* 确保字符串终止 */
++        test->rx_buffer[sizeof(test->rx_buffer) - 1] = '\0';
++        int rx_len = 0;
++        for (int i = 0; i < (int)sizeof(test->rx_buffer); i++) {
++            if (test->rx_buffer[i] == '\0') break;
++            if (test->rx_buffer[i] == '\r' || test->rx_buffer[i] == '\n') {
++                test->rx_buffer[i] = '\0';
++                rx_len = i;
++                break;
++            }
++            rx_len = i + 1;
++        }
++
++        test->recv_count++;
++        LOG_DEBUG("uart_dma", "DMA recv: %d bytes: \"%s\" (recv_count=%lu)",
++                  rx_len, test->rx_buffer, (unsigned long)test->recv_count);
++
++        /* ──── 3. DMA 发送回显 ──── */
++        if (rx_len > 0) {
++            char echo_buf[300];
++            int echo_len = snprintf(echo_buf, sizeof(echo_buf),
++                                    "[Echo #%lu] You sent: %s\r\n",
++                                    (unsigned long)test->recv_count, test->rx_buffer);
++            //test->usart1->vtable->dev_write(test->usart1, echo_buf, echo_len);
++            test->usart4->fun->write_user(test->usart4, echo_buf, echo_len);
++            LOG_DEBUG("uart_dma", "Echo reply sent: %d bytes", echo_len);
++        }
++
++        /* 每秒一轮 */
++        sleep_user(10);
++    }
++}
+diff --git a/os/test/uart_dma_test.h b/os/test/uart_dma_test.h
+new file mode 100644
+index 0000000..a97f0a2
+--- /dev/null
++++ b/os/test/uart_dma_test.h
+@@ -0,0 +1,36 @@
++#ifndef UART_DMA_TEST_H
++#define UART_DMA_TEST_H
++#include <stdint.h>
++#include <stdbool.h>
++#include "../task/task.h"
++#include "../driver/usart.h"
++
++#define GET_UART_DMA_TEST_VTABLE(obj) GET_TASK_VTABLE(obj)
++#define GET_UART_DMA_TEST(obj) ((UartDmaTest *)obj)
++
++/* 派生类声明 */
++typedef struct _UartDmaTest UartDmaTest;
++typedef struct _UartDmaTestFun UartDmaTestFun;
++
++struct _UartDmaTestFun {
++    void (*destroy)(UartDmaTest* self);
++};
++
++struct _UartDmaTest {
++    Task base;
++    const UartDmaTestFun* fun;
++    Device *usart4;          /* USART4 设备句柄 */
++    uint32_t send_count;     /* 发送计数 */
++    uint32_t recv_count;     /* 接收计数 */
++    char tx_buffer[128];
++    char rx_buffer[256];
++};
++
++/* 构造函数声明 */
++UartDmaTest* uart_dma_test_create(const task_into_t *info);
++void uart_dma_test_init(UartDmaTest* self, const task_into_t *info);
++
++/* 析构函数声明 */
++void uart_dma_test_deinit(UartDmaTest* self);
++
++#endif /* UART_DMA_TEST_H */
+diff --git a/renode_i2c_slave.py b/renode_i2c_slave.py
+new file mode 100644
+index 0000000..f4868b6
+--- /dev/null
++++ b/renode_i2c_slave.py
+@@ -0,0 +1,139 @@
++"""
++Renode I2C 调试外设 —— 模拟一个 I2C EEPROM / 传感器设备
++
++协议:
++  写操作: START → 设备地址+W → 寄存器地址 → 数据字节... → STOP
++  读操作: START → 设备地址+W → 寄存器地址 → RESTART → 设备地址+R → 数据字节... → STOP
++         (或: START → 设备地址+R → 从当前地址读取)
++
++I2C 从地址: 0x50（可通过 resc 文件自定义）
++
++内部空间: 256 字节
++  0x00-0x07: 设备信息 (序列号/版本)
++  0x08-0x0F: 传感器模拟值（温度/湿度/光照）
++  0x10-0x2F: 用户数据区（初始化为 0x00）
++  0x30-0x3F: 预填充测试数据 (0xB0-0xBF)
++
++用法（.resc 中）:
++  machine LoadPlatformDescriptionFromString """
++      i2cDebug: Python.PythonPeripheral @ i2c1
++          address: 0x50
++          script: @renode_i2c_slave.py
++  """
++"""
++import emulation
++
++
++class I2CDebugSlave(object):
++    """I2C 从设备仿真 —— 通用寄存器读写"""
++
++    SLAVE_ADDR = 0x50  # 7 位从地址
++
++    def __init__(self):
++        self._regs = bytearray(256)
++        self._init_registers()
++
++        # I2C 事务状态
++        self._reg_ptr   = 0   # 当前寄存器指针
++        self._is_write  = True
++        self._addr_matched = False
++
++    def _init_registers(self):
++        """填充初始寄存器值"""
++        # 设备信息
++        self._regs[0x00] = 0x12  # 型号高字节
++        self._regs[0x01] = 0x34  # 型号低字节
++        self._regs[0x02] = 0x01  # 版本号
++        self._regs[0x03] = 0x00  # 保留
++        # 传感器模拟值
++        self._regs[0x08] = 0x1A  # 温度高(约 26°C)
++        self._regs[0x09] = 0x80  # 温度低(小数)
++        self._regs[0x0A] = 0x35  # 湿度高(约 53%)
++        self._regs[0x0B] = 0x00  # 湿度低
++        self._regs[0x0C] = 0x01  # 光照高
++        self._regs[0x0D] = 0xF4  # 光照低(500 lux)
++        # 测试数据区
++        for i in range(0x30, 0x40):
++            self._regs[i] = 0xB0 + (i - 0x30)
++
++    # ── I2C 回调 ──
++    def handle_write(self, data):
++        """I2C 主设备写入一个字节。
++
++        第一个字节: 寄存器地址指针
++        后续字节: 写入寄存器，地址自增
++        """
++        self._regs[self._reg_ptr] = data & 0xFF
++        self._reg_ptr = (self._reg_ptr + 1) & 0xFF
++
++    def handle_read(self):
++        """I2C 主设备读取一个字节。返回当前寄存器值，地址自增。"""
++        val = self._regs[self._reg_ptr]
++        self._reg_ptr = (self._reg_ptr + 1) & 0xFF
++        return val
++
++    def handle_write_address(self, addr, is_read):
++        """I2C 地址匹配时的回调。
++
++        Args:
++            addr: 7 位设备地址
++            is_read: True 表示主机请求读, False 表示写
++        Returns:
++            True 表示 ACK（响应）, False 表示 NACK
++        """
++        if addr == self.SLAVE_ADDR:
++            self._addr_matched = True
++            if is_read:
++                # 读操作: 之前必须先写过寄存器地址
++                return True
++            else:
++                # 写操作: 最多 1 字节即可 set 寄存器指针
++                return True
++        return False
++
++    def handle_start(self):
++        """I2C START 条件"""
++        pass
++
++    def handle_stop(self):
++        """I2C STOP 条件 —— 事务结束"""
++        self._addr_matched = False
++
++    def handle_write_to_pointer(self, data):
++        """写寄存器地址指针（收到第一个数据字节时）。
++
++        注意: 某些 Renode 版本将此回调命名为 OnI2CByte
++        第一个收到的主机写字节用于设置寄存器指针。
++        """
++        self._reg_ptr = data & 0xFF
++
++    def handle_read_from_pointer(self):
++        """从当前指针读取一个字节"""
++        val = self._regs[self._reg_ptr]
++        self._reg_ptr = (self._reg_ptr + 1) & 0xFF
++        return val
++
++
++# ── 调试工具函数 ──
++def dump():
++    """在 Renode Monitor 的 python 交互中打印寄存器内容"""
++    try:
++        import renode
++        dev = renode.get_peripheral('i2cDebug')
++        if dev:
++            print("=== I2C Slave Register Dump (0x50) ===")
++            print("  [Device Info]")
++            print(f"    Model:     {dev._regs[0]:02X}{dev._regs[1]:02X}")
++            print(f"    Version:   {dev._regs[2]}")
++            print("  [Sensor Values]")
++            temp = dev._regs[8] + dev._regs[9] / 256.0
++            hum  = dev._regs[0x0A] + dev._regs[0x0B] / 256.0
++            lux  = (dev._regs[0x0C] << 8) | dev._regs[0x0D]
++            print(f"    Temp:      {temp:.1f} C")
++            print(f"    Humidity:  {hum:.1f} %")
++            print(f"    Light:     {lux} lux")
++            print("  [Test Area 0x30-0x3F]")
++            hexline = ' '.join(f'{dev._regs[0x30+i]:02X}' for i in range(16))
++            print(f"    {hexline}")
++    except Exception as e:
++        print(f"Dump error: {e}")
+diff --git a/renode_spi_slave.py b/renode_spi_slave.py
+new file mode 100644
+index 0000000..7a12cfc
+--- /dev/null
++++ b/renode_spi_slave.py
+@@ -0,0 +1,146 @@
++"""
++Renode SPI 调试外设 —— 模拟一个带寄存器映射的 SPI 从设备
++
++帧格式（每字节 MOSI 入 / MISO 出）：
++  命令字节        地址高8位      地址低8位       数据字节...
++  ─────────      ─────────      ─────────      ─────────
++  0x03: 读      ADDR[15:8]     ADDR[7:0]      返回连续数据（地址自增）
++  0x02: 写      ADDR[15:8]     ADDR[7:0]      数据字节... （地址自增）
++  0x9F: 读ID     无关           无关            返回 3 字节 ID: 0xDE 0xAD 0xBE
++
++内部寄存器空间: 256 字节
++  0x00-0x03: 设备 ID (DE AD BE EF)
++  0x04-0x07: 计数器（模拟传感器读数，每次读取后自增）
++  0x10-0x1F: 用户可读写区（初始化为递增模式 0xA0-0xAF）
++  其余: 0x00
++
++用法（.resc 中）:
++  machine LoadPlatformDescriptionFromString """
++      spiDebug: Python.PythonPeripheral @ spi1 0x00
++          size: 0x100
++          script: @renode_spi_slave.py
++  """
++"""
++import emulation
++
++
++class SPIDebugSlave(object):
++    """SPI 从设备仿真 —— 命令/地址/数据协议"""
++
++    # ── 命令码 ──
++    CMD_READ_ID = 0x9F  # 读设备 ID
++    CMD_READ    = 0x03  # 读寄存器
++    CMD_WRITE   = 0x02  # 写寄存器
++
++    def __init__(self):
++        self._regs = bytearray(256)
++        self._init_registers()
++
++        # 事务状态机
++        self._state   = 0   # 0=等命令, 1=等地址高, 2=等地址低
++        self._cmd     = 0
++        self._addr    = 0
++        self._rsp_idx = 0   # 读 ID 响应索引
++
++    def _init_registers(self):
++        """填充初始寄存器值"""
++        # 设备 ID
++        self._regs[0] = 0xDE
++        self._regs[1] = 0xAD
++        self._regs[2] = 0xBE
++        self._regs[3] = 0xEF
++        # 模拟传感器值
++        self._regs[4] = 0x42
++        self._regs[5] = 0x00
++        self._regs[6] = 0x00
++        self._regs[7] = 0x00
++        # 用户可读写区
++        for i in range(0x10, 0x20):
++            self._regs[i] = 0xA0 + (i - 0x10)
++
++    # ── SPI 回调 ──
++    def handle_byte(self, mosibyte):
++        """每收到一个 SPI 字节时调用，返回 MISO 字节。
++
++        注意: 方法名由 Renode 框架约定，可能是:
++          - OnSPIByte (Renode 旧版)
++          - handle_byte / SPIReceiveByte (新版)
++        请根据 Renode 版本调整方法名。
++        """
++        if self._state == 0:
++            return self._handle_cmd(mosibyte)
++        elif self._state == 1:
++            return self._handle_addr_high(mosibyte)
++        elif self._state == 2:
++            return self._handle_addr_low(mosibyte)
++        elif self._state == 3:
++            return self._handle_data(mosibyte)
++        else:
++            return 0x00
++
++    def _handle_cmd(self, b):
++        self._cmd = b
++        if b == self.CMD_READ_ID:
++            self._rsp_idx = 0
++            self._state = 0  # 保持状态，下一个字节直接读 ID
++            return 0xFF      # dummy
++        elif b == self.CMD_READ or b == self.CMD_WRITE:
++            self._state = 1  # 等地址高
++            return 0xFF      # dummy
++        else:
++            self._state = 0  # 未知命令，忽略
++            return 0xFF
++
++    def _handle_addr_high(self, b):
++        self._addr = (b & 0xFF) << 8
++        self._state = 2  # 等地址低
++        return 0xFF  # dummy
++
++    def _handle_addr_low(self, b):
++        self._addr |= (b & 0xFF)
++        if self._cmd == self.CMD_READ:
++            self._state = 3  # 进入读数据模式
++            val = self._regs[self._addr]
++            self._addr = (self._addr + 1) & 0xFF
++            return val       # 返回第一个数据字节
++        else:
++            self._state = 3  # 进入写数据模式
++            return 0xFF      # dummy
++
++    def _handle_data(self, b):
++        if self._cmd == self.CMD_READ:
++            val = self._regs[self._addr]
++            self._addr = (self._addr + 1) & 0xFF
++            return val
++        else:
++            # CMD_WRITE
++            self._regs[self._addr] = b & 0xFF
++            self._addr = (self._addr + 1) & 0xFF
++            return 0xFF  # dummy
++
++    # ── 读 ID 专用 ──
++    def _handle_read_id(self):
++        """返回设备 ID 序列"""
++        ids = [0xDE, 0xAD, 0xBE]
++        v = ids[self._rsp_idx] if self._rsp_idx < 3 else 0x00
++        self._rsp_idx += 1
++        return v
++
++
++# ── 调试工具函数（可在 Renode 的 python 交互中调用） ──
++# 例如在 Renode Monitor 中执行:
++#   python "import renode_spi_slave as s; s.dump()"
++
++def dump():
++    """打印当前寄存器内容"""
++    try:
++        import renode
++        spi = renode.get_peripheral('spiDebug')
++        if spi:
++            print("=== SPI Slave Register Dump ===")
++            for i in range(0, 256, 16):
++                hexline = ' '.join(f'{spi._regs[i+j]:02X}' for j in range(16))
++                ascii_line = ''.join(chr(spi._regs[i+j]) if 32 <= spi._regs[i+j] < 127 else '.' for j in range(16))
++                print(f"  {i:02X}: {hexline}  {ascii_line}")
++    except Exception as e:
++        print(f"Dump error: {e}")
+diff --git a/stm32f4.repl b/stm32f4.repl
+index df75bf5..f80f2db 100644
+--- a/stm32f4.repl
++++ b/stm32f4.repl
+@@ -15,6 +15,7 @@ flash_controller: MTD.STM32F4_FlashController @ {
+ 
+ usart1: UART.STM32_UART @ sysbus <0x40011000, +0x100>
+     -> nvic@37
++    DMARequest -> dma2@2
+ 
+ usart2: UART.STM32_UART @ sysbus <0x40004400, +0x100>
+     -> nvic@38
+@@ -24,6 +25,7 @@ usart3: UART.STM32_UART @ sysbus <0x40004800, +0x100>
+ 
+ uart4: UART.STM32_UART @ sysbus <0x40004C00, +0x100>
+     -> nvic@52
++    DMARequest -> dma1@2
+ 	
+ uart5: UART.STM32_UART @ sysbus <0x40005000, +0x100>
+     -> nvic@53
+@@ -132,16 +134,22 @@ rom2: Memory.MappedMemory @ sysbus 0x1FFFC400
+ 
+ spi1: SPI.STM32SPI @ sysbus 0x40013000
+     IRQ->nvic@35
++    DMARecieve->dma2@2
++    //DMASend->dma2@3
+ 
+ spi2: SPI.STM32SPI @ sysbus 0x40003800
+     IRQ->nvic@36
+     DMARecieve->dma1@3
++    //            DMAReceive = new GPIO();
++    //              DMASend = new GPIO();
+ 
+ spi3: SPI.STM32SPI @ sysbus 0x40003C00
+ 
+ i2c1: I2C.STM32F4_I2C @ sysbus 0x40005400
+     EventInterrupt -> nvic@31
+     ErrorInterrupt -> nvic@32
++    TxDMARequest -> dma1@6
++    RxDMARequest -> dma1@0
+ 
+ i2c2: I2C.STM32F4_I2C @ sysbus 0x40005800
+     EventInterrupt -> nvic@33
+diff --git a/stm32f4_discovery.resc b/stm32f4_discovery.resc
+index 018911c..af431b1 100644
+--- a/stm32f4_discovery.resc
++++ b/stm32f4_discovery.resc
+@@ -13,7 +13,7 @@ machine StartGdbServer 3333 true
+ $bin?=@cmake-build-debug/stm32f4discovery.elf
+ 
+ showAnalyzer sysbus.usart1
+-
++showAnalyzer sysbus.uart4
+ ### Set random board UNIQUE ID ###
+ 
+ python "import _random"
+@@ -32,15 +32,15 @@ macro reset
+ """
+ 
+ runMacro $reset
+-### SPI
+-machine LoadPlatformDescriptionFromString "dummySpi: Mocks.DummySPISlave @ spi1"
+-logLevel 0 spi1.dummySpi
+-
+-### I2C
+-
+-machine LoadPlatformDescriptionFromString "dummy_i2c: Mocks.DummyI2CSlave @ i2c1 0x50"
+-logLevel 0 i2c1.dummy_i2c
+-
++### ─── SPI 调试外设 ──────────────────────────────────
++machine LoadPlatformDescription @my_platform.repl
++
++### ─── I2C 调试外设 ──────────────────────────────────
++# 模拟 I2C EEPROM / 传感器 (从地址 0x50)
++#  写: START→0x50+W→寄存器地址→数据→STOP
++#  读: START→0x50+W→寄存器地址→RESTART→0x50+R→读数据→STOP
++#machine LoadPlatformDescriptionFromString "i2cDebug: Python.PythonPeripheral @ i2c1 { script: "renode_i2c_slave.py" }"
++i2c1 Register adxl345 0x53
+ 
+ ###ADC1
+ adc1 FeedSample 0xFF 0

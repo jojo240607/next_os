@@ -1,0 +1,10 @@
+//using "./stm32f4.repl"
+
+// ICM20948 9轴IMU，接在 SPI1
+icm20948: Sensors.ICM20948 @ spi1
+
+gpioPortA:
+    4 -> icm20948@0
+
+// ADXL345 三轴加速度计，I2C 地址 0x53
+adxl345: Sensors.ADXL345 @ sysbus

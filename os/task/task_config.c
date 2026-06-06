@@ -10,6 +10,7 @@
 #include "../task/os/log_task.h"
 #include "../test/time_task.h"
 #include "../test/task_test1.h"
+#include "../test/uart_dma_test.h"
 
 static const task_into_t systick_task_info = {
         .name = "systick",
@@ -60,6 +61,13 @@ static const task_into_t test1_task_info = {
         .create = (Task_create)task_test1_create
 };
 
+static const task_into_t uart_dma_task_info = {
+        .name = "uart_dma",
+        .priority = THREAD_PRIORITY_2,
+        .stack_size = MPU_SIZE_2K,
+        .create = (Task_create)uart_dma_test_create
+};
+
 const task_into_t * const task_lists[] = {
         (const task_into_t *)(&os_cb_task_info),
         (const task_into_t *)(&idle_task_info),
@@ -68,6 +76,7 @@ const task_into_t * const task_lists[] = {
         (const task_into_t *)(&test1_task_info),
         (const task_into_t *)(&time_task_info),
         (const task_into_t *)(&systick_task_info),
+        (const task_into_t *)(&uart_dma_task_info),
 };
 
 const size_t totel_task = ARRAY_SIZE(task_lists);

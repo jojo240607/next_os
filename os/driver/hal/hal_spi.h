@@ -7,6 +7,8 @@
 
 #include <stdbool.h>
 #include "stdint.h"
+#include "../common/dma.h"
+#include "../common/gpio.h"
 
 #define xSPI1_BASE  0x40013000UL
 #define xSPI2_BASE  0x40003800UL
@@ -90,8 +92,21 @@ typedef enum : uint16_t {
 } spi_ctl_t;
 
 
+/* 帧位序 */
+typedef enum : uint8_t {
+    SPI_MSB_FIRST = 0,   // CR1.LSBFIRST = 0
+    SPI_LSB_FIRST = 1,   // CR1.LSBFIRST = 1
+} spi_first_bit_t;
+
+/* NSS 管理模式 */
+typedef enum : uint8_t {
+    SPI_NSS_SOFT = 0,    // 软件 NSS (SSM=1, SSI=1)，需手动 GPIO 控制 CS
+    SPI_NSS_HARD = 1,    // 硬件 NSS 输出 (SSM=0, SSOE=1)，SPI 外设自动控制 CS
+} spi_nss_mode_t;
+
+
 void hal_spi_clock_enable(spi_id_t id);
-void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master);
+void hal_spi_init(spi_id_t id, spi_mode_t mode, spi_frame_t frame_format, spi_br_t baudrate_div, spi_slave_mode_t master, spi_first_bit_t first_bit, spi_nss_mode_t nss_mode);
 void hal_spi_disable_it(spi_id_t id);
 bool hal_spi_it_init(spi_id_t id, spi_it_t it_enable);
 void hal_spi_set_it(spi_id_t id, spi_it_t it_event);
@@ -101,5 +116,13 @@ uint32_t hal_spi_get_it_event(spi_id_t id);
 void hal_spi_disable(spi_id_t id);
 void hal_spi_enable(spi_id_t id);
 volatile uint8_t *hal_spi_data_addr(spi_id_t id);
+
+int hal_spi_send_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len);
+int hal_spi_recv_dma(spi_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size);
+
+void hal_spi_transmit(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, size_t len);
+void hal_spi_receive(spi_id_t id, const gpio_t* cs_pin, uint8_t *rx_data, size_t len);
+void hal_spi_transfer(spi_id_t id, const gpio_t* cs_pin, const uint8_t *tx_data, uint8_t *rx_data, size_t len);
+//int hal_spi_write(spi_id_t id, const uint8_t *buf, uint16_t buf_size, uint8_t *recv_buf, uint16_t recv_size);
 
 #endif //STM32F4DISCOVERY_HAL_SPI_H

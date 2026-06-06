@@ -57,7 +57,15 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     /* 先关闭流 */
     dma->SxCR = 0;
     /* 设置通道 */
-    uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
+    //  #define DMA_CHANNEL_0                 0x00000000U    /*!< DMA Channel 0 */
+    //  #define DMA_CHANNEL_1                 0x02000000U    /*!< DMA Channel 1 */
+    //  #define DMA_CHANNEL_2                 0x04000000U    /*!< DMA Channel 2 */
+    //  #define DMA_CHANNEL_3                 0x06000000U    /*!< DMA Channel 3 */
+    //  #define DMA_CHANNEL_4                 0x08000000U    /*!< DMA Channel 4 */
+    //  #define DMA_CHANNEL_5                 0x0A000000U    /*!< DMA Channel 5 */
+    //  #define DMA_CHANNEL_6                 0x0C000000U    /*!< DMA Channel 6 */
+    //  #define DMA_CHANNEL_7                 0x0E000000U    /*!< DMA Channel 7 */ 1110 0000
+    volatile uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
     /* 方向：注意 bit6=DIR, bit7=DIR 搭配？参考手册：位6/7用于方向控制（双缓冲模式下） */
     /*  #define DMA_SxCR_DIR_0           (0x1UL << DMA_SxCR_DIR_Pos)                    !< 0x00000040
         #define DMA_SxCR_DIR_1           (0x2UL << DMA_SxCR_DIR_Pos)                    !< 0x00000080
@@ -92,7 +100,7 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     }
     /* 循环模式 */
     if (cfg->mode == DMA_MODE_CIRCULAR) {
-        cr |= (1 << 8);
+        cr |= (1 << 8);//#define DMA_SxCR_CIRC_Pos        (8U)
     }
     /* 传输完成中断使能（暂时不开，可扩展） */
     dma->SxCR = cr;
@@ -150,10 +158,23 @@ int dma_start_transfer(const dma_stream_config_t *cfg,
     /* 停止当前传输 */
     dma->SxCR &= ~(1 << 0);
     /* 清除标志 */
-    //dma_clear_flag(cfg);
+    dma_clear_flag(cfg);
     /* 设置地址和数量 */
-    dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
-    dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
+    //SxPAR (外设地址寄存器)
+    //SxM0AR (存储器地址 0 寄存器)
+    //外设到存储器 (P2M)：外设是源 (SxPAR 是源地址)，存储器是目标 (SxM0AR 是目标地址)。
+    //存储器到外设 (M2P)：存储器是源 (SxM0AR 是源地址)，外设是目标 (SxPAR 是目标地址)。
+    if (cfg->direction == DMA_DIR_P2M) {
+        dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
+        dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
+    } else if (cfg->direction == DMA_DIR_M2P) {
+        dma->SxPAR  = dst_addr;   /* 根据方向，这里是外设地址 或 源 */
+        dma->SxM0AR = src_addr;   /* 存储器地址 或 目标 */
+    } else {
+        dma->SxPAR  = (uint32_t)dst_addr;   // 目标内存
+        dma->SxM0AR = (uint32_t)src_addr;   // 源内存
+    }
+
     dma->SxNDTR = count;
     /* 使能流 */
     dma->SxCR |= 1;
@@ -186,6 +207,30 @@ bool dma_is_busy(const dma_stream_config_t *cfg)
     return (dma->SxNDTR != 0) && (dma->SxCR & 1);
 }
 /*
+ * #define DMA_HIFCR_CTCIF7_Pos     (27U)
+ * #define DMA_HIFCR_CFEIF7_Pos     (22U)
+ *
+ * #define DMA_HIFCR_CTCIF6_Pos     (21U)
+ * #define DMA_HIFCR_CFEIF6_Pos     (16U)
+ *
+ * #define DMA_HIFCR_CTCIF5_Pos     (11U)
+ * #define DMA_HIFCR_CFEIF5_Pos     (6U)
+ *
+ * #define DMA_HIFCR_CTCIF4_Pos     (5U)
+ * #define DMA_HIFCR_CFEIF4_Pos     (0U)
+ * -----------------------------------------------
+ * #define DMA_LIFCR_CTCIF3_Pos     (27U)
+ * #define DMA_LIFCR_CFEIF3_Pos     (22U)
+ *
+ * #define DMA_LIFCR_CTCIF2_Pos     (21U)
+ * #define DMA_LIFCR_CFEIF2_Pos     (16U)
+ *
+ * #define DMA_LIFCR_CTCIF1_Pos     (11U)
+ * #define DMA_LIFCR_CFEIF1_Pos     (6U)
+ *
+ * #define DMA_LIFCR_CTCIF0_Pos     (5U)
+ * #define DMA_LIFCR_CFEIF0_Pos     (0U)
+ *
  *  Bit 0: FEIF4 (流错误中断标志) —— 实际可能是“保留”或 FIFO 错误，不同型号位定义有差异
     Bit 1: 保留
     Bit 2: DMEIF4 (直接模式错误中断标志)
@@ -199,15 +244,15 @@ void dma_clear_flag(const dma_stream_config_t *cfg) {
     // 清除 TC、HT、TE、DME、FE 标志 (bit5,4,3,2,0); 跳过保留位1
     //uint32_t mask = (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 0);
     // 也可以用 0x3D 来涵盖常见位 (bit5,4,3,2,0)
-    if (DMA_REQ_GET_STREAM(cfg->dma_request) < 4) {
-        uint32_t mask = 0x3F << (DMA_REQ_GET_STREAM(cfg->dma_request) * 6 + 0); // 具体按手册，简化：清除对应流所有标志
-        base->LIFCR = mask;  // 写1清除
+    uint32_t it_flags = 0x3F;
+    uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
+    if (stream < 4) {
+        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4); // 具体按手册，简化：清除对应流所有标志
+        base->LIFCR |= mask;  // 写1清除
     } else {
-        uint32_t mask = 0x3F << ((DMA_REQ_GET_STREAM(cfg->dma_request) - 4) * 6 + 0);
-        mask |= ( (1 << 26) | (1 << 24) | (1 << 25) );
-        uint32_t flags = base->HISR;  // 读取所有挂起标志
-        base->HIFCR = flags;          // 写 1 清所有对应位
-        //base->HIFCR = 0xFFFFFFFF;//mask;
+        stream -= 4;
+        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4);
+        base->HIFCR |= mask;          // 写 1 清所有对应位
     }
 }
 

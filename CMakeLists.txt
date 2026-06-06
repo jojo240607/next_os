@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/scheduler/context_switch.s
         os/common/queue.c
         os/common/ring.c
+        os/common/ringbuf.c
         os/common/list.c
         os/common/linear_pool.c
         os/common/os_init.c
@@ -121,6 +122,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/device_manager.c
         os/test/task_test1.c
         os/test/time_task.c
+        os/test/uart_dma_test.c
 
 )
 

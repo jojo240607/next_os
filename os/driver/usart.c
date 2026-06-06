@@ -18,16 +18,18 @@ dev_ioctl_override(usart_dev_ioctl_impl);
 static bool usart_irq_handler_impl(nvic_irq_t *irq_conf);
 static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf);
 static bool usart_rxdma_irq_handler_impl(nvic_irq_t *irq_conf);
+static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf);
+//static void copy2user(Usart *self);
 // 析构函数声明
 static void usart_destroy(Usart* self);
 
 // TODO: 初始化数据成员
 static const UsartFun usart_fun = {
     .destroy = usart_destroy,
-	.send_it = usart_send_it,
-	.recv_it = usart_recv_it,
-    .send = usart_send,
-    .recv = usart_recv,
+	//.send_it = usart_send_it,
+	//.recv_it = usart_recv_it,
+    //.send = usart_send,
+    //.recv = usart_recv,
 };
 
 // 构造函数实现
@@ -48,12 +50,25 @@ void usart_init(Usart* self, const device_info_t *info) {
     device_init(&self->base, info);
     self->fun = &(usart_fun);
     // TODO: 初始化派生类特有成员
-
     GET_DEVICE_VTABLE(self)->dev_init = usart_dev_init_impl;
     GET_DEVICE_VTABLE(self)->dev_read = usart_dev_read_impl;
     GET_DEVICE_VTABLE(self)->dev_write = usart_dev_write_impl;
     GET_DEVICE_VTABLE(self)->dev_ioctl = usart_dev_ioctl_impl;
+    const usart_config_t *conf = info->conf;
 
+    self->rx_cache_buf = ringbuf_create(conf->cache_size);
+
+    //初始化uart_xfer对象,从用户空间传递发送接收buffer
+    if (!self->uart_xfer) {
+        self->uart_xfer = os_malloc(sizeof(uart_xfer_t));
+        memset(self->uart_xfer, 0, sizeof(uart_xfer_t));
+        self->uart_xfer->tx_user_buf = os_malloc(sizeof(uart_cache_t));
+        memset(self->uart_xfer->tx_user_buf, 0, sizeof(uart_cache_t));
+        self->uart_xfer->rx_user_buf = os_malloc(sizeof(uart_cache_t));
+        memset(self->uart_xfer->rx_user_buf, 0, sizeof(uart_cache_t));
+        self->uart_xfer->uart_tx_sem = semaphore_create(0);
+        self->uart_xfer->uart_rx_sem = semaphore_create(0);
+    }
 }
 
 void usart_deinit(Usart* self) {
@@ -99,15 +114,12 @@ dev_init_override(usart_dev_init_impl) {
     hal_uart_set_baudrate(conf->id, conf->baudrate);
     // 4. 配置帧格式
     hal_uart_set_format(conf->id, conf->word_len, conf->stop_bits, conf->parity);
-
     hal_uart_enable(conf->id);
-
-
     if (conf->dma_cfg) {
-        if (!usart->dma_sem) {
-            usart->dma_sem = os_malloc(sizeof(dma_sem_t));
-            memset(usart->dma_sem, 0, sizeof(dma_sem_t));
-        }
+        /*// 正确的初始化顺序
+            dma_stream_request(&rx_dma_cfg);      // 配置 DMA 流
+            USART1->CR3 |= USART_CR3_DMAR;        // 先开 DMAR
+            dma_start_transfer(..., rx_buf, len); // 再启动 DMA（EN=1）*/
         if (conf->dma_cfg->tx_dma) {
             if (dma_stream_request(conf->dma_cfg->tx_dma) != DMA_SUCCESS) {
                 // 申请失败，回滚
@@ -121,7 +133,6 @@ dev_init_override(usart_dev_init_impl) {
                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->tx_dma));
                 self->fun->config_irq(self, self->irq_conf);
             }
-            usart->dma_sem->uart_tx_sem = semaphore_create(0);
         }
         if (conf->dma_cfg->rx_dma) {
             if (dma_stream_request(conf->dma_cfg->rx_dma) != DMA_SUCCESS) {
@@ -135,25 +146,33 @@ dev_init_override(usart_dev_init_impl) {
                 self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, dma_get_irqnum(conf->dma_cfg->rx_dma));
                 self->fun->config_irq(self, self->irq_conf);
             }
-            usart->dma_sem->uart_rx_sem = semaphore_create(0);
+            if (usart->rx_cache_buf) {
+                /* 使能 USART IDLE 中断用于帧边界检测
+             * 注意：直接调用 nvic_register 注册 USART IRQ，
+             * 避免通过 config_irq 重新注册已绑定的 TX DMA IRQ */
+                hal_uart_it_enable(conf->id, xUART_FLAG_IDLE);
+                nvic_register(gloable_nvic, USART1_IRQ + conf->id,
+                              usart_dma_idle_irq_handler_impl, self, NULL);
+                LOG_DEBUG("usart", "DMA RX circular buffer started, size=%d", DEFAULT_RX_BUFFER);
+            } else {
+                LOG_ERROR("usart", "DMA RX buffer alloc failed");
+            }
         }
         hal_uart_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
 
-
+        if (conf->dma_cfg->rx_dma) {
+            uart_recv_dma(conf->id, conf->dma_cfg->rx_dma,
+                          usart->rx_cache_buf->buffer, usart->rx_cache_buf->size);
+        }
     } else if (hal_uart_it_init(conf->id, conf->it_enable)) {
         // 6. 中断配置
         self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, USART1_IRQ + conf->id);
         self->irq_conf->handler = usart_irq_handler_impl;
         self->irq_conf->arg = self;
         if (!self->fun->config_irq(self, self->irq_conf)) {
-            LOG_ERROR("systick", "attach irq %d error", USART1_IRQ + conf->id);
+            LOG_ERROR("uart", "attach irq %d error", USART1_IRQ + conf->id);
         }
-        if (!usart->uart_xfer) {
-            usart->uart_xfer = os_malloc(sizeof(uart_xfer_t));
-            memset(usart->uart_xfer, 0, sizeof(uart_xfer_t));
-            usart->uart_xfer->uart_tx_sem = semaphore_create(0);
-            usart->uart_xfer->uart_rx_sem = semaphore_create(0);
-        }
+
     }
 
 }
@@ -162,24 +181,39 @@ dev_read_override(usart_dev_read_impl) {
     // TODO: add dev_read method
     Usart *usart = (Usart *)self;
     const usart_config_t *conf = self->info->conf;
+    uart_xfer_t *rx = usart->uart_xfer;
+    uint8_t *buf_ptr = (uint8_t *)buf;
+    if (!rx) {
+        return 0;
+    }
     //params , void *buf, size_t count
-    if (conf->dma_cfg) {
-
+    if (conf->dma_cfg && conf->dma_cfg->rx_dma) {
+        /* ① 先取环形缓冲中的已有数据（上次 dev_read 返回后新来的） */
+        size_t recv_size = ringbuf_get(usart->rx_cache_buf, buf_ptr, count);
+        if (recv_size) {
+            return recv_size;                  /* 已有数据，立即返回 */
+        } else {
+            rx->rx_user_buf->buf = buf_ptr;
+            rx->rx_user_buf->buf_size = (uint16_t) count;
+            rx->rx_user_buf->pos = 0;
+            rx->rx_user_active = true;
+            rx->uart_rx_sem->fun->take(rx->uart_rx_sem);
+            return rx->rx_user_buf->pos;
+        }
     } else if (conf->it_enable) {
-        uart_xfer_t *x = usart->uart_xfer;
-        if (!x) {
-            return;
+        /* ① 先取环形缓冲中的已有数据（上次 dev_read 返回后新来的） */
+        size_t recv_size = ringbuf_get(usart->rx_cache_buf, buf_ptr, count);
+        if (recv_size) {
+            return recv_size;                  /* 已有数据，立即返回 */
+        } else {
+            rx->rx_user_buf->buf    = buf_ptr;
+            rx->rx_user_buf->buf_size  = (uint16_t)count;
+            rx->rx_user_buf->pos  = 0;
+            rx->rx_user_active = true;
+            hal_uart_it_enable(conf->id, xUART_IT_RXNE | xUART_FLAG_IDLE);
+            rx->uart_rx_sem->fun->take(rx->uart_rx_sem);
+            return rx->rx_user_buf->pos;
         }
-        if (x->rx_active) {
-            return;
-        }
-
-        x->rx_buf = (uint8_t *) buf;
-        x->rx_total = count;
-        x->rx_index = 0;
-        x->rx_active = true;
-        hal_uart_set_it_event(conf->id, xUART_IT_RXNE);// RXNEIE
-        x->uart_rx_sem->fun->take(x->uart_rx_sem);
     } else {
         hal_uart_recv(conf->id, (uint8_t *) buf, count);
     }
@@ -193,23 +227,23 @@ dev_write_override(usart_dev_write_impl) {
     // 检查发送数据寄存器是否为空 (TXE标志位)
     if (conf->dma_cfg) {
         uart_send_dma(conf->id, conf->dma_cfg->tx_dma, (uint8_t *) buf, count);
-        usart->dma_sem->uart_tx_sem->fun->take(usart->dma_sem->uart_tx_sem);
+        usart->uart_xfer->uart_tx_sem->fun->take(usart->uart_xfer->uart_tx_sem);
     } else if (conf->it_enable) {
         uart_xfer_t *x = usart->uart_xfer;
         if (!x) {
             return;
         }
-        if (x->tx_active) {
+        if (x->tx_user_active) {
             return;   // 上次传输未结束
         }
 
-        x->tx_buf = (uint8_t *) buf;
-        x->tx_total = count;
-        x->tx_index = 0;
-        x->tx_active = true;
+        x->tx_user_buf->buf = (uint8_t *) buf;
+        x->tx_user_buf->buf_size = count;
+        x->tx_user_buf->pos = 0;
+        x->tx_user_active = true;
 
         // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
-        hal_uart_set_it_event(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
+        hal_uart_it_enable(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
         x->uart_tx_sem->fun->take(x->uart_tx_sem);
     } else {
         hal_uart_send(conf->id, (uint8_t *) buf, count);
@@ -237,52 +271,88 @@ static bool usart_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
     //params , void *arg
-    // 检查SR寄存器的RXNE位，表示接收到了新数据
     uart_xfer_t *x = usart->uart_xfer;
     uint32_t sr = hal_uart_get_it_event(conf->id);
-   // uint8_t data;
 
-    // --- 接收中断 (RXNE) ---
-    if (sr & xUART_FLAG_RXNE) {  // RXNE
-        if (x && x->rx_active && x->rx_index < x->rx_total) {
-            x->rx_buf[x->rx_index++] = *hal_uart_data_addr(conf->id);  // 读取数据自动清 RXNE
-        }
-        if (x && x->rx_active && x->rx_index >= x->rx_total) {
-            x->rx_active = false;
-            hal_uart_clear_it_event(conf->id, xUART_IT_RXNE);// 关闭 RXNE 中断
-            x->uart_rx_sem->fun->give(x->uart_rx_sem);
+    /*
+     * --- 接收中断 (RXNE) ---
+     *
+     * ISR 永远把 DR 数据推入软件环形缓冲区（类似 DMA 推入硬件环形缓冲）。
+     * RXNEIE 始终开启不关，保证 DR 每次都被读走，
+     * 消除两帧之间的数据遗漏窗口。
+     */
+    if (sr & xUART_FLAG_RXNE) {
+        uint8_t data = *hal_uart_data_addr(conf->id);  /* 无条件读 DR，防锁死 */
+        if (x) {
+            ringbuf_put(usart->rx_cache_buf, data);
         }
     }
 
+    /*
+     * --- IDLE 中断：帧结束检测 ---
+     *
+     * 清除 IDLE 标志（IT 模式无 DMA，直接 SR→DR 即可）。
+     *
+     * 关键：只有环形缓冲区已有数据时才通知 dev_read。
+     * 系统上电后 RX 线一直空闲 → IDLE 早已置位 →
+     * 若不做判断直接 signal，会使能 IDLEIE 的瞬间假唤醒。
+     * 另一方面，若在 dev_read 中直接 SR→DR 清除 IDLE，
+     * 可能吞掉刚到达 DR 但 ISR 还来不及推入 ring 的字符。
+     * 因此判断逻辑统一放在 ISR 中，以 ring 是否非空为准。
+     */
+    if (sr & xUART_FLAG_IDLE) {
+        volatile uint32_t dr_clear = *hal_uart_data_addr(conf->id);
+        (void)dr_clear;
+
+        /* 环形缓冲有数据才是真正的帧结束 && x->rx_active */
+        if (x && usart->rx_cache_buf->count > 0) {
+            hal_uart_it_disable(conf->id, xUART_FLAG_IDLE);
+            x->rx_user_active = false;
+            if (x->rx_user_buf->buf) {
+                size_t recv_size = ringbuf_get(usart->rx_cache_buf, x->rx_user_buf->buf, x->rx_user_buf->buf_size);
+                x->rx_user_buf->pos = recv_size;
+                x->rx_user_buf->buf = NULL;
+                x->uart_rx_sem->fun->give(x->uart_rx_sem);
+            }
+        }
+        /* ring 为空 → 假 IDLE（线路空闲但无数据），仅清标志，继续等 */
+    }
+
     // --- 发送中断 (TXE) ---
-    if (sr & xUART_FLAG_TXE) {  // TXE
-        if (x && x->tx_active && x->tx_index < x->tx_total) {
-            *hal_uart_data_addr(conf->id) = x->tx_buf[x->tx_index++];
+    if (sr & xUART_FLAG_TXE) {
+        if (x && x->tx_user_active && x->tx_user_buf->pos < x->tx_user_buf->buf_size) {
+            *hal_uart_data_addr(conf->id) = x->tx_user_buf->buf[x->tx_user_buf->pos++];
         } else {
-            // 缓冲区已空，关闭 TXE 中断，保留 TC 中断用于完成通知
-            hal_uart_clear_it_event(conf->id, xUART_IT_TXE);
-            if (x && x->tx_active) {
-                x->tx_active = false;
+            hal_uart_it_disable(conf->id, xUART_IT_TXE);
+            if (x && x->tx_user_active) {
+                x->tx_user_active = false;
                 x->uart_tx_sem->fun->give(x->uart_tx_sem);
             }
         }
     }
 
     // --- 发送完成中断 (TC) ---
-    if (sr & xUART_FLAG_TC) {  // TC
-        // 清除 TC 标志：先读 SR，再写 DR 无效（TC 是软件清除，写0到SR的TC位）
-        // 但 USART 的 TC 标志是通过写 0 清？实际上写 0 无效，需要读 SR + 写 DR？不，TC 清法：直接向 SR 的 TC 位写 0 即可（F4手册：通过对 USART_SR 寄存器的 TC 位写 0 来清除）
-        hal_uart_clear_it_event(conf->id, xUART_IT_TC);
-        if (x && x->tx_active && x->tx_index >= x->tx_total) {
-            x->tx_active = false;
+    if (sr & xUART_FLAG_TC) {
+        hal_uart_it_clear(conf->id, xUART_IT_TC);
+        if (x && x->tx_user_active && x->tx_user_buf->pos >= x->tx_user_buf->buf_size) {
+            x->tx_user_active = false;
             x->uart_tx_sem->fun->give(x->uart_tx_sem);
         }
     }
 
-    // --- 错误处理 ---
-    if (sr & xUART_FLAG_PE || sr & xUART_FLAG_FE || sr & xUART_FLAG_NE || sr & xUART_FLAG_ORE) {
-        // PE, FE, NF, ORE 等
-        uint32_t dr = *hal_uart_data_addr(conf->id);  // 读 DR 可清除部分错误标志
+    /*
+     * --- 溢出错误处理 (ORE) ---
+     * ORE 清除序列：读 SR（ISR 入口已做），再读 DR。
+     * 必须独立处理——ORE 在 USART 中单独触发，不与 RXNE 重叠。
+     */
+    if (sr & xUART_FLAG_ORE) {
+        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
+        (void)dr;
+    }
+
+    // --- 其他错误处理 ---
+    if (sr & (xUART_FLAG_PE | xUART_FLAG_FE | xUART_FLAG_NE)) {
+        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
         (void)dr;
     }
     return true;
@@ -292,7 +362,7 @@ static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
     dma_clear_flag(conf->dma_cfg->tx_dma);
-    usart->dma_sem->uart_tx_sem->fun->give(usart->dma_sem->uart_tx_sem);
+    usart->uart_xfer->uart_tx_sem->fun->give(usart->uart_xfer->uart_tx_sem);
     return true;
 }
 
@@ -300,6 +370,44 @@ static bool usart_rxdma_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
     dma_clear_flag(conf->dma_cfg->rx_dma);
+    return true;
+}
+/*
+ * USART IDLE 中断处理（DMA 接收模式）
+ * IDLE 帧表示一帧数据接收完毕，通过 NDTR 计算实际接收字节数，
+ * 从 DMA 环形缓冲区拷贝到用户缓冲区，然后释放信号量。
+ */
+static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf) {
+    Usart *usart = (Usart *)irq_conf->arg;
+    const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
+    uint32_t sr = hal_uart_get_it_event(conf->id);
+    /* --- IDLE 中断：检测到帧空闲 --- */
+    if (sr & xUART_FLAG_IDLE) {
+        if (!conf->dma_cfg || !conf->dma_cfg->rx_dma) {
+            return true;
+        }
+        uart_xfer_t *rx = usart->uart_xfer;
+        hal_uart_clear_idle_flag(conf->id, conf->dma_cfg->rx_dma);
+        uint16_t cur_ndtr = uart_dma_get_rx_ndtr(conf->dma_cfg->rx_dma);
+
+        size_t dma_pos = usart->rx_cache_buf->size - cur_ndtr;
+        ringbuf_dma_update(usart->rx_cache_buf, dma_pos);
+        rx->rx_user_active = false;
+        /* 如果 dev_read 在等待，拷贝数据到用户缓冲区 */
+        if (rx->rx_user_buf->buf) {
+            size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf, rx->rx_user_buf->buf_size);
+            rx->rx_user_buf->pos = recv_size;
+            rx->rx_user_buf->buf = NULL;
+            rx->uart_rx_sem->fun->give(rx->uart_rx_sem);
+        }
+    }
+
+    /* --- 溢出错误处理 --- */
+    if (sr & xUART_FLAG_ORE) {
+        volatile uint32_t dr = *hal_uart_data_addr(conf->id);
+        (void)dr;
+    }
+
     return true;
 }
 
@@ -313,17 +421,17 @@ static void usart_send_it(Usart* self, const uint8_t *data, uint16_t len) {
     if (!x) {
         return;
     }
-    if (x->tx_active) {
+    if (x->tx_user_active) {
         return;   // 上次传输未结束
     }
 
-    x->tx_buf = data;
-    x->tx_total = len;
-    x->tx_index = 0;
-    x->tx_active = true;
+    x->tx_user_buf->buf = data;
+    x->tx_user_buf->buf_size = len;
+    x->tx_user_buf->pos = 0;
+    x->tx_user_active = true;
 
     // 使能发送中断，并确保 TC 中断也打开（用于检测完成）
-    hal_uart_set_it_event(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
+    hal_uart_it_enable(conf->id, xUART_IT_TXE | xUART_IT_TC);// TXEIE + TCIE
     //self->uart_tx_sem->fun->take(self->uart_tx_sem);
 }
 
@@ -338,15 +446,15 @@ static void usart_recv_it(Usart* self, uint8_t *buffer, uint16_t len) {
     if (!x) {
         return;
     }
-    if (x->rx_active) {
+    if (x->rx_user_active) {
         return;
     }
 
-    x->rx_buf = buffer;
-    x->rx_total = len;
-    x->rx_index = 0;
-    x->rx_active = true;
-    hal_uart_set_it_event(conf->id, xUART_IT_RXNE);// RXNEIE
+    x->rx_user_buf->buf = buffer;
+    x->rx_user_buf->buf_size = len;
+    x->rx_user_buf->pos = 0;
+    x->rx_user_active = true;
+    hal_uart_it_enable(conf->id, xUART_IT_RXNE);// RXNEIE
     x->uart_rx_sem->fun->take(x->uart_rx_sem);
 }
 

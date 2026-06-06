@@ -81,7 +81,11 @@ bool systick_irq_handler_impl(nvic_irq_t *irq_conf) {
     // TODO: add irq_handler method
     //Systick *systick = (Systick *)arg;
     //params , void *arg
+#ifdef USE_CCMRAM
     gloable_sys_time->time_us = hal_dwt_get_timestamp_us()->time_us;
+#else
+    gloable_sys_time->time_us ++;
+#endif
     if (gloable_current_tcb->sp != NULL) {
         global_thread_scheduler->fun->delay_ticks(global_thread_scheduler);
         // 触发 PendSV 中断

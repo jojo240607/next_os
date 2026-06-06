@@ -94,11 +94,11 @@ static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
     }
     Device *device = (Device *)a1;
     const device_ctrl *ctrl = (const device_ctrl *)a2;
-
+    const device_transfer_conf_t *transfer_conf = ctrl->buf;
     switch (ctrl->cmd) {
         case DEVICE_READ:
             if (device->vtable->dev_read) {
-                device->vtable->dev_read(device, ctrl->buf, ctrl->count);
+                return device->vtable->dev_read(device, ctrl->buf, ctrl->count);
             }
 
             break;
@@ -109,7 +109,7 @@ static uint32_t kdevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
             break;
         case DEVICE_IOCTL:
             if (device->vtable->dev_ioctl) {
-                //device->vtable->dev_ioctl(device, ctrl->buf, ctrl->count);
+                device->vtable->dev_ioctl(device, transfer_conf->cmd, transfer_conf->conf);
             }
             break;
         default:

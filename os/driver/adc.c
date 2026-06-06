@@ -176,7 +176,7 @@ dev_read_override(adc_dev_read_impl) {
     const adc_config_t *conf = self->info->conf;
     //params , void *buf, size_t count
     if (conf->id >= ADC_MAX) {
-        return;
+        return 0;
     }
     xADC_TypeDef *adc_ctrl = ADCx[conf->id];
     /* 启动转换 */
@@ -184,7 +184,7 @@ dev_read_override(adc_dev_read_impl) {
     /* 等待转换结束 */
     while (!(adc_ctrl->SR & (1 << 1)));  /* EOC */
     *(uint16_t *)buf = (uint16_t)adc_ctrl->DR;
-    return;
+    return 0;
 }
 
 

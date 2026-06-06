@@ -14,7 +14,6 @@ struct _RingFun {
     void (*destroy)(Ring* self);
 	bool (*push)(Ring* self, const void *data);
 	bool (*pop)(Ring* self, void *data);
-
 	void * (*pop_nocpy)(Ring* self);
 
 };

@@ -3,6 +3,9 @@
 #include "linear_pool.h"
 #include "util.h"
 
+static bool ring_push_data(Ring* self, uint8_t data);
+static bool ring_pop_data(Ring* self, uint8_t *addr, uint16_t len);
+
 static void * ring_pop_nocpy(Ring* self);
 
 static bool ring_push(Ring* self, const void *data);

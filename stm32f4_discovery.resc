@@ -13,7 +13,7 @@ machine StartGdbServer 3333 true
 $bin?=@cmake-build-debug/stm32f4discovery.elf
 
 showAnalyzer sysbus.usart1
-
+showAnalyzer sysbus.uart4
 ### Set random board UNIQUE ID ###
 
 python "import _random"
@@ -32,15 +32,15 @@ macro reset
 """
 
 runMacro $reset
-### SPI
-machine LoadPlatformDescriptionFromString "dummySpi: Mocks.DummySPISlave @ spi1"
-logLevel 0 spi1.dummySpi
+### ─── SPI 调试外设 ──────────────────────────────────
+machine LoadPlatformDescription @my_platform.repl
 
-### I2C
-
-machine LoadPlatformDescriptionFromString "dummy_i2c: Mocks.DummyI2CSlave @ i2c1 0x50"
-logLevel 0 i2c1.dummy_i2c
-
+### ─── I2C 调试外设 ──────────────────────────────────
+# 模拟 I2C EEPROM / 传感器 (从地址 0x50)
+#  写: START→0x50+W→寄存器地址→数据→STOP
+#  读: START→0x50+W→寄存器地址→RESTART→0x50+R→读数据→STOP
+#machine LoadPlatformDescriptionFromString "i2cDebug: Python.PythonPeripheral @ i2c1 { script: "renode_i2c_slave.py" }"
+i2c1 Register adxl345 0x53
 
 ###ADC1
 adc1 FeedSample 0xFF 0

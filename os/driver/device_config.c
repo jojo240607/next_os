@@ -62,7 +62,8 @@ const usart_config_t usart1_conf = {
                 .uart_tx = PA9_REQ_USART1_TX,
                 .uart_rx = PA10_REQ_USART1_RX,
         },
-        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC | xUART_FLAG_IDLE,
+        .cache_size = 64,
         .dma_cfg = &(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
                         .dma_request    = DMA2_REQ_USART1_TX,
@@ -101,8 +102,9 @@ const usart_config_t usart4_conf = {
                 .uart_tx = PC10_REQ_UART4_TX,
                 .uart_rx = PC11_REQ_UART4_RX,
         },
-        .it_enable = xUART_IT_NONE,//xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
-        .dma_cfg = NULL /*&(const uart_dma_config_t) {
+        .it_enable = xUART_IT_TXE | xUART_IT_RXNE | xUART_IT_TC,
+        .cache_size = 64,
+        .dma_cfg = NULL/*&(const uart_dma_config_t) {
                 .tx_dma = &(const dma_stream_config_t) {
                     .dma_request    = DMA1_REQ_UART4_TX,
                     .direction      = DMA_DIR_M2P,
@@ -127,7 +129,7 @@ const usart_config_t usart4_conf = {
                     .fifo_mode      = DMA_FIFO_DIRECT,
                     .it_enable      = 0,                 // 直接读取缓冲区则无需中断
                 },
-        }*/,
+        },*/
 };
 
 const exti_config_t exti_conf = {
@@ -180,43 +182,47 @@ const adc_config_t adc1_conf = {
 
 const spi_config_t spi1_conf = {
         .id = SPI_1,
-        .mode = SPI_MODE_0,
+        .mode = SPI_MODE_3,            // ICM20948: CPOL=1, CPHA=1
         .frame_format = SPI_FRAME_8BIT,
-        .baudrate_div = SPI_BR_DIV64,   // 84MHz/128 ≈ 656kHz (假设 PCLK=84MHz)
+        .baudrate_div = SPI_BR_DIV64,   // 84MHz/128 ≈ 656kHz
         .master = SPI_MASTER,
+        .first_bit = SPI_MSB_FIRST,    // MSB 优先
+        .nss_mode  = SPI_NSS_SOFT,     // 软件 NSS → Renode 调试更可靠
+        .cache_size = 64,              // ringbuf 大小
         .pins = {
                 .sck_pin  = PA5_REQ_SPI1_SCK,
                 .miso_pin = PA6_REQ_SPI1_MISO,
                 .mosi_pin = PA7_REQ_SPI1_MOSI,
-                .nss_pin  = PA4_REQ_SPI1_NSS   // 硬件 NSS 或软件管理
+                .nss_pin  = PA4_REQ_SPI1_NSS,   // 硬件 NSS 或软件管理
+                .cs_pin = {.port = PORT_A, .pin = PIN_4},//软件 cs
         },
-        .it_enable = xSPI_IT_TXE | xSPI_IT_RXNE,
-        .dma_cfg = NULL/*&(const spi_dma_config_t){
-            .tx_dma = &(const dma_stream_config_t) {
-                 .dma_request = DMA2_REQ_SPI1_TX_ST3,
-                 .direction = DMA_DIR_M2P,
-                 .priority = xDMA_PRIORITY_HIGH,
-                 .mem_data_size = DMA_DATA_SIZE_BYTE,
-                 .per_data_size = DMA_DATA_SIZE_BYTE,
-                 .mem_inc = 1,
-                 .per_inc = 0,
-                 .mode = DMA_MODE_NORMAL,
-                 .fifo_mode = DMA_FIFO_DIRECT,
-                 .it_enable = xDMA_IT_TC,
-            },
-            .rx_dma = &(const dma_stream_config_t) {
-                 .dma_request = DMA2_REQ_SPI1_RX_ST2,
-                 .direction = DMA_DIR_P2M,
-                 .priority = xDMA_PRIORITY_HIGH,
-                 .mem_data_size = DMA_DATA_SIZE_BYTE,
-                 .per_data_size = DMA_DATA_SIZE_BYTE,
-                 .mem_inc = 1,
-                 .per_inc = 0,
-                 .mode = DMA_MODE_NORMAL,
-                 .fifo_mode = DMA_FIFO_DIRECT,
-                 .it_enable = xDMA_IT_TC,
-            },
-        }*/
+        .it_enable = xSPI_IT_TXE | xSPI_IT_RXNE,//xSPI_IT_NONE,
+        .dma_cfg = &(const spi_dma_config_t){
+                .tx_dma = &(const dma_stream_config_t) {
+                        .dma_request = DMA2_REQ_SPI1_TX_ST3,
+                        .direction = DMA_DIR_M2P,
+                        .priority = xDMA_PRIORITY_HIGH,
+                        .mem_data_size = DMA_DATA_SIZE_BYTE,
+                        .per_data_size = DMA_DATA_SIZE_BYTE,
+                        .mem_inc = 1,
+                        .per_inc = 0,
+                        .mode = DMA_MODE_NORMAL,
+                        .fifo_mode = DMA_FIFO_DIRECT,
+                        .it_enable = xDMA_IT_TC,
+                },
+                .rx_dma = &(const dma_stream_config_t) {
+                        .dma_request = DMA2_REQ_SPI1_RX_ST2,
+                        .direction = DMA_DIR_P2M,
+                        .priority = xDMA_PRIORITY_HIGH,
+                        .mem_data_size = DMA_DATA_SIZE_BYTE,
+                        .per_data_size = DMA_DATA_SIZE_BYTE,
+                        .mem_inc = 1,
+                        .per_inc = 0,
+                        .mode = DMA_MODE_NORMAL,
+                        .fifo_mode = DMA_FIFO_DIRECT,
+                        .it_enable = xDMA_IT_NONE,  // 只靠 TX TC 通知完成
+                },
+        },
 };
 
 const i2c_config_t i2c1_conf = {
@@ -229,7 +235,32 @@ const i2c_config_t i2c1_conf = {
                 .sda_pin = PB7_REQ_I2C1_SDA
         },
         .it_enable = xI2C_IT_TXE | xI2C_IT_RXNE,                 // 不使用中断
-        .dma_cfg = NULL,
+        .dma_cfg = &(const i2c_dma_config_t){
+                .tx_dma = &(const dma_stream_config_t) {
+                        .dma_request = DMA1_REQ_I2C1_TX_ST6,
+                        .direction = DMA_DIR_M2P,
+                        .priority = xDMA_PRIORITY_HIGH,
+                        .mem_data_size = DMA_DATA_SIZE_BYTE,
+                        .per_data_size = DMA_DATA_SIZE_BYTE,
+                        .mem_inc = 1,
+                        .per_inc = 0,
+                        .mode = DMA_MODE_NORMAL,
+                        .fifo_mode = DMA_FIFO_DIRECT,
+                        .it_enable = xDMA_IT_TC,
+                },
+                .rx_dma = &(const dma_stream_config_t) {
+                        .dma_request = DMA1_REQ_I2C1_RX_ST0,
+                        .direction = DMA_DIR_P2M,
+                        .priority = xDMA_PRIORITY_HIGH,
+                        .mem_data_size = DMA_DATA_SIZE_BYTE,
+                        .per_data_size = DMA_DATA_SIZE_BYTE,
+                        .mem_inc = 1,
+                        .per_inc = 0,
+                        .mode = DMA_MODE_NORMAL,
+                        .fifo_mode = DMA_FIFO_DIRECT,
+                        .it_enable = xDMA_IT_NONE,  // 只靠 TX TC 通知完成
+                },
+        },
 };
 
 const can_config_t can1_conf = {

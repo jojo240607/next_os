@@ -10,7 +10,7 @@
 /* GPIO 引脚描述符 */
 typedef struct {
     gpio_port_t port;     // 端口 (PORT_A ~ PORT_I)
-    uint8_t     pin;      // 引脚号 (0..15)
+    gpio_pin_t    pin;      // 引脚号 (0..15)
 } gpio_t;
 
 /* API 函数 */

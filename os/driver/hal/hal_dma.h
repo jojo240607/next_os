@@ -65,7 +65,7 @@ typedef enum : uint16_t {
     DMA1_REQ_UART5_RX        = DMA_REQ_ENCODE(DMA_1, 0, 4),
     DMA1_REQ_USART3_RX       = DMA_REQ_ENCODE(DMA_1, 1, 4),
     DMA1_REQ_UART4_RX        = DMA_REQ_ENCODE(DMA_1, 2, 4),
-    DMA1_REQ_USART3_TX_ST3       = DMA_REQ_ENCODE(DMA_1, 3, 4),
+    DMA1_REQ_USART3_TX_ST3   = DMA_REQ_ENCODE(DMA_1, 3, 4),
     DMA1_REQ_UART4_TX        = DMA_REQ_ENCODE(DMA_1, 4, 4),
     DMA1_REQ_USART2_RX       = DMA_REQ_ENCODE(DMA_1, 5, 4),
     DMA1_REQ_USART2_TX       = DMA_REQ_ENCODE(DMA_1, 6, 4),
@@ -185,6 +185,57 @@ typedef enum : uint16_t {
     DMA2_REQ_TIM8_COM            = DMA_REQ_ENCODE(DMA_2, 7, 7),
 } dma_request_t;
 
+/* 高4流 (HIFCR) */
+#define xDMA_HIFCR_CFEIF4_Pos    (0U)
+#define xDMA_HIFCR_CDMEIF4_Pos   (2U)
+#define xDMA_HIFCR_CTEIF4_Pos    (3U)
+#define xDMA_HIFCR_CHTIF4_Pos    (4U)
+#define xDMA_HIFCR_CTCIF4_Pos    (5U)
+
+#define xDMA_HIFCR_CFEIF5_Pos    (6U)
+#define xDMA_HIFCR_CDMEIF5_Pos   (8U)
+#define xDMA_HIFCR_CTEIF5_Pos    (9U)
+#define xDMA_HIFCR_CHTIF5_Pos    (10U)
+#define xDMA_HIFCR_CTCIF5_Pos    (11U)
+
+#define xDMA_HIFCR_CFEIF6_Pos    (16U)
+#define xDMA_HIFCR_CDMEIF6_Pos   (18U)
+#define xDMA_HIFCR_CTEIF6_Pos    (19U)
+#define xDMA_HIFCR_CHTIF6_Pos    (20U)
+#define xDMA_HIFCR_CTCIF6_Pos    (21U)
+
+#define xDMA_HIFCR_CFEIF7_Pos    (22U)
+#define xDMA_HIFCR_CDMEIF7_Pos   (24U)
+#define xDMA_HIFCR_CTEIF7_Pos    (25U)
+#define xDMA_HIFCR_CHTIF7_Pos    (26U)
+#define xDMA_HIFCR_CTCIF7_Pos    (27U)
+
+/* 低4流 (LIFCR) —— 位分布与高4流相同 */
+#define xDMA_LIFCR_CFEIF0_Pos    (0U)
+#define xDMA_LIFCR_CDMEIF0_Pos   (2U)
+#define xDMA_LIFCR_CTEIF0_Pos    (3U)
+#define xDMA_LIFCR_CHTIF0_Pos    (4U)
+#define xDMA_LIFCR_CTCIF0_Pos    (5U)
+
+#define xDMA_LIFCR_CFEIF1_Pos    (6U)
+#define xDMA_LIFCR_CDMEIF1_Pos   (8U)
+#define xDMA_LIFCR_CTEIF1_Pos    (9U)
+#define xDMA_LIFCR_CHTIF1_Pos    (10U)
+#define xDMA_LIFCR_CTCIF1_Pos    (11U)
+
+#define xDMA_LIFCR_CFEIF2_Pos    (16U)
+#define xDMA_LIFCR_CDMEIF2_Pos   (18U)
+#define xDMA_LIFCR_CTEIF2_Pos    (19U)
+#define xDMA_LIFCR_CHTIF2_Pos    (20U)
+#define xDMA_LIFCR_CTCIF2_Pos    (21U)
+
+#define xDMA_LIFCR_CFEIF3_Pos    (22U)
+#define xDMA_LIFCR_CDMEIF3_Pos   (24U)
+#define xDMA_LIFCR_CTEIF3_Pos    (25U)
+#define xDMA_LIFCR_CHTIF3_Pos    (26U)
+#define xDMA_LIFCR_CTCIF3_Pos    (27U)
+
+
 /* ---------- DMA 寄存器定义 ---------- */
 typedef struct {
     volatile uint32_t LISR;
@@ -204,7 +255,24 @@ typedef struct {
 
 #define xDMA1_BASE       0x40026000UL
 #define xDMA2_BASE       0x40026400UL
-
+/*#define DMA1_BASE             (AHB1PERIPH_BASE + 0x6000UL)
+#define DMA1_Stream0_BASE     (DMA1_BASE + 0x010UL)
+#define DMA1_Stream1_BASE     (DMA1_BASE + 0x028UL)
+#define DMA1_Stream2_BASE     (DMA1_BASE + 0x040UL)
+#define DMA1_Stream3_BASE     (DMA1_BASE + 0x058UL)
+#define DMA1_Stream4_BASE     (DMA1_BASE + 0x070UL)
+#define DMA1_Stream5_BASE     (DMA1_BASE + 0x088UL)
+#define DMA1_Stream6_BASE     (DMA1_BASE + 0x0A0UL)
+#define DMA1_Stream7_BASE     (DMA1_BASE + 0x0B8UL)
+#define DMA2_BASE             (AHB1PERIPH_BASE + 0x6400UL)
+#define DMA2_Stream0_BASE     (DMA2_BASE + 0x010UL)
+#define DMA2_Stream1_BASE     (DMA2_BASE + 0x028UL)
+#define DMA2_Stream2_BASE     (DMA2_BASE + 0x040UL)
+#define DMA2_Stream3_BASE     (DMA2_BASE + 0x058UL)
+#define DMA2_Stream4_BASE     (DMA2_BASE + 0x070UL)
+#define DMA2_Stream5_BASE     (DMA2_BASE + 0x088UL)
+#define DMA2_Stream6_BASE     (DMA2_BASE + 0x0A0UL)
+#define DMA2_Stream7_BASE     (DMA2_BASE + 0x0B8UL)*/
 #define DMA1_STREAM_BASE(i)  (xDMA1_BASE + 0x10 + (i) * 0x18)  /* Stream i 寄存器起始 */
 #define DMA2_STREAM_BASE(i)  (xDMA2_BASE + 0x10 + (i) * 0x18)
 

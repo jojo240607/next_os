@@ -28,7 +28,7 @@ void dev_ioctl_user(int cmd, void *arg);
 #define def_dev_init(obj) (GET_DEVICE_VTABLE(obj)->dev_init)
 #define virtual_dev_init(obj, ...) def_dev_init(obj)(obj, ##__VA_ARGS__)
 
-#define dev_read_override(func_name) static void func_name(Device* self, void *buf, size_t count)
+#define dev_read_override(func_name) static size_t func_name(Device* self, void *buf, size_t count)
 #define def_dev_read(obj) (GET_DEVICE_VTABLE(obj)->dev_read)
 #define virtual_dev_read(obj, ...) def_dev_read(obj)(obj, ##__VA_ARGS__)
 
@@ -77,12 +77,13 @@ typedef struct {
 typedef enum :uint8_t {
     DEVICE_START = 0x30,
     DEVICE_STOP,
+    DEVICE_TRANSFER,
 } ioctl_cmd_t;
 // 虚函数表结构
 struct _DeviceVTable {
     // TODO : 添加其他虚函数
 	void (*dev_init)(Device* self);
-	void (*dev_read)(Device* self, void *buf, size_t count);
+	size_t (*dev_read)(Device* self, void *buf, size_t count);
 	void (*dev_write)(Device* self, const void *buf, size_t count);
 	void (*dev_ioctl)(Device* self, ioctl_cmd_t cmd, void *arg);
 };
@@ -97,9 +98,13 @@ struct _irq_config {
     void *arg;
     void *event;
     nvic_handler_t handler;
-    const dev_pripority_t *priority;
+    dev_pripority_t *priority;
 };
 
+typedef struct {
+    ioctl_cmd_t cmd;
+    void *conf;
+} device_transfer_conf_t;
 // 类成员函数结构
 struct _DeviceFun {
     void (*destroy)(Device* self);
@@ -108,7 +113,7 @@ struct _DeviceFun {
 
 	void (*read_user)(Device* self, void *buf, size_t count);
 	void (*write_user)(Device* self, const void *buf, size_t count);
-	void (*ioctl_user)(Device* self, int cmd, void *arg);
+	void (*ioctl_user)(Device* self, ioctl_cmd_t cmd, void *arg);
 
     bool (*config_irq)(Device* self, const irq_config *conf);
 

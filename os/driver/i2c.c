@@ -1,3 +1,17 @@
+/**
+ * I2C 驱动 — Device VTable + SVC 模式
+ *
+ * 用户接口（通过 SVC 调用）:
+ *   dev_ioctl(i2c, I2C_IOCTL_SET_ADDR, &addr)  → 设置从设备地址
+ *   dev_write(i2c, buf, count)  → I2C 主设备发送 (IT/DMA/阻塞)
+ *   dev_read(i2c, buf, count)   → I2C 主设备接收 (IT/DMA/阻塞)
+ *   dev_ioctl(i2c, I2C_IOCTL_TRANSFER, &args) → 写寄存器地址+读数据组合
+ *
+ * 内部模式选择:
+ *   dma_cfg != NULL → DMA 模式
+ *   dma_cfg == NULL && it_enable → 中断模式
+ *   否则 → 阻塞轮询 (调用 hal 层实现)
+ */
 #include "i2c.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,29 +20,27 @@
 #include "hal/hal_i2c.h"
 #include "common/rcc.h"
 
-//static void i2c_transmit_dma(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
-static void i2c_receive_it(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
-static void i2c_transmit_it(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
-//static void i2c_receive(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
-//static void i2c_transmit(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len);
-
-dev_init_override(i2c_dev_init_impl);
 static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf);
 static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf);
-// 析构函数声明
+
+/* ── Device VTable override ── */
+dev_init_override(i2c_dev_init_impl);
+dev_read_override(i2c_dev_read_impl);
+dev_write_override(i2c_dev_write_impl);
+dev_ioctl_override(i2c_dev_ioctl_impl);
+
 static void i2c_destroy(I2c* self);
 
-
-// TODO: 初始化数据成员
 static const I2cFun i2c_fun = {
     .destroy = i2c_destroy,
-//	.transmit = i2c_transmit,
-//	.receive = i2c_receive,
-	.transmit_it = i2c_transmit_it,
-	.receive_it = i2c_receive_it,
 };
-// 构造函数实现
-I2c* i2c_create(const device_info_t *info) {
+
+/* ══════════════════════════════════════════════════════════════
+   构造 / 析构
+   ══════════════════════════════════════════════════════════════ */
+
+I2c* i2c_create(const device_info_t *info)
+{
     I2c* obj = (I2c*)os_malloc(sizeof(I2c));
     if (obj) {
         memset(obj, 0, sizeof(I2c));
@@ -37,245 +49,297 @@ I2c* i2c_create(const device_info_t *info) {
     return obj;
 }
 
-void i2c_init(I2c* self, const device_info_t *info) {
-    // 初始化基类部分
+void i2c_init(I2c* self, const device_info_t *info)
+{
     device_init(&self->base, info);
-    self->fun = &(i2c_fun);
-    // TODO: 初始化派生类特有成员
+    self->fun = &i2c_fun;
 
-	def_dev_init(self) = i2c_dev_init_impl;
-    self->i2c_xfer = NULL;
+    GET_DEVICE_VTABLE(self)->dev_init  = i2c_dev_init_impl;
+    GET_DEVICE_VTABLE(self)->dev_read  = i2c_dev_read_impl;
+    GET_DEVICE_VTABLE(self)->dev_write = i2c_dev_write_impl;
+    GET_DEVICE_VTABLE(self)->dev_ioctl = i2c_dev_ioctl_impl;
+
+    self->i2c_xfer  = NULL;
+    self->slave_addr = 0x50;  /* 默认从地址 */
 }
 
-
-
-void i2c_deinit(I2c* self) {
+void i2c_deinit(I2c* self)
+{
     device_deinit(GET_DEVICE(self));
-    // TODO: 数据成员申请资源释放
-}
-// 析构函数实现
-static void i2c_destroy(I2c* self) {
-    if (self != NULL) {
-        i2c_deinit(self);
-        os_free(self);
-    }
 }
 
-// dev_init method
-dev_init_override(i2c_dev_init_impl) {
-    LOG_DEBUG("i2c", "i2c init");
-    // TODO: add dev_init method
+static void i2c_destroy(I2c* self)
+{
+    if (self) { i2c_deinit(self); os_free(self); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   dev_init — 硬件初始化
+   ══════════════════════════════════════════════════════════════ */
+
+dev_init_override(i2c_dev_init_impl)
+{
     I2c *i2c = (I2c *)self;
     const i2c_config_t *conf = self->info->conf;
-    //params 
-    if (conf->id >= I2C_MAX) {
-        return;
-    }
 
-    /* 1. 通过 PinMux 申请引脚 (AF4) */
+    if (conf->id >= I2C_MAX) return;
+
+    /* 1. PinMux AF4 (开漏) */
     const i2c_pins_t *p = &conf->pins;
-    /*
-     *  I2C1：例如 PB6、PB7 等引脚，复用功能为 AF4。
-        I2C2：例如 PB10、PB11 等引脚，复用功能为 AF4。
-        I2C3：例如 PA8、PC9 等引脚，复用功能也为 AF4。
-        */
     pin_config_t pins[] = {
-            {.mode = PIN_MODE_AF,
-              .otype = PIN_OTYPE_OD,
-              .ospeed = PIN_OSPEED_HIGH,
-              .pupd = PIN_PUPD_NONE,
-              .af = p->scl_pin },
-            {.mode = PIN_MODE_AF,
-              .otype = PIN_OTYPE_OD,
-              .ospeed = PIN_OSPEED_HIGH,
-              .pupd = PIN_PUPD_NONE,
-              .af = p->sda_pin }
+        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_OD, .ospeed = PIN_OSPEED_HIGH,
+         .pupd = PIN_PUPD_NONE, .af = p->scl_pin },
+        {.mode = PIN_MODE_AF, .otype = PIN_OTYPE_OD, .ospeed = PIN_OSPEED_HIGH,
+         .pupd = PIN_PUPD_NONE, .af = p->sda_pin },
     };
     for (int i = 0; i < 2; i++) {
         if (pinmux_request(&pins[i]) != PINMUX_SUCCESS) {
-            LOG_ERROR("i2c", "i2c pinmux error");
+            LOG_ERROR("i2c", "pinmux error");
             return;
         }
     }
-    LOG_DEBUG("i2c", "enable clock");
-    /* 2. 使能时钟 */
+
+    /* 2. 时钟 + 复位 + 配置 */
     hal_i2c_clock_enable(conf->id);
-    /* 3. 复位 I2C */
     hal_i2c_reset(conf->id);
-
-    /* 4. 配置时钟 */
-
     hal_i2c_set_clock(conf->id, conf->clock_speed);
-
-    /* 5. 配置本机地址 */
     hal_i2c_set_addr(conf->id, conf->addr_mode, conf->own_address);
-
-    /* 6. 使能外设 */
     hal_i2c_enable(conf->id);
 
-    /* 7. 中断配置 */
-    if (hal_i2c_it_init(conf->id, conf->it_enable)) {
+    /* 4. DMA 初始化 */
+    if (conf->dma_cfg) {
+        if (!i2c->i2c_xfer) {
+            i2c->i2c_xfer = os_malloc(sizeof(i2c_xfer_state_t));
+            memset(i2c->i2c_xfer, 0, sizeof(i2c_xfer_state_t));
+            i2c->i2c_xfer->i2c_sem = semaphore_create(0);
+        }
+        if (conf->dma_cfg->tx_dma) dma_stream_request(conf->dma_cfg->tx_dma);
+        if (conf->dma_cfg->rx_dma) dma_stream_request(conf->dma_cfg->rx_dma);
+        hal_i2c_dma_init(conf->id, conf->dma_cfg->tx_dma,
+                         conf->dma_cfg->rx_dma);
+    } else if (hal_i2c_it_init(conf->id, conf->it_enable)) {
         self->irq_conf->arg = self;
+
         if (conf->it_enable & (xI2C_IT_TXE | xI2C_IT_RXNE)) {
             self->irq_conf->handler = i2c_irq_handler_impl;
-            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, I2C1_EV_IRQ + conf->id * 2);
+            self->irq_conf->irq_list->fun->add_int(
+                    self->irq_conf->irq_list, I2C1_EV_IRQ + conf->id * 2);
             self->fun->config_irq(self, self->irq_conf);
         }
         if (conf->it_enable & xI2C_IT_ERR) {
             self->irq_conf->handler = i2c_irq_err_handler_impl;
-            self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, I2C1_ER_IRQ + conf->id * 2);
+            self->irq_conf->irq_list->fun->add_int(
+                    self->irq_conf->irq_list, I2C1_ER_IRQ + conf->id * 2);
             self->fun->config_irq(self, self->irq_conf);
         }
 
         if (!i2c->i2c_xfer) {
             i2c->i2c_xfer = os_malloc(sizeof(i2c_xfer_state_t));
             memset(i2c->i2c_xfer, 0, sizeof(i2c_xfer_state_t));
-            i2c->i2c_xfer->i2c_tx_sem = semaphore_create(0);
-            i2c->i2c_xfer->i2c_rx_sem = semaphore_create(0);
+            i2c->i2c_xfer->i2c_sem = semaphore_create(0);
         }
     }
 
-    if (conf->dma_cfg) {
-        if (conf->dma_cfg->tx_dma) {
-            dma_stream_request(conf->dma_cfg->tx_dma);
+    LOG_DEBUG("i2c", "i2c%d init ok", conf->id);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   dev_write — I2C 主设备发送
+   ══════════════════════════════════════════════════════════════ */
+
+dev_write_override(i2c_dev_write_impl)
+{
+    I2c *i2c = (I2c *)self;
+    const i2c_config_t *conf = self->info->conf;
+
+    if (conf->id >= I2C_MAX || count == 0) return;
+
+    i2c_xfer_state_t *s = i2c->i2c_xfer;
+    const uint8_t *data = (const uint8_t *)buf;
+    uint16_t len = (uint16_t)count;
+
+    if (conf->dma_cfg && conf->dma_cfg->tx_dma && conf->dma_cfg->rx_dma) {
+        /* ─── DMA 发送 ─── */
+        i2c_transmit_dma(conf->id, conf->dma_cfg->tx_dma,
+                         i2c->slave_addr, data, len);
+
+    } else if (conf->it_enable) {
+        /* ─── 中断发送 ─── */
+        if (!s || s->active) {
+            return;
         }
-        if (conf->dma_cfg->rx_dma) {
-            dma_stream_request(conf->dma_cfg->rx_dma);
-        }
-        hal_i2c_dma_init(conf->id, conf->dma_cfg->tx_dma, conf->dma_cfg->rx_dma);
+
+        s->tx_buf    = data;
+        s->total_len = len;
+        s->index     = 0;
+        s->active    = true;
+        s->direction = 0;  /* TX */
+
+        hal_i2c_transmit_it_start(conf->id);
+        s->i2c_sem->fun->take(s->i2c_sem);
+
+    } else {
+        /* ─── 阻塞发送 ─── */
+        i2c_transmit(conf->id, i2c->slave_addr, data, len);
     }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   dev_read — I2C 主设备接收
+   ══════════════════════════════════════════════════════════════ */
 
-static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf) {
+dev_read_override(i2c_dev_read_impl)
+{
+    I2c *i2c = (I2c *)self;
+    const i2c_config_t *conf = self->info->conf;
+
+    if (conf->id >= I2C_MAX || count == 0) return 0;
+
+    i2c_xfer_state_t *s = i2c->i2c_xfer;
+    uint8_t *data = (uint8_t *)buf;
+    uint16_t len = (uint16_t)count;
+
+    if (conf->dma_cfg && conf->dma_cfg->rx_dma) {
+        /* ─── DMA 接收 ── */
+        i2c_transmit_dma(conf->id, conf->dma_cfg->rx_dma,
+                         i2c->slave_addr, NULL, len);  /* TODO: 正确 DMA 接收 */
+
+    } else if (conf->it_enable) {
+        /* ─── 中断接收 ─── */
+        if (!s || s->active) {
+            return 0;
+        }
+
+        s->rx_buf    = data;
+        s->total_len = len;
+        s->index     = 0;
+        s->active    = true;
+        s->direction = 1;  /* RX */
+
+        hal_i2c_receive_it_start(conf->id);
+        s->i2c_sem->fun->take(s->i2c_sem);
+
+    } else {
+        /* ─── 阻塞接收 ─── */
+        i2c_receive(conf->id, i2c->slave_addr, data, len);
+    }
+    return len;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   dev_ioctl — 扩展控制
+   ══════════════════════════════════════════════════════════════ */
+
+dev_ioctl_override(i2c_dev_ioctl_impl)
+{
+    I2c *i2c = (I2c *)self;
+
+    switch (cmd) {
+    case I2C_IOCTL_SET_ADDR:
+        if (arg) i2c->slave_addr = *(uint8_t *)arg;
+        break;
+
+    case I2C_IOCTL_TRANSFER: {
+        /* 写寄存器地址 + 读数据的组合操作 */
+        i2c_transfer_args_t *a = (i2c_transfer_args_t *)arg;
+        if (!a) break;
+        i2c->slave_addr = a->slave_addr;
+        if (a->tx_buf && a->tx_len > 0) {
+            virtual_dev_write(self, a->tx_buf, a->tx_len);
+        }
+        if (a->rx_buf && a->rx_len > 0) {
+            virtual_dev_read(self, a->rx_buf, a->rx_len);
+        }
+        break;
+    }
+    default: break;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   I2C 中断处理
+   ══════════════════════════════════════════════════════════════ */
+
+static bool i2c_irq_handler_impl(nvic_irq_t *irq_conf)
+{
     I2c *i2c = GET_I2C(irq_conf->arg);
     const i2c_config_t *conf = GET_DEVICE(i2c)->info->conf;
-   // xI2C_TypeDef *i2c_ctrl = I2Cx[conf->id];
     i2c_xfer_state_t *s = i2c->i2c_xfer;
-    if (!s) {
-        return true;
-    }
-    if (!s->active) {
-        return true;
-    }
+    if (!s || !s->active) return true;
 
     uint16_t sr1 = hal_i2c_get_it_event(conf->id);
 
-    /* SB: 起始条件已发送 */
+    /* SB: 起始条件已发送 → 发送从设备地址 */
     if (sr1 & I2C_FLG_SB) {
-        if (s->direction == 0) {  // TX
-            *hal_i2c_addr(conf->id) = (s->slave_addr << 1) | 0x00;  // 写地址;
-        } else {                    // RX
-            *hal_i2c_addr(conf->id) = (s->slave_addr << 1) | 0x01;  // 读地址
-        }
+        *hal_i2c_addr(conf->id) = (i2c->slave_addr << 1)
+            | (s->direction ? 0x01 : 0x00);
         return true;
     }
 
-    /* ADDR: 地址已发送，读 SR2 清除 ADDR 标志 */
+    /* ADDR: 地址已发送 → 清 ADDR */
     if (sr1 & I2C_FLG_ADDR) {
         hal_i2c_clear_addr_flag(conf->id);
         if (s->direction == 1 && s->total_len == 1) {
-            // 若只收一个字节，提前关闭 ACK
             hal_i2c_close_ack(conf->id);
         }
         return true;
     }
 
-    /* TXE: 数据寄存器空，可以继续发送 */
+    /* TXE: 发送下一个字节 */
     if (sr1 & I2C_FLG_TXE) {
         if (s->direction == 0 && s->index < s->total_len) {
             *hal_i2c_addr(conf->id) = s->tx_buf[s->index++];
-        } else if (s->direction == 0 && s->index >= s->total_len) {
-            // 发送完成，等 BTF 后发停止
-            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN); // 关闭 TXE 中断
+        } else if (s->direction == 0) {
+            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN);
         }
-        //return true;
     }
 
-    /* RXNE: 收到数据 */
+    /* RXNE: 收到一个字节 */
     if (sr1 & I2C_FLG_RXNE) {
         if (s->direction == 1 && s->index < s->total_len) {
             s->rx_buf[s->index++] = *hal_i2c_addr(conf->id);
             if (s->index == s->total_len - 1) {
-                hal_i2c_close_ack(conf->id);// 最后字节前关 ACK
+                hal_i2c_close_ack(conf->id);
             }
             if (s->index >= s->total_len) {
-                // 接收完成
-                hal_i2c_clear_it_event(conf->id, xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN);
+                hal_i2c_clear_it_event(conf->id,
+                    xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN);
                 hal_i2c_stop(conf->id);
                 s->active = false;
-                s->i2c_rx_sem->fun->give(s->i2c_rx_sem);
+                s->i2c_sem->fun->give(s->i2c_sem);
             }
         }
         return true;
     }
 
-    /* BTF: 字节传输完成 */
+    /* BTF: 字节传输完成 → 发 STOP */
     if (sr1 & I2C_FLG_BTF) {
         if (s->direction == 0 && s->index >= s->total_len) {
-            hal_i2c_stop(conf->id); // 发 STOP
-            hal_i2c_clear_it_event(conf->id, xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);          // ★ 关掉事件中断总开关
-
+            hal_i2c_stop(conf->id);
+            hal_i2c_clear_it_event(conf->id,
+                xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);
             s->active = false;
-            s->i2c_tx_sem->fun->give(s->i2c_tx_sem);
+            s->i2c_sem->fun->give(s->i2c_sem);
         }
         return true;
     }
 
+    /* 防御：SR1 == 0 可能是噪声 */
     if (sr1 == 0) {
-        hal_i2c_stop(conf->id);                // 发 STOP
-        hal_i2c_clear_it_event(conf->id, xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);          // ★ 关掉事件中断总开关
+        hal_i2c_stop(conf->id);
+        hal_i2c_clear_it_event(conf->id,
+            xI2C_IE_ITEVTEN | xI2C_IE_ITBUFEN);
     }
     return true;
 }
 
-static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf) {
+static bool i2c_irq_err_handler_impl(nvic_irq_t *irq_conf)
+{
+    I2c *i2c = GET_I2C(irq_conf->arg);
     LOG_ERROR("i2c", "irq error");
+    if (i2c->i2c_xfer && i2c->i2c_xfer->active) {
+        i2c->i2c_xfer->active = false;
+        i2c->i2c_xfer->i2c_sem->fun->give(i2c->i2c_xfer->i2c_sem);
+    }
     return true;
 }
-
-
-// transmit_it method
-static void i2c_transmit_it(I2c* self, uint8_t slave_addr, const uint8_t *data, uint16_t len) {
-    const i2c_config_t *conf = GET_DEVICE(self)->info->conf;
-    if (conf->id >= I2C_MAX || len == 0) {
-        return;
-    }
-
-    i2c_xfer_state_t *s = self->i2c_xfer;
-    s->tx_buf = data;
-    s->total_len = len;
-    s->index = 0;
-    s->active = true;
-    s->direction = 0;   // TX
-    s->slave_addr = slave_addr;
-
-    hal_i2c_transmit_it_start(conf->id);
-    if (s->i2c_tx_sem) {
-        s->i2c_tx_sem->fun->take(s->i2c_tx_sem);
-    }
-}
-
-
-// receive_it method
-static void i2c_receive_it(I2c* self, uint8_t slave_addr, uint8_t *buffer, uint16_t len) {
-    // TODO: add receive_it method
-    const i2c_config_t *conf = GET_DEVICE(self)->info->conf;
-    if (conf->id >= I2C_MAX || len == 0) {
-        return;
-    }
-
-    i2c_xfer_state_t *s = self->i2c_xfer;
-    s->rx_buf = buffer;
-    s->total_len = len;
-    s->index = 0;
-    s->active = true;
-    s->direction = 1;   // RX
-    s->slave_addr = slave_addr;
-
-    hal_i2c_receive_it_start(conf->id);
-    if (self->i2c_xfer->i2c_rx_sem) {
-        self->i2c_xfer->i2c_rx_sem->fun->take(self->i2c_xfer->i2c_rx_sem);
-    }
-}
-

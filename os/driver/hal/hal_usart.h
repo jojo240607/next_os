@@ -70,7 +70,8 @@ typedef enum : uint16_t {
     xUART_FLAG_TXE  = xUART_IT_TXE,
     xUART_FLAG_TC   = xUART_IT_TC,
 } uart_it_t;
-
+#define USART_CR3_DMAT_Pos            (7U)
+#define USART_CR3_DMAR_Pos            (6U)
 
 void hal_uart_clock_enable(uart_id_t id);
 void hal_uart_set_baudrate(uart_id_t id, uint32_t baudrate);
@@ -79,11 +80,15 @@ void hal_uart_enable(uart_id_t id);
 bool hal_uart_it_init(uart_id_t id, uart_it_t it_enable);
 void hal_uart_dma_init(uart_id_t id, bool txdma, bool rxdma);
 void hal_uart_send(uart_id_t id, uint8_t *buf, size_t count);
-void hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count);
+size_t hal_uart_recv(uart_id_t id, uint8_t *buf, size_t count);
 uint32_t hal_uart_get_it_event(uart_id_t id);
-void hal_uart_set_it_event(uart_id_t id, uart_it_t it_event);
-void hal_uart_clear_it_event(uart_id_t id, uart_it_t it_event);
+void hal_uart_it_enable(uart_id_t id, uart_it_t it_event);
+void hal_uart_it_disable(uart_id_t id, uart_it_t it_event);
+void hal_uart_it_clear(uart_id_t id, uart_it_t it_event);
 volatile uint8_t *hal_uart_data_addr(uart_id_t id);
 int uart_send_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, const uint8_t *data, uint16_t len);
+int uart_recv_dma(uart_id_t id, const dma_stream_config_t *dma_cfg, uint8_t *buf, uint16_t buf_size);
+uint16_t uart_dma_get_rx_ndtr(const dma_stream_config_t *dma_cfg);
+void hal_uart_clear_idle_flag(uart_id_t id, const dma_stream_config_t *dma_cfg);
 
 #endif //STM32F4DISCOVERY_HAL_USART_H
