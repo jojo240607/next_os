@@ -21,6 +21,7 @@ void dev_ioctl_user(int cmd, void *arg);
 #include "nvic.h"
 #include "../hal/hal_nvic.h"
 #include "../../common/list.h"
+#include "../../scheduler/mutex.h"
 
 #define GET_DEVICE_VTABLE(obj) (*(DeviceVTable **)obj)
 
@@ -133,6 +134,8 @@ struct _Device {
     // TODO: 添加数据成员
     const device_info_t *info;
     irq_config *irq_conf;
+    Mutex *read_mutex;
+    Mutex *write_mutex;
 };
 
 // 构造函数声明

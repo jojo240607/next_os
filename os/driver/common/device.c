@@ -56,6 +56,8 @@ void device_init(Device* self, const device_info_t *info) {
     } else {
         self->irq_conf = NULL;
     }
+    self->read_mutex = mutex_create();
+    self->write_mutex = mutex_create();
 }
 
 void device_deinit(Device* self) {
@@ -113,7 +115,10 @@ static void device_dev_read_user(Device* self, void *buf, size_t count) {
             .buf = buf,
             .count = count,
     };
+    mutex_lock_user(self->read_mutex, 1000);     //添加互斥锁，防止多线程调用
     device_user(self, &ctrl);
+    mutex_unlock_user(self->read_mutex);     //添加互斥锁，防止多线程调用
+
 }
 // dev_write_user method
 static void device_dev_write_user(Device* self, const void *buf, size_t count) {
@@ -122,7 +127,9 @@ static void device_dev_write_user(Device* self, const void *buf, size_t count) {
             .buf = (void *)buf,
             .count = count,
     };
+    mutex_lock_user(self->write_mutex, 1000);     //添加互斥锁，防止多线程调用
     device_user(self, &ctrl);
+    mutex_unlock_user(self->write_mutex);     //添加互斥锁，防止多线程调用
 }
 // dev_ioctl_user method
 static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg) {

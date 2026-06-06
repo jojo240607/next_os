@@ -76,7 +76,7 @@ static uint32_t kmutex_lock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) 
         return 0;
     }
     Mutex *mutex = (Mutex *)a1;
-    LOG_DEBUG("svc", "kmutex_lock");
+    //LOG_DEBUG("svc", "kmutex_lock");
     return mutex->fun->mutex_lock(mutex, a2);
 }
 static uint32_t kmutex_unlock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
@@ -84,7 +84,7 @@ static uint32_t kmutex_unlock(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4
         return 0;
     }
     Mutex *mutex = (Mutex *)a1;
-    LOG_DEBUG("svc", "kmutex_unlock");
+    //LOG_DEBUG("svc", "kmutex_unlock");
     return mutex->fun->mutex_unlock(mutex);
 }
 
