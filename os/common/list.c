@@ -60,6 +60,7 @@ static void list_add(List* self, Node *data) {
     data->next = NULL;
     if (self->size == 0) {
         self->head = data;
+        self->tail = self->head;
     } else {
         self->tail->next = data;
         self->tail = data;

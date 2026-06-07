@@ -378,8 +378,27 @@ static bool usart_txdma_irq_handler_impl(nvic_irq_t *irq_conf) {
 
 static bool usart_rxdma_irq_handler_impl(nvic_irq_t *irq_conf) {
     Usart *usart = (Usart *)irq_conf->arg;
+    uart_xfer_t *rx = usart->uart_xfer;
     const usart_config_t *conf = GET_DEVICE(usart)->info->conf;
+    dma_it_event_t it_event = dma_get_it_event(conf->dma_cfg->rx_dma);
     dma_clear_flag(conf->dma_cfg->rx_dma);
+    volatile uint16_t cur_ndtr = uart_dma_get_rx_ndtr(conf->dma_cfg->rx_dma);
+    size_t dma_pos = usart->rx_cache_buf->size - cur_ndtr;
+    if (it_event == DMA_IT_EVENT_HTIF) {//半传输中断
+        if (rx->rx_user_buf->buf) {
+           ringbuf_dma_update(usart->rx_cache_buf, dma_pos);
+           size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf + rx->rx_user_buf->pos, rx->rx_user_buf->buf_size - rx->rx_user_buf->pos);
+           rx->rx_user_buf->pos += recv_size;
+        }
+    }
+    if (it_event == DMA_IT_EVENT_TCIF) {//传输中断
+        if (rx->rx_user_buf->buf) {
+            ringbuf_dma_update(usart->rx_cache_buf, dma_pos);
+            size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf + rx->rx_user_buf->pos, rx->rx_user_buf->buf_size - rx->rx_user_buf->pos);
+            rx->rx_user_buf->pos += recv_size;
+        }
+    }
+
     return true;
 }
 /*
@@ -406,8 +425,8 @@ static bool usart_dma_idle_irq_handler_impl(nvic_irq_t *irq_conf) {
         rx->rx_user_active = false;
         /* 如果 dev_read 在等待，拷贝数据到用户缓冲区 */
         if (rx->rx_user_buf->buf) {
-            size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf, rx->rx_user_buf->buf_size);
-            rx->rx_user_buf->pos = recv_size;
+            size_t recv_size = ringbuf_get(usart->rx_cache_buf, rx->rx_user_buf->buf + rx->rx_user_buf->pos, rx->rx_user_buf->buf_size - rx->rx_user_buf->pos);
+            rx->rx_user_buf->pos += recv_size;
             rx->rx_user_buf->buf = NULL;
             rx->uart_rx_sem->fun->give(rx->uart_rx_sem);
         }

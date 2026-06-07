@@ -87,7 +87,7 @@ const usart_config_t usart1_conf = {
                         .per_inc        = 0,
                         .mode           = DMA_MODE_CIRCULAR, // 接收推荐循环模式
                         .fifo_mode      = DMA_FIFO_DIRECT,
-                        .it_enable      = xDMA_IT_NONE,                 // 直接读取缓冲区则无需中断
+                        .it_enable      = xDMA_IT_HT | xDMA_IT_TC,                 // 双缓冲接收dma数据，更快速处理接收数据，且不会遗漏
                 },
         },
 };

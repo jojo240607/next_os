@@ -56,6 +56,21 @@ typedef enum :uint8_t {
     xDMA_IT_HT = (1 << 1),   /* 半传输中断 */
     xDMA_IT_TE = (1 << 2),   /* 传输错误中断 */
 } dma_it_t;
+
+// *  Bit 0: FEIF4 (流错误中断标志) —— 实际可能是“保留”或 FIFO 错误，不同型号位定义有差异
+//    Bit 1: 保留
+//    Bit 2: DMEIF4 (直接模式错误中断标志)
+//    Bit 3: TEIF4 (传输错误中断标志)
+//    Bit 4: HTIF4 (半传输中断标志)
+//    Bit 5: TCIF4 (传输完成中断标志)
+typedef enum :uint8_t {
+    DMA_IT_EVENT_NONE = 0,
+    DMA_IT_EVENT_FEIF = (1 << 0),
+    DMA_IT_EVENT_DMEIF = (1 << 2),
+    DMA_IT_EVENT_TEIF = (1 << 3),
+    DMA_IT_EVENT_HTIF = (1 << 4),
+    DMA_IT_EVENT_TCIF = (1 << 5),
+} dma_it_event_t;
 /* DMA 流配置描述符 */
 typedef struct {
     dma_request_t           dma_request;
@@ -84,4 +99,5 @@ int  dma_stop_transfer(const dma_stream_config_t *cfg);
 bool dma_is_busy(const dma_stream_config_t *cfg);
 void dma_clear_flag(const dma_stream_config_t *cfg);
 nvic_irq_num dma_get_irqnum(const dma_stream_config_t *dma_ctrl);
+dma_it_event_t dma_get_it_event(const dma_stream_config_t *cfg);
 #endif

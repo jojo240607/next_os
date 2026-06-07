@@ -256,6 +256,22 @@ void dma_clear_flag(const dma_stream_config_t *cfg) {
     }
 }
 
+dma_it_event_t dma_get_it_event(const dma_stream_config_t *cfg) {
+    xDMA_Base_TypeDef *base = (DMA_REQ_GET_CTRL(cfg->dma_request) == DMA_1) ? (xDMA_Base_TypeDef*)xDMA1_BASE :
+                              (xDMA_Base_TypeDef*)xDMA2_BASE;
+    uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
+    uint32_t it_event = 0;
+    if (stream < 4) {
+        it_event = base->LISR;
+        it_event >>= (stream * 6 + (stream >> 1) * 4); // 具体按手册，简化：清除对应流所有标志
+    } else {
+        stream -= 4;
+        it_event = base->HISR;
+        it_event >>= (stream * 6 + (stream >> 1) * 4);
+    }
+    return it_event;
+}
+
 nvic_irq_num dma_get_irqnum(const dma_stream_config_t *dma_conf) {
     if (DMA_REQ_GET_CTRL(dma_conf->dma_request) == DMA_1) {
         return DMA_REQ_GET_STREAM(dma_conf->dma_request) + DMA1_ST0_IRQ;
