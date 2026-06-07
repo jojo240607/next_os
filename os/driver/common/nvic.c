@@ -243,24 +243,16 @@ void nvic_dispatch(Nvic* self, nvic_irq_num irq_num) {
     if (irq_num >= MAX_IRQ)
         return;
     nvic_irq_t *select_irq = *(self->irq_table + irq_num);
-    if (select_irq == NULL) {
+    if (select_irq == NULL || select_irq->handler == NULL) {
         return;
     }
 
-    // 1. 执行上半部回调
-    while (select_irq != NULL) {
-        if (select_irq->handler) {
-            if (select_irq->handler(select_irq)) {
-                // 2. 如果关联了下半部信号量，释放它（注意：此函数在中断中，应使用 from_isr 版本）
-                if (select_irq->bottom_task) {
-                    // 假设你的信号量有 semaphore_give_from_isr 函数
-                    // 并根据返回值决定是否需要请求调度
-                    select_irq->bottom_task->fun->trigger(select_irq->bottom_task, select_irq->event);
-                }
-            }
-            break;
+    // 执行上半部回调
+    if (select_irq->handler(select_irq)) {
+        // 如果关联了下半部任务，触发之
+        if (select_irq->bottom_task) {
+            select_irq->bottom_task->fun->trigger(select_irq->bottom_task, select_irq->event);
         }
-        select_irq = (nvic_irq_t *)GET_NODE(select_irq)->next;
     }
 }
 

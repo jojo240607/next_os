@@ -59,7 +59,7 @@ void uart_dma_test_init(UartDmaTest* self, const task_into_t *info)
     def_task_start(self)  = uart_dma_test_start_impl;
 
     /* 通过设备管理器打开 USART1（会自动完成 DMA TX/RX 初始化） */
-    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
+    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
     self->send_count = 0;
     self->recv_count = 0;
 

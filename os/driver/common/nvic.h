@@ -101,7 +101,7 @@ struct _NvicFun {
 
 // 中断控制块
 struct _nvic_irq_t {
-    Node base;
+   // Node base;
     nvic_irq_num id;
     nvic_handler_t handler;      // 上半部回调
     void *arg;                   // 回调参数

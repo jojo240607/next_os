@@ -117,6 +117,12 @@ static Node * queue_dequeue_node(Queue* self, Node *node) {
             } else {
                 priv->next = current->next;
             }
+            // 更新 tail 指针：如果删除的是尾节点
+            if (current == self->tail) {
+                self->tail = priv;
+            }
+            current->next = NULL;
+            self->size--;
             break;
         }
         priv = current;

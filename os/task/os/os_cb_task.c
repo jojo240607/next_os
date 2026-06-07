@@ -86,7 +86,7 @@ task_thread_override(os_cb_task_task_thread_impl) {
         os_callback *cb = (os_callback*)os_cb_task->callback_list->head;
         while (cb != NULL && cb->cb_source == cb_event->source) {
             LOG_DEBUG("os_cb_task", "do cb_handler");
-            ((os_callback*)os_cb_task->callback_list->head)->cb_handler(cb_event, cb->arg);
+            cb->cb_handler(cb_event, cb->arg);
             cb = (os_callback *)GET_NODE(cb)->next;
         }
     }

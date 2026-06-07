@@ -79,10 +79,10 @@ void thread_scheduler_deinit(volatile Thread_scheduler* self) {
         self->delay_list->fun->destroy(self->delay_list);
     }
     if (self->destory_list) {
-        Tcb_t *tcb = GET_TCB_T(self->delay_list->fun->dequeue(self->delay_list));
+        Tcb_t *tcb = GET_TCB_T(self->destory_list->fun->dequeue(self->destory_list));
         while (tcb != NULL) {
             tcb->fun->destroy(tcb);
-            tcb = GET_TCB_T(self->delay_list->fun->dequeue(self->delay_list));
+            tcb = GET_TCB_T(self->destory_list->fun->dequeue(self->destory_list));
         }
         self->destory_list->fun->destroy(self->destory_list);
     }
@@ -282,6 +282,10 @@ static inline void thread_scheduler_clear_priority_ready(volatile Thread_schedul
 // get_highest_priority method
 static inline uint8_t thread_scheduler_get_highest_priority(volatile Thread_scheduler* self) {
     //用于计算一个无符号整数的前导零个数  优先级31 返回值0， 优先级0 返回31
+    // __builtin_clz(0) 是未定义行为，必须提前判零
+    if (self->priority_bitmap == 0) {
+        return 32;  // 返回无效值，调用者需检查 > 31
+    }
     return 31 - __builtin_clz(self->priority_bitmap);
 }
 

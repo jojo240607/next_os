@@ -73,6 +73,9 @@ task_thread_override(monitor_task_task_thread_impl) {
         uint64_t now = get_systime_us()->time_us;
         uint64_t run_time =  now - monitor_task->last_call;
         monitor_task->last_call = now;
+        if (run_time == 0) {
+            run_time = 1;  /* 防止除零 */
+        }
         LOG_DEBUG("monitor", "--------------------------------");
         LOG_DEBUG("monitor", "name      cpu     mem     stack");
         for (uint32_t i =0; i < gloable_taskManager->task_size; i++) {
