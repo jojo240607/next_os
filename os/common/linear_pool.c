@@ -79,6 +79,12 @@ void *os_stack_malloc(size_t num_bytes, byte_alignment_t alignment) {
     return linear_alloc(&gloable_stack_alloc, num_bytes, alignment);
 }
 
+/*
+ * 注意：当前使用线性分配器，不支持单个对象释放。
+ * os_free() 为有意空实现。内存仅在系统复位时整体回收。
+ * 因此所有 deinit/destroy 调用无法真正回收内存，
+ * 仅释放子对象（如队列、信号量）的资源引用。
+ */
 void os_free (void *p) {
-
+    (void)p;
 }

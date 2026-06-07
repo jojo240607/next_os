@@ -52,6 +52,8 @@ static void mutex_destroy(Mutex* self) {
 }
 
 // take method
+// 注意：timeout_ms 参数当前未实现，调用者必须传 OS_WAIT_FOREVER(0) 或接受永久阻塞。
+// TODO: 在延时队列中加入超时唤醒机制。
 static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
     uint32_t key = arch_irq_lock();
     volatile Tcb_t *curr = global_thread_scheduler->current_thread;

@@ -41,7 +41,9 @@ void ring_init(Ring* self, uint32_t capacity, uint32_t size) {
     self->count = 0;
     self->buffer = os_malloc(self->capacity * self->elem_size);
     if (!self->buffer) {
-        os_free(self);
+        /* 注意：os_malloc 无法释放，此处 self 对象已泄漏。
+         * 将 fun 置 NULL 让调用者可通过检查 fun 判断初始化是否成功。 */
+        self->fun = NULL;
         return;
     }
 }

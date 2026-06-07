@@ -59,7 +59,7 @@ static uint8_t msg_queue_send(Msg_queue* self, void **msg, uint32_t timeout) {
     self->room_sem->fun->take(self->room_sem);
     // 2. 获取互斥锁，操作环形缓冲区
     self->lock->fun->mutex_lock(self->lock, 0);
-    self->ringbuf->fun->pop(self->ringbuf, *msg);
+    self->ringbuf->fun->push(self->ringbuf, *msg);
     self->lock->fun->mutex_unlock(self->lock);
     // 3. 通知数据可用
     self->data_sem->fun->give(self->data_sem);

@@ -105,7 +105,7 @@ dev_init_override(usart_dev_init_impl) {
                     .af = conf->pins.uart_rx }
     };
     if (pinmux_request_group(pins, 2) != PINMUX_SUCCESS) {
-        LOG_DEBUG("can", "init pinmux error!");
+        LOG_ERROR("usart", "init pinmux error!");
         return;
     }
 

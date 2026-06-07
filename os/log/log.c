@@ -54,12 +54,8 @@ void log_output(Log *self, log_level_t level, const char * tag, const char *fmt,
         if (self->log_task) {
             self->log_task->fun->trigger(self->log_task, NULL);
         }
-    } else {
-        // 缓冲区满，记录丢弃次数（可选，这里省略）
-        if (self->log_task) {
-            self->log_task->fun->trigger(self->log_task, NULL);
-        }
     }
+    /* 若 push 失败（缓冲区满），丢弃本条日志，无需重复触发 log_task */
 }
 
 void log_directly_error(Log *self, const char *fmt, ...) {
@@ -68,8 +64,9 @@ void log_directly_error(Log *self, const char *fmt, ...) {
     }
     Log_task *log_task = (Log_task *)self->log_task;
 
+    sys_time_t *st = get_systime_us();
     log_entry_t entry;
-    entry.timestamp = get_systime_us()->time_us;
+    entry.timestamp = st ? st->time_us : 0;
     entry.level = (uint8_t)LOG_LEVEL_ERROR;
     entry.tid = 0;
     entry.tag = "os_error";

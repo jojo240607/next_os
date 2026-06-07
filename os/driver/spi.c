@@ -164,13 +164,7 @@ dev_init_override(spi_dev_init_impl)
         self->irq_conf->irq_list->fun->add_int(
                 self->irq_conf->irq_list, (int) (SPI1_IRQ + conf->id));
         self->fun->config_irq(self, self->irq_conf);
-
-        if (!spi->spi_xfer) {
-            spi->spi_xfer = os_malloc(sizeof(spi_xfer_t));
-            memset(spi->spi_xfer, 0, sizeof(spi_xfer_t));
-            spi->spi_xfer->spi_sem = semaphore_create(0);
-        }
-       // x = spi->spi_xfer;
+        /* spi_xfer 已在 spi_init 中创建，此处无需重复 */
     }
 
     LOG_DEBUG("spi", "spi%d init ok, mode=%s", conf->id,

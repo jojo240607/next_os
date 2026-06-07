@@ -38,9 +38,12 @@ void semaphore_init(Semaphore* self, uint8_t count) {
 void semaphore_deinit(Semaphore* self) {
     // TODO: 数据成员申请资源释放
     if (self->wait_list != NULL) {
+        /* 将等待队列中的 TCB 唤醒为就绪态，而非销毁它们。
+         * TCB 的生命周期由调度器管理，信号量只是借用等待队列。 */
         Tcb_t *tcb = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         while (tcb != NULL) {
-            tcb->fun->destroy(tcb);
+            tcb->state = TCB_STATER_READY;
+            global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, tcb, true);
             tcb = GET_TCB_T(self->wait_list->fun->dequeue(self->wait_list));
         }
         self->wait_list->fun->destroy(self->wait_list);

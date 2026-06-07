@@ -121,7 +121,9 @@ static void tcb_t_os_sleep(Tcb_t* self, uint32_t ms) {
     if (NULL == self) {
         return;
     }
-    uint32_t ticks = ms;//ms_to_ticks(ms);   // 毫秒转节拍数
+    uint32_t ticks = ms;  /* TODO: 应实现 ms_to_ticks(ms) 转换。
+                            * 当前 SYSTEM_TICKS_PER_SEC=1000 时 1ms=1tick，
+                            * 若节拍率改变则此处需修正为: ms * SYSTEM_TICKS_PER_SEC / 1000 */
     uint32_t key = arch_irq_lock();
     self->delay_ticks = ticks;
     self->state = TCB_STATER_DELAYED;          // 延时阻塞状态

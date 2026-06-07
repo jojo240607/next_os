@@ -149,7 +149,7 @@ static void device_dev_ioctl_user(Device* self, ioctl_cmd_t cmd, void *arg) {
 // config_irq method
 static bool device_config_irq(Device* self, const irq_config *conf) {
     // TODO: add config_irq method
-    if (self->irq_conf == NULL || self->irq_conf->handler == NULL) {
+    if (self->irq_conf == NULL || conf == NULL || conf->handler == NULL) {
         return false;
     }
     for (uint32_t i = 0; i < self->irq_conf->irq_list->size; i++) {
