@@ -87,14 +87,9 @@ typedef enum : uint8_t {
     MAX_IRQ
 } nvic_irq_num;
 
-// 类成员函数结构
+// 类成员函数结构（当前使用全局函数 + gloable_nvic 单例模式）
 struct _NvicFun {
     void (*destroy)(Nvic* self);
-    //bool (*register_handler)(Nvic* self, nvic_irq_num irq_num, nvic_handler_t handler, void *arg);
-	//void (*unregister_handler)(Nvic* self, nvic_irq_num irq_num);
-	//void (*attach_semaphore)(Nvic* self, nvic_irq_num irq_num, Semaphore *sem);
-	//void (*set_priority)(Nvic* self, nvic_irq_num irq_num, nvic_priority_t preempt_priority, uint8_t sub_priority);
-
 };
 
 

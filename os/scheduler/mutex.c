@@ -91,15 +91,9 @@ static uint8_t mutex_take(Mutex* self, uint32_t timeout_ms) {
             owner->priority = curr->priority;
         }
     }
-    // 挂起当前任务，加入等待队列（按优先级排序）
+    // 挂起当前任务，加入等待队列
     curr->state = TCB_STATER_WAITING_MUTEX;
-    //os_insert_task_sorted(&self->wait_list, curr);  // 按优先级插入
     self->wait_list->fun->enqueue(self->wait_list, GET_NODE(curr));
-    //if (timeout_ms != OS_WAIT_FOREVER) {
-    //    os_set_task_timeout(curr, timeout_ms);
-    //}
- //   LOG_DEBUG("mutex", "%s wait", curr->name);
-    //curr->need_print = true;
     arch_irq_unlock(key);
     Trigger_PendSV;   // 切换到其他任务
     //start_pendsv_user();
@@ -168,11 +162,9 @@ static uint8_t mutex_give(Mutex* self) {
     // 新任务不是当前任务，需要手动插入插入就绪队列
     LOG_DEBUG("mutex", "add wait unlock owner %s", new_owner->name);
     global_thread_scheduler->fun->add_readly_list(global_thread_scheduler, new_owner, true);
-    // 如果有超时机制，清除该任务的超时定时器
-    //os_clear_task_timeout(new_owner);
+    // TODO: 超时机制实现后，此处需清除新拥有者的超时定时器
     arch_irq_unlock(key);
-    Trigger_PendSV;   // 让新拥有者运行（如果优先级足够高）
-    //start_pendsv_user();
+    Trigger_PendSV;
     return 1;
 }
 

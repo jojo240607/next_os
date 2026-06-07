@@ -26,10 +26,6 @@ static void usart_destroy(Usart* self);
 // TODO: 初始化数据成员
 static const UsartFun usart_fun = {
     .destroy = usart_destroy,
-	//.send_it = usart_send_it,
-	//.recv_it = usart_recv_it,
-    //.send = usart_send,
-    //.recv = usart_recv,
 };
 
 // 构造函数实现

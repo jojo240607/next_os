@@ -25,17 +25,14 @@ Idle_task* idle_task_create(const task_into_t *info) {
 }
 
 void idle_task_init(Idle_task* self, const task_into_t *info) {
-    // 初始化基类部分
     task_init(&self->base, info);
     self->fun = &(idle_task_fun);
-    // TODO: 初始化派生类特有成员
 	def_task_init(self) = idle_task_init_impl;
 	def_task_thread(self) = idle_task_thread_impl;
 }
 
 void idle_task_deinit(Idle_task* self) {
     task_deinit(GET_TASK(self));
-    // TODO: 数据成员申请资源释放
 }
 // 析构函数实现
 static void idle_task_destroy(Idle_task* self) {
@@ -58,10 +55,10 @@ task_thread_override(idle_task_thread_impl) {
     //uint32_t last_idle_start = 0;
     //params , void *arg
     while (true) {
-        while (global_thread_scheduler->destory_list->size) {
-            Tcb_t *destory_tcb = GET_TCB_T(global_thread_scheduler->destory_list->fun->dequeue(global_thread_scheduler->destory_list));
-            if (destory_tcb) {
-                destory_tcb->fun->destroy(destory_tcb);
+        while (global_thread_scheduler->destroy_list->size) {
+            Tcb_t *destroy_tcb = GET_TCB_T(global_thread_scheduler->destroy_list->fun->dequeue(global_thread_scheduler->destroy_list));
+            if (destroy_tcb) {
+                destroy_tcb->fun->destroy(destroy_tcb);
             }
         }
         //LOG_DEBUG(MODULE_SYSTEM,"idle\n");

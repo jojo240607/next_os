@@ -27,11 +27,7 @@ Msg_queue* msg_queue_create(uint16_t queue_size) {
 
 void msg_queue_init(Msg_queue* self, uint16_t queue_size) {
     self->fun = &(msg_queue_fun);
-    // TODO: 初始化数据成员
-    self->ringbuf = ring_create(queue_size, sizeof(void *));//(LOG_RING_BUF_SIZE, sizeof(log_entry_t)
-    //self->queue_len = queue_size;
-    //self->in = 0;
-    //self->out = 0;
+    self->ringbuf = ring_create(queue_size, sizeof(void *));
     self->room_sem = semaphore_create(queue_size);
     self->data_sem = semaphore_create(0);
     self->lock = mutex_create();

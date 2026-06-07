@@ -1,5 +1,4 @@
 #include "tcb_t.h"
-#include <stdio.h>
 #include "thread_scheduler.h"
 #include "../common/linear_pool.h"
 #include "../driver/svc.h"
@@ -39,7 +38,6 @@ void tcb_t_init(Tcb_t* self, const char *name, const thread_conf_t *conf) {
     GET_NODE(self)->next = NULL;
     self->name = name;
     self->stack_left = 0;
-    //self->need_print = false;
     self->stack_size = conf->stack_size;
     tcb_t_stack_init(self, conf);
 }
@@ -86,7 +84,6 @@ static void tcb_t_stack_init(Tcb_t *self, const thread_conf_t *conf) {
     top[5] = (uint32_t)conf->exit;//EXC_RETURN_THRD_PSP_FT;//      // LR (EXC_RETURN)
     top[6] = (uint32_t)conf->loop; // PC
     top[7] = 0x01000000;      // xPSR (Thumb 位)
-    //top[8] = 0;      // 保留位，为了字节对齐
 
 // 再向下移动，留出 R4-R11, R14区
     top -= 10;  // 原来是 top -= 9

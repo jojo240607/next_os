@@ -125,15 +125,9 @@ dev_init_override(spi_dev_init_impl)
                  conf->nss_mode);
 
     /* 3. 中断初始化 */
-    //spi_xfer_t *x = NULL;
     hal_spi_disable_it(conf->id);
     /* 4. DMA 初始化 */
     if (conf->dma_cfg) {
-        //if (!spi->spi_xfer) {
-        //    spi->spi_xfer = os_malloc(sizeof(spi_xfer_t));
-        //    memset(spi->spi_xfer, 0, sizeof(spi_xfer_t));
-        //    spi->spi_xfer->spi_sem = semaphore_create(0);
-        //}
         if (conf->dma_cfg->tx_dma) {
             dma_stream_request(conf->dma_cfg->tx_dma);
             if (conf->dma_cfg->tx_dma->it_enable) {

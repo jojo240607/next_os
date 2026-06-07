@@ -3,18 +3,12 @@
 #include "linear_pool.h"
 #include "util.h"
 
-static bool ring_push_data(Ring* self, uint8_t data);
-static bool ring_pop_data(Ring* self, uint8_t *addr, uint16_t len);
-
+/* ── 前向声明 ── */
 static void * ring_pop_nocpy(Ring* self);
-
 static bool ring_push(Ring* self, const void *data);
 static bool ring_pop(Ring* self, void *data);
-
-// 析构函数声明
 static void ring_destroy(Ring* self);
 
-// TODO: 初始化数据成员
 static const RingFun ring_fun = {
     .destroy = ring_destroy,
 	.push = ring_push,
@@ -33,7 +27,6 @@ Ring* ring_create(uint32_t capacity, uint32_t size) {
 
 void ring_init(Ring* self, uint32_t capacity, uint32_t size) {
     self->fun = &(ring_fun);
-    // TODO: 初始化数据成员
     self->elem_size = size;
     self->capacity = capacity;
     self->head = 0;
@@ -49,7 +42,7 @@ void ring_init(Ring* self, uint32_t capacity, uint32_t size) {
 }
 
 void ring_deinit(Ring* self) {
-    // TODO: 数据成员申请资源释放
+    /* 注意：os_free 为 no-op，buffer 内存不会真正释放 */
     if (self->buffer) {
         os_free(self->buffer);
     }
@@ -91,14 +84,13 @@ static bool ring_pop(Ring* self, void *data) {
 }
 
 
-// pop_nocpy method
+// pop_nocpy method — 零拷贝弹出，返回指向环形缓冲内部数据的指针
 static void * ring_pop_nocpy(Ring* self) {
     if (self->count == 0) {
         return NULL;
     }
 
     char *byte_buffer = ((char *)self->buffer) + self->head * self->elem_size;
-    //memcpy(data, byte_buffer + self->head * self->elem_size, self->elem_size);
     self->head = (self->head + 1) % self->capacity;
     self->count--;
     return byte_buffer;

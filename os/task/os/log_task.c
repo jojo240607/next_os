@@ -74,7 +74,6 @@ task_init_override(log_task_task_init_impl) {
     }
     log_bound_task(gloable_log, self);
 }
-//char test[] = "ssssdddd";
 // task_thread method
 task_thread_override(log_task_task_thread_impl) {
     // TODO: add task_thread method
@@ -98,8 +97,6 @@ task_thread_override(log_task_task_thread_impl) {
                                log_task->entry->tag,
                                log_task->entry->text);
             if (len > 0) {
-
-  //              log_task->usart->fun->write_user(log_task->usart, (const uint8_t *)test, 8);
                 log_task->usart->fun->write_user(log_task->usart, (const uint8_t *)log_task->line, len);
             }
 #ifdef LOG_USE_NOCOPY

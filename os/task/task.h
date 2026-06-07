@@ -1,5 +1,5 @@
-#ifndef Task_H
-#define Task_H
+#ifndef TASK_H
+#define TASK_H
 /*
     override void task_init(void *parent);
     override void task_thread(void *arg);
@@ -11,8 +11,6 @@
 #include <string.h>
 #include "../scheduler/tcb_t.h"
 #include "../scheduler/thread_scheduler.h"
-//#include "../driver/common/nvic.h"
-//#include "../driver/device_manager.h"
 
 
 #define GET_TASK_VTABLE(obj) (*(TaskVTable **)obj)
@@ -77,4 +75,4 @@ void task_init(Task* self, const task_into_t *info);
 // 析构函数声明
 void task_deinit(Task* self);
 
-#endif // Task_H
+#endif // TASK_H

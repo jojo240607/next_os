@@ -59,7 +59,7 @@ void uart_dma_test_init(UartDmaTest* self, const task_into_t *info)
     def_task_start(self)  = uart_dma_test_start_impl;
 
     /* 通过设备管理器打开 USART1（会自动完成 DMA TX/RX 初始化） */
-    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART4);
+    self->usart4 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_USART1);
     self->send_count = 0;
     self->recv_count = 0;
 
@@ -127,7 +127,6 @@ task_thread_override(uart_dma_test_thread_impl)
         LOG_DEBUG("uart_dma", "DMA send: %d bytes (count=%lu)",
                   len, (unsigned long)test->send_count);
 
-        //test->usart1->vtable->dev_write(test->usart1, tx_buffer, len);
         test->usart4->fun->write_user(test->usart4, test->tx_buffer, len);
         LOG_DEBUG("uart_dma", "DMA send complete!");
 
@@ -136,7 +135,6 @@ task_thread_override(uart_dma_test_thread_impl)
         memset(test->rx_buffer, 0, sizeof(test->rx_buffer));
 
         LOG_DEBUG("uart_dma", "------------------------------Waiting for DMA receive...");
-        //test->usart1->vtable->dev_read(test->usart1, rx_buffer, sizeof(rx_buffer) - 1);
         test->usart4->fun->read_user(test->usart4, test->rx_buffer, sizeof(test->rx_buffer) - 1);
         LOG_DEBUG("uart_dma","\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxread_user %s\n\n", test->rx_buffer);
         /* 确保字符串终止 */

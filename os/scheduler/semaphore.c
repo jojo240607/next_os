@@ -1,5 +1,4 @@
 #include "semaphore.h"
-#include <stdio.h>
 #include "thread_scheduler.h"
 #include "../common/linear_pool.h"
 #include "../driver/svc.h"

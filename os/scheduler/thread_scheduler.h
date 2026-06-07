@@ -36,9 +36,9 @@ struct _Thread_scheduler {
     const Thread_schedulerFun* fun;
     // TODO: 添加数据成员
     volatile uint32_t priority_bitmap;                    // 位图，标记哪些优先级有就绪任务
-    Queue *priority_list[THREAD_PRIORITY_MAX];          // 每个优先级的就绪任务链表（可简化成单任务）
+    Queue *priority_list[THREAD_PRIORITY_MAX];          // 每个优先级的就绪任务链表
     Queue *delay_list;
-    Queue *destory_list;
+    Queue *destroy_list;   /* 待销毁 TCB 队列 */
     uint16_t tid_num;
     volatile Tcb_t *current_thread;
 };

@@ -76,7 +76,6 @@ void log_directly_error(Log *self, const char *fmt, ...) {
     int len = vsnprintf(entry.text, LOG_MSG_MAX_LEN, fmt, args);
     va_end(args);
     log_task->usart->vtable->dev_write(log_task->usart, (const uint8_t *)entry.text, len);
-    //GET_USART(log_task->usart)->fun->send(GET_USART(log_task->usart), (const uint8_t *)entry.text, len);
 }
 
 

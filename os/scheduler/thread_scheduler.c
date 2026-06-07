@@ -1,5 +1,4 @@
 #include "thread_scheduler.h"
-#include <stdio.h>
 #include "../common/linear_pool.h"
 #include "../log/log.h"
 #include "../common/sys_time.h"
@@ -51,7 +50,7 @@ void thread_scheduler_init(volatile Thread_scheduler* self) {
         self->priority_list[i] = queue_create();
     }
     self->delay_list = queue_create();
-    self->destory_list = queue_create();
+    self->destroy_list = queue_create();
     self->tid_num = 1000;
     self->current_thread = NULL;
 }
@@ -78,13 +77,13 @@ void thread_scheduler_deinit(volatile Thread_scheduler* self) {
         }
         self->delay_list->fun->destroy(self->delay_list);
     }
-    if (self->destory_list) {
-        Tcb_t *tcb = GET_TCB_T(self->destory_list->fun->dequeue(self->destory_list));
+    if (self->destroy_list) {
+        Tcb_t *tcb = GET_TCB_T(self->destroy_list->fun->dequeue(self->destroy_list));
         while (tcb != NULL) {
             tcb->fun->destroy(tcb);
-            tcb = GET_TCB_T(self->destory_list->fun->dequeue(self->destory_list));
+            tcb = GET_TCB_T(self->destroy_list->fun->dequeue(self->destroy_list));
         }
-        self->destory_list->fun->destroy(self->destory_list);
+        self->destroy_list->fun->destroy(self->destroy_list);
     }
 }
 
@@ -130,7 +129,7 @@ void thread_scheduler_switch_context(volatile Thread_scheduler* self) {
     if (self->current_thread->state == TCB_STATER_READY || self->current_thread->state == TCB_STATER_RUNNING) {
         thread_scheduler_add_readly_list(self, (Tcb_t *)self->current_thread, true);
     } else if (TCB_STATER_TERMINATED == self->current_thread->state) {
-        self->destory_list->fun->enqueue(self->destory_list, GET_NODE(self->current_thread));
+        self->destroy_list->fun->enqueue(self->destroy_list, GET_NODE(self->current_thread));
     }
 
     uint8_t highest_priority = thread_scheduler_get_highest_priority(self);
@@ -147,10 +146,6 @@ void thread_scheduler_switch_context(volatile Thread_scheduler* self) {
     self->current_thread->cpu_usage_info.total_run_time += get_systime_us()->time_us - self->current_thread->cpu_usage_info.last_reported_time;
     self->current_thread->cpu_usage_info.last_reported_time = get_systime_us()->time_us;
 
-    //if (self->current_thread->need_print) {
-    //    self->current_thread->need_print = false;
-    //    LOG_DEBUG("scheduler", "thread %s -> thread %s, size %d", self->current_thread->name, next_tcb->name, self->priority_list[0]->size);
-    //}
     self->current_thread = next_tcb;
     if (self->current_thread != NULL) {
 #ifndef USE_CCMRAM
@@ -166,7 +161,7 @@ void thread_scheduler_switch_context(volatile Thread_scheduler* self) {
 
 // start method
 static void thread_scheduler_start(volatile Thread_scheduler* self) {
-    LOG_DEBUG("scheduler", "system os start runing");
+    LOG_DEBUG("scheduler", "system os start running");
     if (NULL == self) {
         return;
     }

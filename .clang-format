@@ -1,0 +1,18 @@
+# STM32F4 RTOS 项目代码风格配置
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+SortIncludes: false
+IndentCaseLabels: true
+ReflowComments: false
