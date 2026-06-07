@@ -260,7 +260,6 @@ void dispatch(nvic_irq_num irq_num) {
     nvic_dispatch(gloable_nvic, irq_num);
 }
 
-
 void SysTick_Handler(void) {
     nvic_dispatch(gloable_nvic, SYSTIC_IRQ);
 }

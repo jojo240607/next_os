@@ -285,7 +285,7 @@ const mpu_config_t mpu_cfg = {
                         .execute_never    = true,            /* 禁止在 SRAM 中执行代码 (防御 ROP) */
                         .subregion_disable = 0
                 },
-                &(const mpu_region_config_t){/* 区域 1: CCM RAM (数据区) —— 特权可读写，用户可读写 */
+                &(const mpu_region_config_t){/* 区域 2: CCM RAM —— 特权可读写，用户可读写 */
                         .region_num       = 2,
                         .enable           = true,
                         .base_address     = 0x10000000,

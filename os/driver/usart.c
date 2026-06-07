@@ -215,7 +215,7 @@ dev_read_override(usart_dev_read_impl) {
             return rx->rx_user_buf->pos;
         }
     } else {
-        hal_uart_recv(conf->id, (uint8_t *) buf, count);
+        return hal_uart_recv(conf->id, (uint8_t *) buf, count);
     }
 }
 // dev_write method
@@ -228,10 +228,10 @@ dev_write_override(usart_dev_write_impl) {
     if (conf->dma_cfg) {
         uart_xfer_t *x = usart->uart_xfer;
         if (!x) {
-            return;
+            return ;
         }
         if (x->tx_user_active) {
-            return;   // 上次传输未结束
+            return ;   // 上次传输未结束
         }
         x->tx_user_active = true;
         uart_send_dma(conf->id, conf->dma_cfg->tx_dma, (uint8_t *) buf, count);
@@ -239,10 +239,10 @@ dev_write_override(usart_dev_write_impl) {
     } else if (conf->it_enable) {
         uart_xfer_t *x = usart->uart_xfer;
         if (!x) {
-            return;
+            return ;
         }
         if (x->tx_user_active) {
-            return;   // 上次传输未结束
+            return ;   // 上次传输未结束
         }
 
         x->tx_user_buf->buf = (uint8_t *) buf;
@@ -256,6 +256,7 @@ dev_write_override(usart_dev_write_impl) {
     } else {
         hal_uart_send(conf->id, (uint8_t *) buf, count);
     }
+
 
 }
 // dev_ioctl method

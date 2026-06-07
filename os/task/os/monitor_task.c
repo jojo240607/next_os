@@ -67,6 +67,9 @@ task_thread_override(monitor_task_task_thread_impl) {
     //params , void *arg
     while(true) {
         LOG_DEBUG("monitor", "----------------monitor lock----------------");
+        /* 注意：gloable_mutex 是全局互斥锁。
+         * monitor_task 持有锁期间 sleep_user(3000) 会阻塞其他需要该锁的任务。
+         * 生产环境中应使用独立锁或缩短持锁时间。 */
         mutex_lock_user(gloable_mutex, 0);
         LOG_DEBUG("monitor", "sleep 3s");
         sleep_user(3000);

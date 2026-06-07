@@ -1,3 +1,9 @@
+/*
+ * Queue vs List 区别：
+ * - Queue: FIFO 队列，入队检查重复（queue_contain），支持 dequeue_node 按指针移除
+ * - List:  单向链表，仅尾部追加，不检查重复，支持按索引访问
+ * 调度器就绪队列/等待队列使用 Queue，普通链表场景使用 List。
+ */
 #include "queue.h"
 #include "linear_pool.h"
 #include <stdio.h>

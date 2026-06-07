@@ -200,50 +200,25 @@ static inline void thread_scheduler_thread_exit() {
 }
 
 // delay_ticks method
+// 注意：当前为 O(n) 遍历延时链表，任务数多时应改用按到期时间排序的 delta 链表。
 static void thread_scheduler_delay_ticks(volatile Thread_scheduler* self) {
     if (NULL == self) {
         return;
     }
-    // 遍历延时队列（或所有任务），将 delay_ticks 减 1
     volatile Tcb_t *delay_task = GET_TCB_T(self->delay_list->head);
-    volatile Tcb_t *prev = NULL;
-    uint8_t num = 0;
     while (delay_task != NULL) {
+        volatile Tcb_t *next = GET_TCB_T(GET_NODE(delay_task)->next);
         if (delay_task->delay_ticks > 0) {
             delay_task->delay_ticks--;
             if (delay_task->delay_ticks == 0) {
-                // 延时结束，将任务移回就绪队列
                 delay_task->state = TCB_STATER_READY;
-                //remove_from_delay_list(task);
-                if (num == 0) {
-                    self->delay_list->head = GET_NODE(delay_task)->next;
-                    self->delay_list->size--;
-                    if (self->delay_list->size < 2) {
-                        self->delay_list->tail = self->delay_list->head;
-                    }
-                } else {
-                    GET_NODE(prev)->next = GET_NODE(delay_task)->next;
-                    self->delay_list->size--;
-                    if (self->delay_list->size < 2) {
-                        self->delay_list->tail = self->delay_list->head;
-                    }
-                    if (GET_NODE(delay_task) == self->delay_list->tail) {
-                        self->delay_list->tail = GET_NODE(prev);
-                    }
-                }
+                self->delay_list->fun->dequeue_node(self->delay_list, GET_NODE(delay_task));
                 LOG_DEBUG("delay", "delay over, add_readly %s", delay_task->name);
                 thread_scheduler_add_readly_list(self, delay_task, false);
             }
         }
-        num++;
-        prev = delay_task;
-        delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
-        //while (delay_task->state != TCB_STATER_WAITING_MUTEX) {
-        //    prev = delay_task;
-        //    delay_task = GET_TCB_T(GET_NODE(delay_task)->next);
-        //}
+        delay_task = next;
     }
-    
 }
 // add_readly_list method
 static void thread_scheduler_add_readly_list(volatile Thread_scheduler* self, volatile Tcb_t *tcb, bool protected) {

@@ -31,6 +31,8 @@ void systick_task_init(Systick_task* self, const task_into_t *info) {
     self->fun = &(systick_task_fun);
     // TODO: 初始化派生类特有成员
     self->systick = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SYSTICK);
+    /* 注意：systick 任务直接通过 device_manager 打开设备，与任务配置耦合。
+     * 重构时可考虑将设备依赖注入到 task_into_t 中。 */
 	def_task_init(self) = systick_task_task_init_impl;
 	def_task_start(self) = systick_task_task_start_impl;
 }

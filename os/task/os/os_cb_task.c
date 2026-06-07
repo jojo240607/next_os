@@ -84,6 +84,8 @@ task_thread_override(os_cb_task_task_thread_impl) {
         exti_event_t *cb_event = GET_TASK(os_cb_task)->fun->get_event(GET_TASK(os_cb_task));
         LOG_DEBUG("os_cb_task", "----- os callback ----- irq num %d event source %d", cb_event->irq_num, cb_event->source);
         os_callback *cb = (os_callback*)os_cb_task->callback_list->head;
+        /* 注意：回调函数内部若注册/注销回调会修改链表，导致遍历行为不确定。
+         * 如需支持动态注册，应在遍历前保存 next 指针或拷贝链表。 */
         while (cb != NULL && cb->cb_source == cb_event->source) {
             LOG_DEBUG("os_cb_task", "do cb_handler");
             cb->cb_handler(cb_event, cb->arg);

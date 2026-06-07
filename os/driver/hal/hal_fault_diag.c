@@ -172,18 +172,14 @@ void HardFault_Diagnosis(uint32_t exc_return, uint32_t sp) {
     fault_exc_return = exc_return;
 
     // 2. 根据 exc_return 的 bit2 判断原栈是 MSP 还是 PSP
-    if ((exc_return & 0x4) == 0) {
-        // 异常前使用的是主栈 (MSP)
-        fault_msp = sp;
-        fault_psp = __get_PSP();   // PSP 可能仍是旧值，仅供参考
-    } else {
-        // 异常前使用的是进程栈 (PSP)
-        fault_psp = sp;
-        fault_msp = __get_MSP();
-    }
+    //    注意：HardFault_Handler 传入的 sp 始终是 MSP（异常期间 CPU 使用 MSP）
+    //    故障栈帧在发生故障时的栈上，需通过 __get_PSP() 获取
+    fault_msp = __get_MSP();
+    fault_psp = __get_PSP();
+    uint32_t fault_sp = ((exc_return & 0x4) == 0) ? fault_msp : fault_psp;
 
-    // 3. 获取栈帧指针（8 个寄存器的快照）
-    fault_frame = (ExceptionStackFrame *)sp;
+    // 3. 获取故障栈帧指针（CPU 自动压栈的 8 个寄存器）
+    fault_frame = (ExceptionStackFrame *)fault_sp;
     fault_pc = fault_frame->pc;
     fault_lr = fault_frame->lr;
 
@@ -193,9 +189,8 @@ void HardFault_Diagnosis(uint32_t exc_return, uint32_t sp) {
     fault_mmfar = xSCB->MMFAR;
     fault_bfar  = xSCB->BFAR;
 
-    // 5. (可选) 记录当前栈的起始地址，方便在 Memory 窗口中查看栈内容
-    //    这里简单地取 sp 为起点，你可以上下调整偏移量
-    fault_stack_start = (uint32_t *)sp;
+    // 5. (可选) 记录故障栈的起始地址，方便在 Memory 窗口中查看栈内容
+    fault_stack_start = (uint32_t *)fault_sp;
 
     // 6. 【关键】在这里设置一个断点（或死循环），让调试器停住
     __BKPT(0);  // 如果调试器不支持，可以换成 while(1);

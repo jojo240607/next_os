@@ -83,9 +83,13 @@ static void device_destroy(Device* self) {
 }
 
 // attach_irq method
+// 将设备的所有已配置 IRQ 绑定到指定任务的下半部处理。
+// 注意：irq_conf->handler 可能被子类多次修改（DMA TX/RX 各自设置），
+// 但 attach_irq 只关心 bottom_task 绑定，不依赖当前的 handler 值。
+// TODO: 将 handler 和 bottom_task 分离到独立结构，消除 handler 判空对绑定的干扰。
 static bool device_attach_irq(Device* self, Task *task) {
     // TODO: add attach_irq method
-    if (self->irq_conf == NULL || self->irq_conf->handler == NULL) {
+    if (self->irq_conf == NULL || self->irq_conf->irq_list == NULL || self->irq_conf->irq_list->size == 0) {
         return false;
     }
     for (uint8_t i = 0; i < self->irq_conf->irq_list->size; i++) {

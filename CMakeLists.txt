@@ -12,6 +12,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
+# 启用严格编译警告
+add_compile_options(-Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type)
+
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)

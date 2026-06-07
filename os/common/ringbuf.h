@@ -13,6 +13,7 @@ typedef struct {
     size_t   tail;     // 读指针（下一次读取的位置）
     size_t   count;    // 当前已存储的字节数
     size_t   dma_prev;  // 上一次 DMA 写入的结尾位置（索引）
+    size_t   overflow_cnt; /* 累计丢弃字节数（DMA 覆盖导致） */
 } RingBuf;
 
 RingBuf* ringbuf_create(size_t size);

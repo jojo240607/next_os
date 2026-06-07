@@ -182,10 +182,10 @@ dev_read_override(spi_dev_read_impl)
     const spi_config_t *conf = self->info->conf;
     if (conf->dma_cfg && conf->dma_cfg->tx_dma
         && conf->dma_cfg->rx_dma) {
-        /* ── DMA 模式: 从 ringbuf 取 dev_write 时 DMA 写入的 RX 数据 ── */
-        //ringbuf_get(spi->rx_cache_buf, (uint8_t *)buf, count);
-
-
+        /* TODO: DMA 模式下 dev_read 应从内部 rx_cache_buf 取数据。
+         * 当前 rx_cache_buf 未实现 (spi_init 中被注释掉)，
+         * 建议使用 dev_ioctl(SPI_IOCTL_TRANSFER) 进行全双工 DMA 传输。 */
+        return -1;
 
     } else if (conf->it_enable) {
         if (!x || x->active) {

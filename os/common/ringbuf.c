@@ -101,7 +101,7 @@ void ringbuf_dma_update(RingBuf *rb, size_t new_head)
         size_t overflow = (rb->count + new_bytes) - size;
         rb->tail = (rb->tail + overflow) % size;
         rb->count -= overflow;
-        // 记录溢出
+        rb->overflow_cnt += overflow;   /* 累计丢弃字节数，供上层查询 */
     }
 
     rb->count += new_bytes;

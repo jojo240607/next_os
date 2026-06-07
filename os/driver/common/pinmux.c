@@ -120,9 +120,24 @@ int pinmux_release(gpio_port_t port, uint8_t pin)
 
 int pinmux_request_group(const pin_config_t *cfgs, int count)
 {
-    for (int i = 0; i < count; i++) {
-        if (pinmux_request(&cfgs[i]) != PINMUX_SUCCESS)
-            return PINMUX_ERROR; /* 某一项失败，实际应回滚，这里简化处理 */
+    int i;
+    for (i = 0; i < count; i++) {
+        if (pinmux_request(&cfgs[i]) != PINMUX_SUCCESS) {
+            /* 回滚已分配的引脚 */
+            for (int j = 0; j < i; j++) {
+                gpio_port_t port;
+                gpio_pin_t  pin;
+                if (cfgs[j].mode == PIN_MODE_AF) {
+                    port = AF_REQ_GET_PORT(cfgs[j].af);
+                    pin  = AF_REQ_GET_PIN(cfgs[j].af);
+                } else {
+                    port = cfgs[j].port;
+                    pin  = cfgs[j].pin;
+                }
+                pinmux_release(port, pin);
+            }
+            return PINMUX_ERROR;
+        }
     }
     return PINMUX_SUCCESS;
 }

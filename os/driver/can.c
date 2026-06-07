@@ -83,6 +83,7 @@ static bool can_irq_handler_impl(nvic_irq_t *irq_conf) {
     if ((ier & xCAN_IER_ERRIE) && (msr & (1 << 2))) {   // ERRI
 
     }
+    return true;
 }
 
 /* ===================================================================

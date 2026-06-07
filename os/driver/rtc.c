@@ -141,5 +141,6 @@ static bool rtc_irq_handler_impl(nvic_irq_t *irq_conf) {
         xRTC->ISR &= ~xRTC_ISR_TAMP1F;
         //if (rtc_callback) rtc_callback(RTC_EVT_TAMPER);
     }
+    return true;
 }
 

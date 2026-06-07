@@ -1,6 +1,10 @@
 //
 // Created by zhiwei.gong on 2026/5/29.
 //
+// 任务配置表 —— 所有系统任务和测试任务在此注册。
+// 生产环境中建议用宏控制测试任务的编译：
+//   #ifdef ENABLE_TEST_TASKS → 包含 test/ 下的任务
+//   #else → 仅编译系统任务
 
 #include "task_config.h"
 #include "../task/os/systick_task.h"

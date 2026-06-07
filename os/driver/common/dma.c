@@ -241,9 +241,14 @@ bool dma_is_busy(const dma_stream_config_t *cfg)
 void dma_clear_flag(const dma_stream_config_t *cfg) {
     xDMA_Base_TypeDef *base = (DMA_REQ_GET_CTRL(cfg->dma_request) == DMA_1) ? (xDMA_Base_TypeDef*)xDMA1_BASE :
                              (xDMA_Base_TypeDef*)xDMA2_BASE;
-    // 清除 TC、HT、TE、DME、FE 标志 (bit5,4,3,2,0); 跳过保留位1
-    //uint32_t mask = (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 0);
-    // 也可以用 0x3D 来涵盖常见位 (bit5,4,3,2,0)
+    /*
+     * STM32F4 DMA 中断状态寄存器位布局 (每个 stream 占 6 bits, 每 2 个 stream 后有 4 bits 间隙):
+     *   LISR: Stream0[5:0], 间隙[9:6], Stream1[15:10], 间隙[19:16], Stream2[25:20], 间隙[29:26], Stream3[31:30]
+     *   HISR: Stream4[5:0], 间隙[9:6], Stream5[15:10], 间隙[19:16], Stream6[25:20], 间隙[29:26], Stream7[31:30]
+     *   stream * 6 : 每个 stream 占 6 bits
+     *   (stream >> 1) * 4 : 每 2 个 stream 之间 4 bits 间隙
+     * 清除: 向对应位写 1 (TCIF/HTIF/TEIF/DMEIF/FEIF)
+     */
     uint32_t it_flags = 0x3F;
     uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
     if (stream < 4) {
@@ -269,7 +274,7 @@ dma_it_event_t dma_get_it_event(const dma_stream_config_t *cfg) {
         it_event = base->HISR;
         it_event >>= (stream * 6 + (stream >> 1) * 4);
     }
-    return it_event;
+    return it_event & 0x3F;  /* 屏蔽无关高位，仅保留 FEIF/DMEIF/TEIF/HTIF/TCIF */
 }
 
 nvic_irq_num dma_get_irqnum(const dma_stream_config_t *dma_conf) {
