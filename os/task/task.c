@@ -65,7 +65,8 @@ static void task_add_thread(Task* self) {
                 .stack_size = self->info->stack_size,
                 .parent = self,
                 .loop = def_task_thread(self),
-                .arg = NULL//arg need transfer to thread
+                .arg = NULL,//arg need transfer to thread
+                .is_kernal = self->info->is_kernel,
         };
         self->task_tcb = global_thread_scheduler->fun->create_thread(global_thread_scheduler, self->info->name, &conf);
     }

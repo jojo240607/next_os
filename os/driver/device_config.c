@@ -235,7 +235,7 @@ const i2c_config_t i2c1_conf = {
                 .sda_pin = PB7_REQ_I2C1_SDA
         },
         .it_enable = xI2C_IT_TXE | xI2C_IT_RXNE,                 // 不使用中断
-        .dma_cfg = &(const i2c_dma_config_t){
+        .dma_cfg = NULL/*&(const i2c_dma_config_t){
                 .tx_dma = &(const dma_stream_config_t) {
                         .dma_request = DMA1_REQ_I2C1_TX_ST6,
                         .direction = DMA_DIR_M2P,
@@ -260,7 +260,7 @@ const i2c_config_t i2c1_conf = {
                         .fifo_mode = DMA_FIFO_DIRECT,
                         .it_enable = xDMA_IT_NONE,  // 只靠 TX TC 通知完成
                 },
-        },
+        },*/
 };
 
 const can_config_t can1_conf = {
@@ -337,9 +337,7 @@ const i2s_config_t i2s2_conf = {
         .dma_cfg = NULL
 };
 
-const fsmc_lcd_config_t fsmc_conf = {
-        .width = 320,
-        .height = 240,
+const fsmc_config_t fsmc_conf = {
         .pins = {
                 .data0_pin = PD14_REQ_FSMC_D0,
                 .data1_pin = PD15_REQ_FSMC_D1,
@@ -361,43 +359,46 @@ const fsmc_lcd_config_t fsmc_conf = {
                 .a_pin = PD11_REQ_FSMC_A16,
                 .rd_pin = PD4_REQ_FSMC_NOE,
                 .wr_pin = PD5_REQ_FSMC_NWE,
-                .rst_pin = {.port = PORT_D, .pin = PIN_13},
-                .bl_pin = {.port = PORT_D, .pin = PIN_12},
-
-                },
-        .address_setup_time  = 0x0F, // 地址建立15个HCLK周期
-        .data_setup_time     = 60,   // 数据建立60个HCLK周期
-        .bus_turnaround_time = 0,    // 无需总线周转
-        .init_sequence = NULL,//ili9341_init_sequence, Todo
+        },
+        .address_setup_time  = 0x0F,
+        .data_setup_time     = 60,
+        .bus_turnaround_time = 0,
         .dma_cfg = &(dma_stream_config_t) {
-    /*
-     *  因为FSMC无法主动发起DMA请求，你代码中已经使用了正确的“变通”方法：
-        方向 (direction)：必须使用 DMA_DIR_M2M（内存到内存）模式。
-        流/通道 (stream/channel)：在M2M模式下，任何未被占用的Stream和Channel组合都可以使用，
-        因为此时DMA流并不与某个特定的硬件外设请求信号绑定。你代码中选择的 .channel = 0 和 .stream = 6 组合，
-        只要没有其他外设（如TIM1）同时使用它，就完全可以正常工作。
-     */
-                // DMA2_Stream6_Channel0 组合
                 .dma_request = DMA2_REQ_TIM1_CH3_ST6_CN0,
-                // 🔑 关键步骤1：设置为存储器到存储器模式 (Mem2Mem)
                 .direction = DMA_DIR_M2M,
                 .priority = xDMA_PRIORITY_HIGH,
-
-                // 🔑 关键步骤2：数据宽度设为16位，匹配LCD总线
                 .mem_data_size = DMA_DATA_SIZE_HALFWORD,
                 .per_data_size = DMA_DATA_SIZE_HALFWORD,
-
-                // 🔑 关键步骤3：源地址自增（读取缓冲区），目标地址不自增
                 .mem_inc = 1,
                 .per_inc = 0,
-
                 .mode = DMA_MODE_NORMAL,
                 .fifo_mode = DMA_FIFO_DIRECT,
-                .it_enable = xDMA_IT_TC,  // 传输完成中断
-        }
+                .it_enable = xDMA_IT_TC,
+        },
+};
+
+const lcd_fsmc_config_t lcd_fsmc_conf = {
+        .bus_dev_id   = DEVICE_FSMC,
+        .width        = 320,
+        .height       = 240,
+        .rs_addr_line = 16,
+        .rst_pin      = {.port = PORT_D, .pin = PIN_13},
+        .bl_pin       = {.port = PORT_D, .pin = PIN_12},
+        .init_sequence = NULL,
 };
 const iwdg_config_t iwdg_conf = {
         .prescaler = IWDG_PRESCALER_64,
         .reload    = 1250       // (0..4095)
+};
+
+/* ── 片外设备驱动配置 ── */
+const icm20948_config_t icm20948_conf = {
+        .spi_id = SPI_1,
+        .cs     = {.port = PORT_A, .pin = PIN_4},   /* ICM20948 CS = PA4 */
+};
+
+const adxl345_config_t adxl345_conf = {
+        .i2c_id      = I2C_1,
+        .slave_addr  = 0x53,                         /* ADXL345 I2C 地址 */
 };
 

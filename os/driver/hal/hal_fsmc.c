@@ -1,18 +1,11 @@
-//
-// Created by zhiwei.gong on 2026/5/15.
-//
-
 #include "hal_fsmc.h"
+#include "../common/rcc.h"
 
-/* ===================================================================
-   LCD 基础操作
-   =================================================================== */
-void fsmc_lcd_write_cmd(uint8_t cmd) {
-    LCD_CMD_ADDR = cmd;
+void hal_fsmc_clock_enable(void) {
+    rcc_periph_clock_enable(RCC_BUS_AHB3, xRCC_AHB3ENR_FSMCEN);
 }
 
-void fsmc_lcd_write_data(uint8_t data) {
-    LCD_DATA_ADDR = data;
+void hal_fsmc_config_bank1(uint32_t bcr, uint32_t btr) {
+    xFSMC_Bank1[0].BCR = bcr;
+    xFSMC_Bank1[0].BTR = btr;
 }
-
-

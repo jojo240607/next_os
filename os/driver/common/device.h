@@ -42,11 +42,24 @@ void dev_ioctl_user(int cmd, void *arg);
 #define virtual_dev_ioctl(obj, ...) def_dev_ioctl(obj)(obj, ##__VA_ARGS__)
 
 #define GET_DEVICE(obj) ((Device *)obj)
+
+typedef struct {
+    void *arg;
+    uint8_t event;
+} dev_event_t;
+
 // 类声明
 typedef struct _Device Device;
 typedef struct _DeviceFun DeviceFun;
 typedef struct _DeviceVTable DeviceVTable;
 typedef struct _irq_config irq_config;
+typedef void (*dev_listener)(Device *self, uint8_t event, void *arg);
+
+/* 监听器链表节点 — 允许多个监听者共存 */
+typedef struct _listener_node {
+    struct _listener_node *next;
+    dev_listener          fn;
+} listener_node_t;
 
 typedef enum : uint8_t {
     DEVICE_SYSTICK = 0,
@@ -61,6 +74,10 @@ typedef enum : uint8_t {
     DEVICE_CAN,
     DEVICE_PWM1,
     DEVICE_I2S2,
+    DEVICE_ICM20948,        /* ICM-20948 9轴IMU (SPI) */
+    DEVICE_ADXL345,         /* ADXL345 加速度计 (I2C) */
+    DEVICE_FSMC,            /* FSMC 总线 */
+    DEVICE_FSMC_LCD,        /* LCD over FSMC */
     DEVICE_MAX
 } dev_id_t;
 
@@ -120,6 +137,10 @@ struct _DeviceFun {
 
 	void (*add_event)(Device* self, void *event);
 
+	void (*register_listener)(Device* self, dev_listener listener);
+
+	void (*trigger_event)(Device* self, uint8_t event, void *arg);
+
 };
 typedef struct {
     const char *name;
@@ -136,6 +157,9 @@ struct _Device {
     irq_config *irq_conf;
     Mutex *read_mutex;
     Mutex *write_mutex;
+    listener_node_t *listener;   /* 链表头 (原为单指针) — 允许设备外部监听 */
+    void *arg;
+    uint8_t current_event;
 };
 
 // 构造函数声明

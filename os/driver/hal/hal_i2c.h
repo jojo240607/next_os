@@ -96,14 +96,16 @@ bool hal_i2c_it_init(i2c_id_t id, i2c_it_t it_enable);
 void hal_i2c_dma_init(i2c_id_t id, bool txdma, bool rxdma);
 uint32_t hal_i2c_get_it_event(i2c_id_t id);
 volatile uint8_t *hal_i2c_addr(i2c_id_t id);
-void i2c_transmit(i2c_id_t id, uint8_t slave_addr, const uint8_t *data, uint16_t len);
-void i2c_receive(i2c_id_t id, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
+void hal_i2c_transmit(i2c_id_t id, uint8_t slave_addr, const uint8_t *data, uint16_t len);
+void hal_i2c_receive(i2c_id_t id, uint8_t slave_addr, uint8_t *buffer, uint16_t len);
 void hal_i2c_transmit_it_start(i2c_id_t id);
 void hal_i2c_receive_it_start(i2c_id_t id);
 void hal_i2c_clear_addr_flag(i2c_id_t id);
 void hal_i2c_close_ack(i2c_id_t id);
+void hal_i2c_start(i2c_id_t id);
 void hal_i2c_stop(i2c_id_t id);
 void hal_i2c_clear_it_event(i2c_id_t id, i2c_it_t it_event);
+void hal_i2c_set_it_event(i2c_id_t id, i2c_it_t it_event);
 void i2c_transmit_dma(i2c_id_t id, const dma_stream_config_t *cfg, uint8_t slave_addr, const uint8_t *data, uint16_t len);
 
 #endif //STM32F4DISCOVERY_HAL_I2C_H

@@ -3,6 +3,10 @@
 #include "../svc.h"
 #include <stdio.h>
 
+static void device_trigger_event(Device* self, uint8_t event, void *arg);
+
+static void device_register_listener(Device* self, dev_listener listener);
+
 static void device_add_event(Device* self, void *event);
 
 static bool device_config_irq(Device* self, const irq_config *conf);
@@ -28,6 +32,8 @@ static const DeviceFun device_fun = {
 	.ioctl_user = device_dev_ioctl_user,
 	.config_irq = device_config_irq,
 	.add_event = device_add_event,
+	.register_listener = device_register_listener,
+	.trigger_event = device_trigger_event,
 };
 
 // 构造函数实现
@@ -58,6 +64,8 @@ void device_init(Device* self, const device_info_t *info) {
     }
     self->read_mutex = mutex_create();
     self->write_mutex = mutex_create();
+    self->listener = NULL;
+    self->arg = NULL;
 }
 
 void device_deinit(Device* self) {
@@ -176,5 +184,28 @@ static void device_add_event(Device* self, void *event) {
     }
     //将消息event传递到irq conf中
     self->irq_conf->event = event;
+}
+
+
+// register_listener method
+static void device_register_listener(Device* self, dev_listener listener) {
+    // 创建链表节点，追加到 listener 链表
+    listener_node_t *node = (listener_node_t *)os_malloc(sizeof(listener_node_t));
+    if (node) {
+        node->next = self->listener;
+        node->fn   = listener;
+        self->listener = node;
+    }
+}
+
+
+// trigger_event method
+static void device_trigger_event(Device* self, uint8_t event, void *arg) {
+    self->current_event = event;
+    listener_node_t *n = self->listener;
+    while (n) {
+        n->fn(self, event, arg);
+        n = n->next;
+    }
 }
 

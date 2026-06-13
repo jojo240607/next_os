@@ -102,7 +102,7 @@ int dma_stream_request(const dma_stream_config_t *cfg)
     if (cfg->mode == DMA_MODE_CIRCULAR) {
         cr |= (1 << 8);//#define DMA_SxCR_CIRC_Pos        (8U)
     }
-    /* 传输完成中断使能（暂时不开，可扩展） */
+    /* 中断使能: 按 cfg->it_enable 写 SxCR 对应位 */
     dma->SxCR = cr;
     if (cfg->it_enable & xDMA_IT_TC) {  /* 传输完成中断 */
         dma->SxCR |= (1 << 4);   // TCIE

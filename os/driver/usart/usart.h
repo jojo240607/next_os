@@ -2,25 +2,31 @@
 #define USART_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "common/device.h"
-#include "common/pinmux.h"
-#include "common/dma.h"
-#include "hal/hal_usart.h"
-#include "../common/ringbuf.h"
+#include "../common/device.h"
+#include "../common/pinmux.h"
+#include "../common/dma.h"
+#include "../hal/hal_usart.h"
+#include "../../common/ringbuf.h"
+#include "../../scheduler/semaphore.h"
 
 #define GET_USART(obj) ((Usart *)obj)
 #define DEFAULT_RX_BUFFER (256)
+
+/* UART 事件 (用于 listener 模式) */
+typedef enum : uint8_t {
+    UART_TX_START = 1,
+    UART_TX_DONE,
+    UART_RX_START,
+    UART_RX_DONE,
+    UART_XFER_ERROR,
+} uart_dev_event_t;
+
 // 派生类声明
 typedef struct _Usart Usart;
 typedef struct _UsartFun UsartFun;
 // 类成员函数结构
 struct _UsartFun {
     void (*destroy)(Usart* self);
-	//void (*send_it)(Usart* self, const uint8_t *data, uint16_t len);
-	//void (*recv_it)(Usart* self, uint8_t *buffer, uint16_t len);
-    //void (*send)(Usart* self, const uint8_t *data, uint16_t len);
-    //void (*recv)(Usart* self, uint8_t *buffer, uint16_t len);
-
 };
 
 
@@ -67,9 +73,10 @@ typedef struct {
 struct _Usart {
     Device base;  // 基类作为第一个成员
     const UsartFun* fun;
-    // TODO: 添加派生类特有的数据成员
     RingBuf *rx_cache_buf;
     uart_xfer_t *uart_xfer;
+    Semaphore     *uart_tx_sem;          /* 发送完成信号量 (listener 使用) */
+    Semaphore     *uart_rx_sem;          /* 接收完成信号量 (listener 使用) */
 };
 
 // 构造函数声明

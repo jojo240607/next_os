@@ -15,6 +15,7 @@
 #include "../test/time_task.h"
 #include "../test/task_test1.h"
 #include "../test/uart_dma_test.h"
+#include "../kernel/kworker.h"
 
 static const task_into_t systick_task_info = {
         .name = "systick",
@@ -71,8 +72,17 @@ static const task_into_t uart_dma_task_info = {
         .stack_size = MPU_SIZE_2K,
         .create = (Task_create)uart_dma_test_create
 };
+//内核态工作队列
+static const task_into_t kworker_task_info = {
+        .name = "kworker",
+        .priority = THREAD_PRIORITY_7,
+        .stack_size = MPU_SIZE_512B,
+        .create = (Task_create)kworker_create,
+        .is_kernel = true
+};
 
 const task_into_t * const task_lists[] = {
+        (const task_into_t *)(&kworker_task_info),
         (const task_into_t *)(&os_cb_task_info),
         (const task_into_t *)(&idle_task_info),
         (const task_into_t *)(&monitor_task_info),

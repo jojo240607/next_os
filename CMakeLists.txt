@@ -108,24 +108,48 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/common/rcc.c
         os/driver/common/gpio.c
         os/driver/svc.c
-        os/driver/usart.c
-        os/driver/adc.c
-        os/driver/spi.c
-        os/driver/i2c.c
-        os/driver/can.c
-        os/driver/sdio.c
+        os/driver/usart/usart.c
+        os/driver/usart/usart_poll.c
+        os/driver/usart/usart_it.c
+        os/driver/usart/usart_dma.c
+        os/driver/adc/adc.c
+        os/driver/adc/adc_poll.c
+        os/driver/adc/adc_dma.c
+        os/driver/spi/spi.c
+        os/driver/spi/spi_poll.c
+        os/driver/spi/spi_it.c
+        os/driver/spi/spi_dma.c
+        os/driver/i2c/i2c.c
+        os/driver/i2c/i2c_poll.c
+        os/driver/i2c/i2c_it.c
+        os/driver/i2c/i2c_dma.c
+        os/driver/can/can.c
+        os/driver/can/can_it.c
+        os/driver/sdio/sdio.c
+        os/driver/sdio/sdio_poll.c
+        os/driver/sdio/sdio_it.c
+        os/driver/sdio/sdio_dma.c
         os/driver/systick.c
         os/driver/timer.c
         os/driver/exti.c
         os/driver/wdg.c
         os/driver/rtc.c
         os/driver/pwm.c
-        os/driver/i2s.c
-        os/driver/fsmc.c
+        os/driver/i2s/i2s.c
+        os/driver/i2s/i2s_poll.c
+        os/driver/i2s/i2s_it.c
+        os/driver/i2s/i2s_dma.c
+        os/driver/fsmc/fsmc.c
+        os/driver/fsmc/fsmc_poll.c
+        os/driver/fsmc/fsmc_dma.c
+        os/driver/lcd/lcd_fsmc.c
         os/driver/device_manager.c
+        os/kernel/kworker.c
         os/test/task_test1.c
         os/test/time_task.c
         os/test/uart_dma_test.c
+        os/device/icm20948.c
+        os/device/adxl345.c
 
 )
 

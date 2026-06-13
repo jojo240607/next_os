@@ -2,12 +2,20 @@
 #define SPI_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "common/device.h"
-#include "common/pinmux.h"
-#include "common/dma.h"
-#include "common/gpio.h"
-#include "hal/hal_spi.h"
-#include "../common/ringbuf.h"
+#include "../common/device.h"
+#include "../common/pinmux.h"
+#include "../common/dma.h"
+#include "../common/gpio.h"
+#include "../hal/hal_spi.h"
+#include "../../common/ringbuf.h"
+#include "../../scheduler/semaphore.h"
+
+/* SPI 事件 (用于 listener 模式) */
+typedef enum : uint8_t {
+    SPI_XFER_START = 1,
+    SPI_XFER_DONE,
+    SPI_XFER_ERROR,
+} spi_dev_event_t;
 
 #define GET_SPI(obj) ((Spi *)obj)
 
@@ -51,7 +59,8 @@ typedef struct {
     spi_cache_t *tx_user_buf;
     spi_cache_t *rx_user_buf;
     bool           active;
-    Semaphore     *spi_sem;          /* 传输完成信号量 (IT/DMA 模式) */
+    //Semaphore     *spi_sem;          /* 传输完成信号量 (IT/DMA 模式) */
+    const gpio_t  *cs_pin;          /* 本次传输使用的 CS (IT/DMA 模式) */
 } spi_xfer_t;
 
 /*
@@ -66,6 +75,7 @@ typedef struct {
     const uint8_t *tx_buf;
     uint8_t       *rx_buf;
     uint16_t       len;
+    const gpio_t  *cs_pin;     /* CS 引脚 (NULL=使用总线默认 CS) */
 } spi_transfer_args_t;
 
 // 派生类
@@ -80,8 +90,8 @@ struct _Spi {
     Device base;
     const SpiFun* fun;
     spi_xfer_t *spi_xfer;
-    //RingBuf *rx_cache_buf;
     const gpio_t* cs_pin;//软件cs
+    Semaphore     *spi_sem;          /* 传输完成信号量 (listener 使用) */
 };
 
 /* 构造函数 */

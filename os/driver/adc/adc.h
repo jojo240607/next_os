@@ -2,15 +2,22 @@
 #define ADC_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "common/device.h"
-#include "common/pinmux.h"
-#include "common/dma.h"
-#include "hal/hal_adc.h"
+#include "../common/device.h"
+#include "../common/pinmux.h"
+#include "../common/dma.h"
+#include "../hal/hal_adc.h"
+#include "../../scheduler/semaphore.h"
 
 #define GET_ADC_VTABLE(obj) GET_DEVICE_VTABLE(obj) //(*(AdcVTable **)obj)
 #define GET_ADC(obj) ((Adc *)obj)
 #define ADC_SUCCESS 1
 #define ADC_ERROR 0
+
+/* ADC 事件 */
+typedef enum : uint8_t {
+    ADC_XFER_START = 1,
+    ADC_XFER_DONE,
+} adc_dev_event_t;
 // 派生类声明
 typedef struct _Adc Adc;
 typedef struct _AdcFun AdcFun;
@@ -45,13 +52,7 @@ typedef enum :uint8_t {
     ADC_SMP_144CYCLES,
     ADC_SMP_480CYCLES,
 } adc_sample_t;
-/* ADC 通道描述符 */
-typedef struct {
-    gpio_port_t port;
-    gpio_pin_t    pin;
-    uint8_t channel;        /* 0..18, 注意温度/Vref 等内部通道 */
-    uint8_t sample_time;    /* ADC_SMP_xxx */
-} adc_channel_cfg_t;
+
 
 typedef struct {
     adc_id_t id;
@@ -67,7 +68,7 @@ typedef struct {
 struct _Adc {
     Device base;  // 基类作为第一个成员
     const AdcFun* fun;
-    // TODO: 添加派生类特有的数据成员
+    Semaphore     *adc_sem;            /* ADC 完成信号量 (listener 使用) */
 };
 
 // 构造函数声明

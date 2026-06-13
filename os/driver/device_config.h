@@ -7,22 +7,25 @@
 
 #include "timer.h"
 #include "systick.h"
-#include "usart.h"
+#include "usart/usart.h"
 #include "timer.h"
 #include "exti.h"
-#include "adc.h"
-#include "spi.h"
-#include "i2c.h"
-#include "can.h"
+#include "adc/adc.h"
+#include "spi/spi.h"
+#include "i2c/i2c.h"
+#include "can/can.h"
 #include "pwm.h"
-#include "i2s.h"
-#include "fsmc.h"
+#include "i2s/i2s.h"
+#include "fsmc/fsmc.h"         /* fsmc_config_t */
+#include "lcd/lcd_fsmc.h"      /* lcd_fsmc_config_t */
 
 #include "common/pinmux.h"
 #include "common/dma.h"
 #include "common/rcc.h"
 #include "wdg.h"
 #include "hal/hal_fpu.h"
+#include "../device/icm20948.h"
+#include "../device/adxl345.h"
 
 extern const rcc_sysclk_config_t clk_conf;
 extern const systick_config_t sys_tick_conf;
@@ -37,7 +40,10 @@ extern const iwdg_config_t iwdg_conf;
 extern const can_config_t can1_conf;
 extern const pwm_config_t pwm1_conf;
 extern const i2s_config_t i2s2_conf;
-extern const fsmc_lcd_config_t fsmc_conf;
+extern const fsmc_config_t fsmc_conf;
+extern const lcd_fsmc_config_t lcd_fsmc_conf;
+extern const icm20948_config_t icm20948_conf;
+extern const adxl345_config_t adxl345_conf;
 
 
 #endif //STM32F4DISCOVERY_DEVICE_CONFIG_H

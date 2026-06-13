@@ -5,6 +5,8 @@
 #include "../log/log.h"
 #include "../driver/svc.h"
 #include "../driver/device_manager.h"
+#include "../device/icm20948.h"
+#include "../device/adxl345.h"
 
 task_start_override(time_task_task_start_impl);
 
@@ -41,6 +43,8 @@ void time_task_init(Time_task* self, const task_into_t *info) {
     self->adc = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ADC1);
     self->spi = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_SPI1);
     self->i2c = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_I2C1);
+    self->icm20948 = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ICM20948);
+    self->adxl345  = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_ADXL345);
    // self->wdg = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_WDG);
     self->pwm = gloable_deviceManager->fun->dev_open(gloable_deviceManager, DEVICE_PWM1);
 
@@ -81,44 +85,6 @@ task_init_override(time_task_task_init_impl) {
 
 }
 
-#pragma pack(push, 1)
-typedef struct {
-    uint8_t cmd;
-    uint8_t data;
-} icm20948_data_t;
-#pragma pack(pop)        // 恢复之前的对齐值
-
-// 向 ICM-20948 的寄存器写入一个字节
-void ICM20948_WriteReg(Device *spi, uint8_t reg, uint8_t data) {
-    //uint8_t cmd = reg & 0x7F;       // 确保最高位为 0 (写操作)
-    icm20948_data_t regdata = {.cmd = reg & 0x7F,
-                            .data = data};
-
-   spi->fun->write_user(spi, &regdata, 2);
-
-}
-
-// 从 ICM-20948 的寄存器读取一个字节
-// ICM20948 要求命令和响应在**同一 SPI 事务**内完成，
-// 不能用 write+read 两次独立事务（响应会在第二次事务中丢失）。
-uint8_t ICM20948_ReadReg(Device *spi, uint8_t reg) {
-    uint8_t rx[2] = {0};
-    icm20948_data_t regdata = {.cmd = reg | 0x80 ,
-            .data = 0x00};// 读 WHO_AM_I + dummy
-
-    spi_transfer_args_t args = {.rx_buf = rx,
-            .tx_buf = (uint8_t *)&regdata,
-            .len = 2};
-    spi->fun->ioctl_user(spi, DEVICE_TRANSFER, &args);
-
- //   uint8_t tx[2] = {reg | 0x80, 0x00};   // 读命令 + dummy
- //
- //   spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = rx, .len = 2};
- //   spi->fun->ioctl_user(spi, DEVICE_TRANSFER, &args);
-    return rx[1];   // 响应在第 2 字节
-}
-
-
 // task_thread method
 task_thread_override(time_task_task_thread_impl) {
     // TODO: add task_thread method
@@ -130,27 +96,37 @@ task_thread_override(time_task_task_thread_impl) {
 
         time_task->adc->fun->read_user(time_task->adc, &adc_data, 2);
         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
-        /*
-         * ICM20948 SPI 地址格式: {register[6:0], R/W#}
-         *   R/W# = 1 → 读, R/W# = 0 → 写
-         *   WHO_AM_I (reg 0x00) 读: (0x00 << 1) | 1 = 0x01
-         *   响应在第一字节的下一字节 (rx[1])
-         */
-//        uint8_t data = ICM20948_ReadReg(time_task->spi, 0x00);
-//        LOG_DEBUG("time_task", "ICM20948 WHO_AM_I: data=%02x (expect EA)", data);
-//        uint8_t reg_addr = 0x10;        // 假设设备寄存器地址
-//        uint8_t write_val = 0xA5;
-//        uint8_t read_val = 0;
-//
-//        /* ── ADXL345 I2C 轮询读 DEVID ── */
-//        uint8_t adxl_addr = 0x53;
-//        time_task->i2c->fun->ioctl_user(time_task->i2c,
-//                                         I2C_IOCTL_SET_ADDR, &adxl_addr);
-//        uint8_t reg = 0x00;   // DEVID 寄存器
-//        time_task->i2c->fun->write_user(time_task->i2c, &reg, 1);
-//        uint8_t devid = 0;
-//        time_task->i2c->fun->read_user(time_task->i2c, &devid, 1);
-//        LOG_DEBUG("time_task", "ADXL345 DEVID: %02x (expect E5)", devid);
+
+        /* ── ICM20948 读 WHO_AM_I ── */
+        uint8_t icm_id;
+        time_task->icm20948->fun->ioctl_user(time_task->icm20948,
+                                              ICM20948_IOCTL_READ_ID, &icm_id);
+        LOG_DEBUG("time_task", "ICM20948 WHO_AM_I: %02x (expect EA)", icm_id);
+
+        /* ── ADXL345 读 DEVID ── */
+#if 1
+//        time_task->adxl345->fun->ioctl_user(time_task->adxl345,
+//                                            ADXL345_IOCTL_INIT, NULL);
+        uint8_t adxl_id;
+        time_task->adxl345->fun->ioctl_user(time_task->adxl345,
+                                             ADXL345_IOCTL_READ_ID, &adxl_id);
+        LOG_DEBUG("time_task", "ADXL345 DEVID: %02x (expect E5)", adxl_id);
+        adxl345_accel_t adxl345_accel = {0};
+        time_task->adxl345->fun->ioctl_user(time_task->adxl345,
+                                            ADXL345_IOCTL_READ_ACCEL, &adxl345_accel);
+        LOG_DEBUG("time_task", "ADXL345 accel: %d %d %d", adxl345_accel.accel_x, adxl345_accel.accel_y, adxl345_accel.accel_z);
+#else
+        /* ── ADXL345 单字节逐次读 (验证 Renode 模型是否支持多字节) ── */
+        GET_I2C(time_task->i2c)->slave_addr = 0x53;
+        uint8_t raw6[6] = {0};
+        for (int i = 0; i < 6; i++) {
+            uint8_t reg = 0x32 + i;          // 每次用不同地址
+            time_task->i2c->fun->write_user(time_task->i2c, &reg, 1);
+            time_task->i2c->fun->read_user(time_task->i2c, &raw6[i], 1);
+        }
+        LOG_DEBUG("time_task", "ADXL345 single-byte x6: %02x %02x %02x %02x %02x %02x",
+                  raw6[0], raw6[1], raw6[2], raw6[3], raw6[4], raw6[5]);
+#endif
         //GET_WDG(time_task->wdg)->fun->iwdg_reload();
         //LOG_DEBUG("time_task", "feed watch dog");
     }

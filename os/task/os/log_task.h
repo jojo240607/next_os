@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../task.h"
-#include "../../driver/usart.h"
+#include "../../driver/usart/usart.h"
 #include "string.h"
 #include "../../driver/device_manager.h"
 #include "../../log/log.h"

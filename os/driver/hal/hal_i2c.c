@@ -136,7 +136,7 @@ volatile uint8_t *hal_i2c_addr(i2c_id_t id) {
 
 
 // transmit method
-void i2c_transmit(i2c_id_t id, uint8_t slave_addr, const uint8_t *data, uint16_t len) {
+void hal_i2c_transmit(i2c_id_t id, uint8_t slave_addr, const uint8_t *data, uint16_t len) {
     // TODO: add transmit method
     if (id >= I2C_MAX) {
         return;
@@ -164,7 +164,7 @@ void i2c_transmit(i2c_id_t id, uint8_t slave_addr, const uint8_t *data, uint16_t
 
 
 // receive method
-void i2c_receive(i2c_id_t id, uint8_t slave_addr, uint8_t *buffer, uint16_t len) {
+void hal_i2c_receive(i2c_id_t id, uint8_t slave_addr, uint8_t *buffer, uint16_t len) {
     // TODO: add receive method
     if (id >= I2C_MAX) {
         return;
@@ -198,7 +198,11 @@ void i2c_receive(i2c_id_t id, uint8_t slave_addr, uint8_t *buffer, uint16_t len)
 
 void hal_i2c_transmit_it_start(i2c_id_t id) {
     xI2C_TypeDef *i2c_ctrl = I2Cx[id];
-    /* 使能中断（若未打开） */
+    /* 等待上一次 STOP 完成 (BUSY=0)，再生成新 START。 */
+    while (i2c_ctrl->SR2 & (1 << 1));
+    /* 恢复 ACK — 1 字节读后设了 NACK, 必须还原 */
+    i2c_ctrl->CR1 |= I2C_CTL_ACK;
+    /* 使能中断 */
     i2c_ctrl->CR2 |= xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN;
     /* 发送起始条件 */
     i2c_ctrl->CR1 |= I2C_CTL_START;
@@ -206,6 +210,9 @@ void hal_i2c_transmit_it_start(i2c_id_t id) {
 
 void hal_i2c_receive_it_start(i2c_id_t id) {
     xI2C_TypeDef *i2c_ctrl = I2Cx[id];
+    while (i2c_ctrl->SR2 & (1 << 1));
+    /* 恢复 ACK */
+    i2c_ctrl->CR1 |= I2C_CTL_ACK;
     i2c_ctrl->CR2 |= xI2C_IE_ITBUFEN | xI2C_IE_ITEVTEN;
     i2c_ctrl->CR1 |= I2C_CTL_START;
 }
@@ -220,6 +227,11 @@ void hal_i2c_close_ack(i2c_id_t id) {
     i2c_ctrl->CR1 &= ~I2C_CTL_ACK;
 }
 
+void hal_i2c_start(i2c_id_t id) {
+    xI2C_TypeDef *i2c_ctrl = I2Cx[id];
+    i2c_ctrl->CR1 |= I2C_CTL_START;
+}
+
 void hal_i2c_stop(i2c_id_t id) {
     xI2C_TypeDef *i2c_ctrl = I2Cx[id];
     i2c_ctrl->CR1 |= I2C_CTL_STOP;
@@ -227,7 +239,12 @@ void hal_i2c_stop(i2c_id_t id) {
 
 void hal_i2c_clear_it_event(i2c_id_t id, i2c_it_t it_event) {
     xI2C_TypeDef *i2c_ctrl = I2Cx[id];
-    i2c_ctrl->CR2 &= ~it_event;  // 关闭 TXE 中断
+    i2c_ctrl->CR2 &= ~it_event;
+}
+
+void hal_i2c_set_it_event(i2c_id_t id, i2c_it_t it_event) {
+    xI2C_TypeDef *i2c_ctrl = I2Cx[id];
+    i2c_ctrl->CR2 |= it_event;
 }
 // transmit_dma method
 void i2c_transmit_dma(i2c_id_t id, const dma_stream_config_t *cfg, uint8_t slave_addr, const uint8_t *data, uint16_t len) {

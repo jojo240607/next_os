@@ -125,15 +125,32 @@ typedef struct {
 
 extern xI2S_TypeDef* const I2Sx[I2S_MAX];
 
+/* ── 硬件配置 ── */
+void hal_i2s_clock_enable(i2s_id_t id);
+void hal_i2s_config_pll(i2s_id_t id, uint32_t plln, uint32_t pllr);
+void hal_i2s_config_i2spr(i2s_id_t id, uint8_t div, bool odd, bool mckoe);
+void hal_i2s_config_i2scfgr(i2s_id_t id, i2s_mode_t mode, i2s_standard_t std,
+                            uint8_t data_format, uint8_t clock_polarity, bool pcm_sync);
+void hal_i2s_config_it(i2s_id_t id, uint8_t it_enable);
+void hal_i2s_enable_txdma(i2s_id_t id, bool enable);
+void hal_i2s_enable_rxdma(i2s_id_t id, bool enable);
+
+/* ── 启动/停止 ── */
 void hal_i2s_start(i2s_id_t id);
 void hal_i2s_stop(i2s_id_t id);
+
+/* ── 轮询传输 ── */
 int hal_i2s_transmit(i2s_id_t id, const uint16_t *data, uint16_t len);
 int hal_i2s_receive(i2s_id_t id, uint16_t *buffer, uint16_t len);
+
+/* ── DMA 传输 ── */
 int hal_i2s_transmit_dma(i2s_id_t id, const dma_stream_config_t *dma_cfg, const uint16_t *data, uint16_t len);
 int hal_i2s_receive_dma(i2s_id_t id, const dma_stream_config_t *dma_cfg, uint16_t *buffer, uint16_t len);
-bool hal_i2s_is_busy(i2s_id_t id);
-int hal_i2s_transmit_it(i2s_id_t id, i2s_xfer_t *xfer, const uint16_t *data, uint16_t len);
-int hal_i2s_receive_it(i2s_id_t id, i2s_xfer_t *xfer, uint16_t *buffer, uint16_t len);
+
+/* ── 中断传输 ── */
+int  hal_i2s_transmit_it(i2s_id_t id, i2s_xfer_t *xfer, const uint16_t *data, uint16_t len);
+int  hal_i2s_receive_it(i2s_id_t id, i2s_xfer_t *xfer, uint16_t *buffer, uint16_t len);
 void hal_i2s_abort_it(i2s_id_t id, i2s_xfer_t *xfer);
+bool hal_i2s_is_busy(i2s_id_t id);
 
 #endif //STM32F4DISCOVERY_HAL_I2S_H

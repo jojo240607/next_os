@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../task/task.h"
-#include "../driver/usart.h"
+#include "../driver/usart/usart.h"
 
 #define GET_UART_DMA_TEST_VTABLE(obj) GET_TASK_VTABLE(obj)
 #define GET_UART_DMA_TEST(obj) ((UartDmaTest *)obj)

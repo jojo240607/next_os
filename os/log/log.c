@@ -5,7 +5,7 @@
 #include "log.h"
 #include "../common/sys_time.h"
 #include "../driver/common/device.h"
-#include "../driver/usart.h"
+#include "../driver/usart/usart.h"
 #include "../task/os/log_task.h"
 #include "../common/linear_pool.h"
 

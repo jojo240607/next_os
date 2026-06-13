@@ -225,6 +225,7 @@ static bool usb_cdc_irq_handler_impl(nvic_irq_t *irq_conf) {
             }
         }
     }
+    return true;
 }
 
 /* ───────── 发送数据 ───────── */

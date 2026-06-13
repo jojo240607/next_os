@@ -55,6 +55,7 @@ struct _TaskFun {
 struct _task_into_t{
     const char *name;
     thread_priority_t priority;
+    bool is_kernel;
     mpu_region_size_t stack_size;
     Task_create create;
 } ;

@@ -121,6 +121,7 @@ typedef struct {
     Tcb_loop loop;
     void *arg;
     void *exit;
+    bool is_kernal;//是否是特权模式线程（内核态线程才能特权模式）
 } thread_conf_t;
 // 构造函数声明
 Tcb_t* tcb_t_create(const char *name, const thread_conf_t *conf);

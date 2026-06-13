@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include "../task/task.h"
 #include "../driver/timer.h"
-#include "../driver/adc.h"
-#include "../driver/spi.h"
-#include "../driver/i2c.h"
+#include "../driver/adc/adc.h"
+#include "../driver/spi/spi.h"
+#include "../driver/i2c/i2c.h"
 #include "../driver/wdg.h"
 #include "../driver/pwm.h"
 
@@ -24,13 +24,14 @@ struct _Time_taskFun {
 struct _Time_task {
     Task base;  // 基类作为第一个成员
     const Time_taskFun* fun;
-    // TODO: 添加派生类特有的数据成员
     Device *timer;
     Device *adc;
     Device *spi;
     Device *i2c;
     Device *wdg;
     Device *pwm;
+    Device *icm20948;         /* ICM-20948 设备 */
+    Device *adxl345;          /* ADXL345 设备 */
 };
 
 // 构造函数声明

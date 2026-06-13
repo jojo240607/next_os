@@ -1,17 +1,19 @@
 #include "device_manager.h"
 #include <stdio.h>
-#include "usart.h"
+#include "usart/usart.h"
 #include "systick.h"
 #include "../common/linear_pool.h"
 #include "../log/log.h"
 #include "device_config.h"
 #include "exti.h"
-#include "adc.h"
-#include "spi.h"
+#include "adc/adc.h"
+#include "spi/spi.h"
 #include "wdg.h"
-#include "can.h"
+#include "can/can.h"
 #include "pwm.h"
-#include "i2s.h"
+#include "i2s/i2s.h"
+#include "fsmc/fsmc.h"
+#include "lcd/lcd_fsmc.h"
 
 static Device* device_manager_dev_open(Device_manager* self, dev_id_t id);
 
@@ -80,11 +82,29 @@ static const Device_list dev_lists[] = {
                 .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
                 .conf = &pwm1_conf,},
                 .device_create = (Device_create) pwm_create,},
+        {.info = &(const device_info_t){.name = "fsmc", .id = DEVICE_FSMC,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &fsmc_conf},
+                .device_create = (Device_create) fsmc_create,},
+        {.info = &(const device_info_t){.name = "lcd", .id = DEVICE_FSMC_LCD,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &lcd_fsmc_conf},
+                .device_create = (Device_create) lcd_fsmc_create,},
         {.info = &(const device_info_t){.name = "i2s2",
                 .id = DEVICE_I2S2,
                 .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
                 .conf = &i2s2_conf,},
                 .device_create = (Device_create) i2s_create,},
+        {.info = &(const device_info_t){.name = "icm20948",
+                .id = DEVICE_ICM20948,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &icm20948_conf,},
+                .device_create = (Device_create) icm20948_create,},
+        {.info = &(const device_info_t){.name = "adxl345",
+                .id = DEVICE_ADXL345,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
+                .conf = &adxl345_conf,},
+                .device_create = (Device_create) adxl345_create,},
 
 };
 Device_manager *gloable_deviceManager = NULL;

@@ -88,7 +88,7 @@ static void tcb_t_stack_init(Tcb_t *self, const thread_conf_t *conf) {
 // 再向下移动，留出 R4-R11, R14区
     top -= 10;  // 原来是 top -= 9
     top[9] = EXC_RETURN_THRD_PSP_NF;// LR (EXC_RETURN)
-    top[8] = CONTROL_THREAD_PSP_UNPRIV;//线程都是非特权模式
+    top[8] = conf->is_kernal ? CONTROL_THREAD_PSP_PRIV : CONTROL_THREAD_PSP_UNPRIV;//线程都是非特权模式
     // R4 - R11 初始化为 0 或其他安全值
     for (int i = 0; i < 8; i++) {
         top[i] = 0x00;   // 或保留 MAGIC_NUM 用于栈调试，但不影响运行
