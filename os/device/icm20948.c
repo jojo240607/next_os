@@ -63,15 +63,14 @@ dev_init_override(icm20948_dev_init)
 
     icm->spi_bus = gloable_deviceManager->fun->dev_open(
         gloable_deviceManager, DEVICE_SPI1 + conf->spi_id);
-    icm->cs_pin  = conf->cs;
     icm->cur_reg = 0;
 
     /* 设置 CS 默认高（未选中）并配置为输出 */
     if (conf->cs.pin < PIN_MAX) {
-        gpio_set(&icm->cs_pin);
+        gpio_set(&conf->cs);
     }
     LOG_DEBUG("icm20948", "init ok, spi%d cs=P%c%d",
-              conf->spi_id, 'A' + icm->cs_pin.port, icm->cs_pin.pin);
+              conf->spi_id, 'A' + conf->cs.port, conf->cs.pin);
 }
 
 /* ── dev_write: 写寄存器 ──
@@ -81,11 +80,12 @@ dev_init_override(icm20948_dev_init)
 dev_write_override(icm20948_dev_write)
 {
     ICM20948 *icm = (ICM20948 *)self;
+    const icm20948_config_t *conf = self->info->conf;
     const uint8_t *p = (const uint8_t *)buf;
 
     if (count >= 2) {
         uint8_t tx[2] = {(uint8_t)(p[0] & 0x7F), p[1]};
-        spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = NULL, .len = 2, .cs_pin = &icm->cs_pin};
+        spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = NULL, .len = 2, .cs_pin = &conf->cs};
         virtual_dev_ioctl(icm->spi_bus, DEVICE_TRANSFER, &args);
         icm->cur_reg = p[0] + 1;
     } else if (count == 1) {
@@ -98,13 +98,14 @@ dev_write_override(icm20948_dev_write)
 dev_read_override(icm20948_dev_read)
 {
     ICM20948 *icm = (ICM20948 *)self;
+    const icm20948_config_t *conf = self->info->conf;
     uint8_t *dst = (uint8_t *)buf;
 
     for (size_t i = 0; i < count; i++) {
         /* 每读一个寄存器需要 2 字节 SPI: 发地址+dummy, rx[1] 是数据 */
         uint8_t tx[2] = {(uint8_t)(icm->cur_reg | 0x80), 0x00};
         uint8_t rx[2];
-        spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = rx, .len = 2, .cs_pin = &icm->cs_pin};
+        spi_transfer_args_t args = {.tx_buf = tx, .rx_buf = rx, .len = 2, .cs_pin = &conf->cs};
         virtual_dev_ioctl(icm->spi_bus, DEVICE_TRANSFER, &args);
         dst[i] = rx[1];
         icm->cur_reg++;

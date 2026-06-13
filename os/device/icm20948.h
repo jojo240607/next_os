@@ -38,7 +38,7 @@ struct _ICM20948 {
     Device   base;
     Device  *spi_bus;         /* SPI 总线设备句柄 */
     uint8_t  cur_reg;         /* 当前寄存器指针 */
-    gpio_t   cs_pin;          /* 本设备的 CS 引脚 */
+    //gpio_t   *cs_pin;          /* 本设备的 CS 引脚 */
 };
 
 ICM20948* icm20948_create(const device_info_t *info);

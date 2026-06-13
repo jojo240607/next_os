@@ -96,7 +96,7 @@ task_thread_override(time_task_task_thread_impl) {
 
         time_task->adc->fun->read_user(time_task->adc, &adc_data, 2);
         LOG_DEBUG("time_task", "----- timer on ----- read ad %x", adc_data);
-
+#ifndef USE_CCMRAM
         /* ── ICM20948 读 WHO_AM_I ── */
         uint8_t icm_id;
         time_task->icm20948->fun->ioctl_user(time_task->icm20948,
@@ -126,6 +126,7 @@ task_thread_override(time_task_task_thread_impl) {
         }
         LOG_DEBUG("time_task", "ADXL345 single-byte x6: %02x %02x %02x %02x %02x %02x",
                   raw6[0], raw6[1], raw6[2], raw6[3], raw6[4], raw6[5]);
+#endif
 #endif
         //GET_WDG(time_task->wdg)->fun->iwdg_reload();
         //LOG_DEBUG("time_task", "feed watch dog");
