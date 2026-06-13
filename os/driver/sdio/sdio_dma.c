@@ -1,27 +1,30 @@
 /**
- * SDIO DMA 模式 — 步骤表状态机 + 中断驱动
+ * sdio_dma.c — SDIO 总线 DMA 模式 (kwork 状态机驱动)
+ * 提供非阻塞命令发送和数据传输，不绑定 SD Card 协议。
  */
 #include "sdio.h"
 #include "../hal/hal_sdio.h"
 #include "../common/dma.h"
+#include "../../kernel/kwork.h"
 #include "../../kernel/kworker.h"
+#include "../../common/linear_pool.h"
 
+/* ── ISR: 唤醒 kworker ── */
 static bool sdio_irq_handler(nvic_irq_t *irq_conf) {
     (void)irq_conf;
     gloable_kworker->wake->fun->give(gloable_kworker->wake);
     return true;
 }
 
-/* ════ 命令步骤表 ════ */
+/* ════ 命令状态机 ════ */
 typedef struct { Device *dev; sdio_cmd_t *user_cmd; } cmd_ctx_t;
 typedef void (*cmd_step_t)(kwork_t *w, cmd_ctx_t *c);
 enum { CMD_STEP_SEND = 1, CMD_STEP_WAIT };
 
 static void cmd_send(kwork_t *w, cmd_ctx_t *c) {
-    sdio_cmd_t *cmd = c->user_cmd;
     hal_sdio_clear_icr(0xFFFFFFFF);
-    hal_sdio_set_arg(cmd->arg);
-    hal_sdio_send_cmd(hal_sdio_build_cmd(cmd->cmd, cmd->resp_type & 0x3));
+    hal_sdio_set_arg(c->user_cmd->arg);
+    hal_sdio_send_cmd(hal_sdio_build_cmd(c->user_cmd->cmd, c->user_cmd->resp_type & 0x3));
     w->state = CMD_STEP_WAIT;
 }
 static void cmd_wait(kwork_t *w, cmd_ctx_t *c) {
@@ -40,87 +43,60 @@ static void cmd_wait(kwork_t *w, cmd_ctx_t *c) {
             }
         }
         cmd->error = 0;
-    } else {
-        w->state = CMD_STEP_WAIT; return;
-    }
-    c->dev->fun->trigger_event(c->dev, SDIO_CMD_DONE, c->dev->arg);
+    } else { w->state = CMD_STEP_WAIT; return; }
+    c->dev->fun->trigger_event(c->dev, SDIO_CMD_DONE, NULL);
     w->state = 0;
 }
 static const cmd_step_t cmd_steps[] = { cmd_send, cmd_wait };
 
-/* ════ DMA 数据步骤表 ════ */
+/* ════ DMA 数据状态机 ════ */
 typedef struct {
-    Device *dev; sdio_data_t data; uint32_t block_addr;
-    uint8_t cmd_idx; int *result; uint32_t *p_block_addr; uint32_t block_size;
+    Device *dev; sdio_cmd_t *cmd; sdio_data_t *data; int *result;
 } data_ctx_t;
 typedef void (*data_step_t)(kwork_t *w, data_ctx_t *c);
-enum {
-    DMA_STEP_SETUP = 1, DMA_STEP_CMD_DONE,
-    DMA_STEP_START, DMA_STEP_WAIT_END,
-};
+enum { DMA_S_SETUP = 1, DMA_S_CMD_DONE, DMA_S_DMA_START, DMA_S_WAIT_END };
 
 static void dma_setup_cmd(kwork_t *w, data_ctx_t *c) {
-    hal_sdio_set_dlen(c->data.len);
+    hal_sdio_set_dlen(c->data->len);
     hal_sdio_set_dtimer(0xFFFFFFFF);
-    uint32_t dctrl = (c->data.block_size << 4);
-    if (c->data.dir_to_card) dctrl |= (1UL << 0);
+    uint32_t dctrl = (c->data->block_size << 4);
+    if (c->data->dir_to_card) dctrl |= (1UL << 0);
     dctrl |= (1UL << 1);
     hal_sdio_set_dctrl(dctrl);
     hal_sdio_clear_icr(0xFFFFFFFF);
-    hal_sdio_set_arg(c->block_addr);
-    hal_sdio_send_cmd(hal_sdio_build_cmd(c->cmd_idx, 1));
-    w->state = DMA_STEP_CMD_DONE;
+    hal_sdio_set_arg(c->cmd->arg);
+    hal_sdio_send_cmd(hal_sdio_build_cmd(c->cmd->cmd, c->cmd->resp_type));
+    w->state = DMA_S_CMD_DONE;
 }
 static void dma_cmd_done(kwork_t *w, data_ctx_t *c) {
     uint32_t sta = hal_sdio_get_sta();
-    if (hal_sdio_sta_has_error(sta)) {
-        *c->result = -1; c->data.error = -1;
-        c->dev->fun->trigger_event(c->dev, SDIO_DATA_DONE, c->dev->arg);
-        w->state = 0; return;
-    }
-    if (sta & xSDIO_STA_CMDREND) {
-        hal_sdio_clear_icr(xSDIO_STA_CMDREND);
-        w->state = DMA_STEP_START; return;
-    }
-    w->state = DMA_STEP_CMD_DONE;
+    if (hal_sdio_sta_has_error(sta)) { *c->result = -1; w->state = 0; return; }
+    if (sta & xSDIO_STA_CMDREND) { hal_sdio_clear_icr(xSDIO_STA_CMDREND); w->state = DMA_S_DMA_START; return; }
+    w->state = DMA_S_CMD_DONE;
 }
-static void dma_start(kwork_t *w, data_ctx_t *c) {
+static void dma_start_xfer(kwork_t *w, data_ctx_t *c) {
     const sdio_config_t *conf = c->dev->info->conf;
-    if (c->data.dir_to_card && conf->dma_cfg->tx_dma)
-        dma_start_transfer(conf->dma_cfg->tx_dma, (uint32_t)c->data.buf,
-            hal_sdio_get_fifo_addr(), c->data.len / 4);
-    else if (!c->data.dir_to_card && conf->dma_cfg->rx_dma)
+    if (c->data->dir_to_card && conf->dma_cfg && conf->dma_cfg->tx_dma)
+        dma_start_transfer(conf->dma_cfg->tx_dma, (uint32_t)c->data->buf,
+            hal_sdio_get_fifo_addr(), c->data->len / 4);
+    else if (!c->data->dir_to_card && conf->dma_cfg && conf->dma_cfg->rx_dma)
         dma_start_transfer(conf->dma_cfg->rx_dma, hal_sdio_get_fifo_addr(),
-            (uint32_t)c->data.buf, c->data.len / 4);
-    w->state = DMA_STEP_WAIT_END;
+            (uint32_t)c->data->buf, c->data->len / 4);
+    w->state = DMA_S_WAIT_END;
 }
 static void dma_wait_end(kwork_t *w, data_ctx_t *c) {
     uint32_t sta = hal_sdio_get_sta();
-    if (hal_sdio_sta_has_error(sta)) {
-        *c->result = -1; c->data.error = -1;
-        c->dev->fun->trigger_event(c->dev, SDIO_DATA_DONE, c->dev->arg);
-        w->state = 0; return;
-    }
-    if (sta & xSDIO_STA_DATAEND) {
-        hal_sdio_clear_icr(xSDIO_STA_DATAEND);
-        *c->result = 0; *c->p_block_addr += c->data.len / c->block_size;
-        w->state = 0; return;
-    }
-    w->state = DMA_STEP_WAIT_END;
+    if (hal_sdio_sta_has_error(sta)) { *c->result = -1; c->data->error = -1; w->state = 0; return; }
+    if (sta & xSDIO_STA_DATAEND) { hal_sdio_clear_icr(xSDIO_STA_DATAEND); *c->result = 0; w->state = 0; return; }
+    w->state = DMA_S_WAIT_END;
 }
-static const data_step_t dma_steps[] = { dma_setup_cmd, dma_cmd_done, dma_start, dma_wait_end };
+static const data_step_t dma_steps[] = { dma_setup_cmd, dma_cmd_done, dma_start_xfer, dma_wait_end };
 
-static int cmd_work_fn(kwork_t *w) {
-    cmd_ctx_t *c = (cmd_ctx_t *)w->ctx;
-    cmd_steps[w->state - 1](w, c);
-    return w->state;
-}
-static int data_work_fn(kwork_t *w) {
-    data_ctx_t *c = (data_ctx_t *)w->ctx;
-    dma_steps[w->state - 1](w, c);
-    return w->state;
-}
+/* ── work 函数 ── */
+static int cmd_work_fn(kwork_t *w) { cmd_ctx_t *c = (cmd_ctx_t *)w->ctx; cmd_steps[w->state-1](w,c); return w->state; }
+static int data_work_fn(kwork_t *w){ data_ctx_t *c=(data_ctx_t*)w->ctx; dma_steps[w->state-1](w,c); return w->state; }
 
+/* ── 驱动初始化 ── */
 void sdio_dma_dev_init(Device *self) {
     Sdio *sdio = GET_SDIO(self);
     if (!sdio->kwork) { sdio->kwork = os_malloc(sizeof(kwork_t)); memset(sdio->kwork, 0, sizeof(kwork_t)); }
@@ -137,37 +113,30 @@ void sdio_dma_dev_init(Device *self) {
     self->fun->config_irq(self, self->irq_conf);
 }
 
+/* ── ioctl: 发命令或启动数据传输 ── */
 void sdio_dma_ioctl(Device *self, ioctl_cmd_t cmd, void *arg) {
     Sdio *sdio = GET_SDIO(self);
     switch (cmd) {
-    case SDIO_IOCTL_SEND_CMD:
+    case SDIO_CMD_SEND:
         if (arg) {
             cmd_ctx_t ctx = { .dev = self, .user_cmd = (sdio_cmd_t *)arg };
-            kwork_init(sdio->kwork, cmd_work_fn, &ctx);
-            kwork_submit(gloable_kworker, sdio->kwork);
-            self->fun->trigger_event(self, SDIO_XFER_START, self->arg);
+            kwork_init((kwork_t*)sdio->kwork, cmd_work_fn, &ctx);
+            kwork_submit(gloable_kworker, (kwork_t*)sdio->kwork);
+            self->fun->trigger_event(self, SDIO_XFER_START, NULL);
         }
         break;
-    case SDIO_IOCTL_SET_BLOCK: if (arg) sdio->block_addr = *(uint32_t *)arg; break;
+    case SDIO_DATA_XFER:
+        if (arg) {
+            ((sdio_data_t*)arg)->error = -1; int result = -1;
+            data_ctx_t ctx = { .dev = self, .cmd = NULL, .data = (sdio_data_t*)arg, .result = &result };
+            kwork_init((kwork_t*)sdio->kwork, data_work_fn, &ctx);
+            kwork_submit(gloable_kworker, (kwork_t*)sdio->kwork);
+            self->fun->trigger_event(self, SDIO_XFER_START, NULL);
+        }
+        break;
     default: break;
     }
 }
-size_t sdio_dma_read(Device *self, void *buf, size_t count) {
-    Sdio *sdio = GET_SDIO(self); int result = -1;
-    data_ctx_t ctx = { .dev = self, .block_addr = sdio->block_addr, .cmd_idx = 17,
-        .data = { .buf = buf, .len = (uint32_t)count, .block_size = sdio->block_size, .dir_to_card = false },
-        .result = &result, .p_block_addr = &sdio->block_addr, .block_size = sdio->block_size };
-    kwork_init(sdio->kwork, data_work_fn, &ctx);
-    kwork_submit(gloable_kworker, sdio->kwork);
-    self->fun->trigger_event(self, SDIO_XFER_START, self->arg);
-    return result == 0 ? count : 0;
-}
-void sdio_dma_write(Device *self, const void *buf, size_t count) {
-    Sdio *sdio = GET_SDIO(self); int result = -1;
-    data_ctx_t ctx = { .dev = self, .block_addr = sdio->block_addr, .cmd_idx = 24,
-        .data = { .buf = (uint8_t *)buf, .len = (uint32_t)count, .block_size = sdio->block_size, .dir_to_card = true },
-        .result = &result, .p_block_addr = &sdio->block_addr, .block_size = sdio->block_size };
-    kwork_init(sdio->kwork, data_work_fn, &ctx);
-    kwork_submit(gloable_kworker, sdio->kwork);
-    self->fun->trigger_event(self, SDIO_XFER_START, self->arg);
-}
+
+size_t sdio_dma_read(Device *self, void *buf, size_t count)  { (void)self;(void)buf;(void)count; return 0; }
+void   sdio_dma_write(Device *self, const void *buf, size_t count) { (void)self;(void)buf;(void)count; }

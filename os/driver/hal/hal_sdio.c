@@ -26,7 +26,12 @@ void hal_sdio_config_clock(uint32_t clkcr) { xSDIO->CLKCR = clkcr; }
 void hal_sdio_set_arg(uint32_t arg)          { xSDIO->ARG = arg; }
 
 uint32_t hal_sdio_build_cmd(uint32_t cmd_index, uint32_t resp_type) {
-    return (cmd_index & 0x3F) | resp_type | xSDIO_CMD_CPSMEN;
+    /* resp_type 取低 2 位，映射到 CMD 寄存器 WAITRESP (bit6-7):
+     *   0 → 00 (No response)
+     *   1 → 01 (Short, 对应 SDIO_RESPONSE_SHORT)
+     *   2 → 10 (Short no CRC)
+     *   3 → 11 (Long,  对应 SDIO_RESPONSE_LONG) */
+    return (cmd_index & 0x3F) | ((resp_type & 0x3) << 6) | xSDIO_CMD_CPSMEN;
 }
 
 void hal_sdio_send_cmd(uint32_t cmd_reg) { xSDIO->CMD = cmd_reg; }

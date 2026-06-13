@@ -1,26 +1,28 @@
 /**
- * SDIO 驱动 — 公共部分
+ * sdio.c — SDIO 总线驱动公共部分
+ * 负责硬件初始化（时钟、引脚、电源），不涉及任何设备协议。
  */
 #include "sdio.h"
 #include "../../common/linear_pool.h"
-#include "../common/rcc.h"
+#include "../common/pinmux.h"
 
-extern void sdio_poll_dev_init(Device*);
+/* ── 外部声明（poll/it/dma 模式各自提供） ── */
+extern void   sdio_poll_dev_init(Device*);
 extern size_t sdio_poll_read(Device*, void*, size_t);
 extern void   sdio_poll_write(Device*, const void*, size_t);
 extern void   sdio_poll_ioctl(Device*, ioctl_cmd_t, void*);
+
 extern void   sdio_it_dev_init(Device*);
 extern size_t sdio_it_read(Device*, void*, size_t);
 extern void   sdio_it_write(Device*, const void*, size_t);
 extern void   sdio_it_ioctl(Device*, ioctl_cmd_t, void*);
+
 extern void   sdio_dma_dev_init(Device*);
 extern size_t sdio_dma_read(Device*, void*, size_t);
 extern void   sdio_dma_write(Device*, const void*, size_t);
 extern void   sdio_dma_ioctl(Device*, ioctl_cmd_t, void*);
 
-static void sdio_destroy(Sdio* self);
-static const SdioFun sdio_fun = { .destroy = sdio_destroy };
-
+/* ── 默认 listener: semaphore 同步 ── */
 static void default_sdio_listener(Device *self, uint8_t event, void *arg) {
     Sdio *sdio = GET_SDIO(self);
     (void)arg;
@@ -33,6 +35,9 @@ static void default_sdio_listener(Device *self, uint8_t event, void *arg) {
     }
 }
 
+static void sdio_destroy(Sdio* self);
+static const SdioFun sdio_fun = { .destroy = sdio_destroy };
+
 Sdio* sdio_create(const device_info_t *info) {
     Sdio* obj = (Sdio*)os_malloc(sizeof(Sdio));
     if (obj) { memset(obj, 0, sizeof(Sdio)); sdio_init(obj, info); }
@@ -44,6 +49,9 @@ void sdio_init(Sdio* self, const device_info_t *info) {
     self->fun = &sdio_fun;
 
     const sdio_config_t *conf = (const sdio_config_t *)info->conf;
+    if (!conf) return;
+
+    /* 根据配置选择模式 */
     if (conf->dma_cfg) {
         GET_DEVICE_VTABLE(self)->dev_init  = sdio_dma_dev_init;
         GET_DEVICE_VTABLE(self)->dev_read  = sdio_dma_read;
@@ -61,22 +69,20 @@ void sdio_init(Sdio* self, const device_info_t *info) {
         GET_DEVICE_VTABLE(self)->dev_ioctl = sdio_poll_ioctl;
     }
 
-    self->sdio_sem    = semaphore_create(0);
-    self->block_addr  = 0;
-    self->block_size  = 512;
-    self->kwork       = NULL;
+    self->sdio_sem = semaphore_create(0);
+    self->kwork    = NULL;
 
-    if (!conf) return;
+    /* 硬件初始化 */
     hal_sdio_clock_enable();
 
     const sdio_pins_t *p = &conf->pins;
     const pin_config_t pin_cfgs[] = {
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_NONE, .af = p->clk_pin },
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP, .af = p->cmd_pin },
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP, .af = p->d0_pin },
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP, .af = p->d1_pin },
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP, .af = p->d2_pin },
-        { .mode = PIN_MODE_AF, .otype = PIN_OTYPE_PP, .ospeed = PIN_OSPEED_HIGH, .pupd = PIN_PUPD_PULLUP, .af = p->d3_pin },
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_NONE, .af=p->clk_pin},
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_PULLUP,.af=p->cmd_pin},
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_PULLUP,.af=p->d0_pin},
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_PULLUP,.af=p->d1_pin},
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_PULLUP,.af=p->d2_pin},
+        {.mode=PIN_MODE_AF,.otype=PIN_OTYPE_PP,.ospeed=PIN_OSPEED_HIGH,.pupd=PIN_PUPD_PULLUP,.af=p->d3_pin},
     };
     if (pinmux_request_group(pin_cfgs, 6) != 0) return;
 
@@ -90,7 +96,3 @@ void sdio_init(Sdio* self, const device_info_t *info) {
 
 void sdio_deinit(Sdio* self) { device_deinit(GET_DEVICE(self)); }
 static void sdio_destroy(Sdio* self) { if (self) { sdio_deinit(self); os_free(self); } }
-
-
-
-
