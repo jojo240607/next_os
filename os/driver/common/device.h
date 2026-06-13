@@ -63,8 +63,8 @@ typedef struct _listener_node {
 
 typedef enum : uint8_t {
     DEVICE_SYSTICK = 0,
-    DEVICE_USART4,
     DEVICE_USART1,
+    DEVICE_USART4,
     DEVICE_TIME2,
     DEVICE_EXTI,
     DEVICE_ADC1,
