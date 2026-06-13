@@ -27,16 +27,45 @@ typedef struct {
     bool            enable_dcache;     // 使能数据缓存
 } flash_config_t;
 
-/* ========== API ========== */
+/* ── Flash 寄存器 ── */
+typedef struct {
+    volatile uint32_t ACR;
+    volatile uint32_t KEYR;
+    volatile uint32_t OPTKEYR;
+    volatile uint32_t SR;
+    volatile uint32_t CR;
+    volatile uint32_t OPTCR;
+} xFLASH_TypeDef;
+
+#define xFLASH_BASE  0x40023C00UL
+#define xFLASH       ((xFLASH_TypeDef *)xFLASH_BASE)
+
+/* KEYR 密钥 */
+#define xFLASH_KEY1   0x45670123UL
+#define xFLASH_KEY2   0xCDEF89ABUL
+
+/* SR 位 */
+#define xFLASH_SR_BSY     (1 << 16)
+
+/* CR 位 */
+#define xFLASH_CR_PG      (1 << 0)
+#define xFLASH_CR_SER     (1 << 1)
+#define xFLASH_CR_STRT    (1 << 16)
+#define xFLASH_CR_LOCK    (1 << 31)
+
+/* ========== 原 API ========== */
 int  hal_flash_init(const flash_config_t *cfg);
 void hal_flash_deinit(void);
-
-/* 运行时修改等待周期 (需谨慎，通常不建议在运行中更改) */
 int  hal_flash_set_latency(flash_latency_t latency);
-
-/* 启用/禁用预取指和缓存 */
 void hal_flash_enable_prefetch(bool enable);
 void hal_flash_enable_icache(bool enable);
 void hal_flash_enable_dcache(bool enable);
+
+/* ========== Flash EEPROM API ========== */
+void hal_flash_unlock(void);
+void hal_flash_lock(void);
+void hal_flash_wait_bsy(void);
+void hal_flash_erase_sector(uint32_t sector_addr);
+void hal_flash_program_word(uint32_t addr, uint32_t data);
 
 #endif //STM32F4DISCOVERY_HAL_FLASH_H

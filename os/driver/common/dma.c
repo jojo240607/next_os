@@ -1,16 +1,10 @@
+/**
+ * dma.c — DMA 管理逻辑（流分配、传输调度）
+ * 所有寄存器操作通过 hal_dma_* 函数，本层只做管理逻辑。
+ */
 #include "dma.h"
-#include "rcc.h"
 #include "../../log/log.h"
 #include "../../common/linear_pool.h"
-
-
-/* 获取 stream 寄存器指针 */
-static inline xDMA_Stream_TypeDef* DMA_Stream(const dma_stream_config_t *cfg)
-{
-    uint32_t base = (DMA_REQ_GET_CTRL(cfg->dma_request) == DMA_1) ?
-            DMA1_STREAM_BASE(DMA_REQ_GET_STREAM(cfg->dma_request)) : DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(cfg->dma_request));
-    return (xDMA_Stream_TypeDef*)base;
-}
 
 /* 全局流占用表 */
 typedef struct {
@@ -32,255 +26,119 @@ void dma_init(void)
 
 int dma_stream_request(const dma_stream_config_t *cfg)
 {
-    if (DMA_REQ_GET_CTRL(cfg->dma_request) >= xDMA_CONTROLLER_MAX || DMA_REQ_GET_STREAM(cfg->dma_request) > 7) {
-        return DMA_ERROR;
-    }
+    dma_controller_t ctrl = DMA_REQ_GET_CTRL(cfg->dma_request);
+    uint8_t          strm = DMA_REQ_GET_STREAM(cfg->dma_request);
 
-    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
+    if (ctrl >= xDMA_CONTROLLER_MAX || strm > 7) return DMA_ERROR;
+
+    dma_stream_state_t *st = dma_states[ctrl][strm];
     if (!st) {
         st = os_malloc(sizeof(dma_stream_state_t));
         memset(st, 0, sizeof(dma_stream_state_t));
-        dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)] = st;
+        dma_states[ctrl][strm] = st;
     }
-
     if (st->allocated) {
-        /* 简单冲突检查：只要占用就不让用（也可按需求宽松处理） */
-        LOG_ERROR("dma", "error dma %d stream %d have allocated", DMA_REQ_GET_CTRL(cfg->dma_request), DMA_REQ_GET_STREAM(cfg->dma_request));
+        LOG_ERROR("dma", "error dma %d stream %d have allocated", ctrl, strm);
         return DMA_ERROR;
     }
-    LOG_DEBUG("dma", "dma init ctrl %d, stream %d", DMA_REQ_GET_CTRL(cfg->dma_request), DMA_REQ_GET_STREAM(cfg->dma_request));
-    /* 使能时钟 */
-    dma_clock_enable(DMA_REQ_GET_CTRL(cfg->dma_request));
 
-    /* 配置流寄存器 */
-    xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
-    /* 先关闭流 */
-    dma->SxCR = 0;
-    /* 设置通道 */
-    //  #define DMA_CHANNEL_0                 0x00000000U    /*!< DMA Channel 0 */
-    //  #define DMA_CHANNEL_1                 0x02000000U    /*!< DMA Channel 1 */
-    //  #define DMA_CHANNEL_2                 0x04000000U    /*!< DMA Channel 2 */
-    //  #define DMA_CHANNEL_3                 0x06000000U    /*!< DMA Channel 3 */
-    //  #define DMA_CHANNEL_4                 0x08000000U    /*!< DMA Channel 4 */
-    //  #define DMA_CHANNEL_5                 0x0A000000U    /*!< DMA Channel 5 */
-    //  #define DMA_CHANNEL_6                 0x0C000000U    /*!< DMA Channel 6 */
-    //  #define DMA_CHANNEL_7                 0x0E000000U    /*!< DMA Channel 7 */ 1110 0000
-    volatile uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
-    /* 方向：注意 bit6=DIR, bit7=DIR 搭配？参考手册：位6/7用于方向控制（双缓冲模式下） */
-    /*  #define DMA_SxCR_DIR_0           (0x1UL << DMA_SxCR_DIR_Pos)                    !< 0x00000040
-        #define DMA_SxCR_DIR_1           (0x2UL << DMA_SxCR_DIR_Pos)                    !< 0x00000080
-     *  #define DMA_PERIPH_TO_MEMORY          0x00000000U                 //!< Peripheral to memory direction
-        #define DMA_MEMORY_TO_PERIPH          ((uint32_t)DMA_SxCR_DIR_0) 1 //!< Memory to peripheral direction
-        #define DMA_MEMORY_TO_MEMORY          ((uint32_t)DMA_SxCR_DIR_1) 2 //!< Memory to memory direction
-     * */
-    if (cfg->direction == DMA_DIR_P2M) {
-        cr |= (0x00 << 6);   /* 外设到存储器 */
-    } else if (cfg->direction == DMA_DIR_M2P) {
-        cr |= (0x01 << 6);   /* 存储器到外设 */
-    } else {
-        cr |= (0x02 << 6);   /* 存储器到存储器 */
-    }
-    /*
-     * PFCTRL = 0：DMA 控制流（这是你需要的）。DMA 会在传输完设定的所有数据后自动停止。
-     * PFCTRL = 1：外设控制流。
-     *
-     * */
-    cr |= (0x0 << 5);
-    /* 优先级 */
+    hal_dma_clock_enable(ctrl);
+
+    /* 构建 SxCR（包含中断使能位） */
+    uint32_t cr = (DMA_REQ_GET_CHANNEL(cfg->dma_request) & 0x7) << 25;
+    if (cfg->direction == DMA_DIR_P2M)      cr |= (0x0 << 6);
+    else if (cfg->direction == DMA_DIR_M2P) cr |= (0x1 << 6);
+    else                                     cr |= (0x2 << 6);
     cr |= (cfg->priority & 0x3) << 16;
-    /* 数据宽度 */
     cr |= (cfg->mem_data_size & 0x3) << 13;
     cr |= (cfg->per_data_size & 0x3) << 11;
-    /* 地址递增 */
-    if (cfg->mem_inc) {
-        cr |= (1 << 10);
-    }
-    if (cfg->per_inc) {
-        cr |= (1 << 9);
-    }
-    /* 循环模式 */
-    if (cfg->mode == DMA_MODE_CIRCULAR) {
-        cr |= (1 << 8);//#define DMA_SxCR_CIRC_Pos        (8U)
-    }
-    /* 中断使能: 按 cfg->it_enable 写 SxCR 对应位 */
-    dma->SxCR = cr;
-    if (cfg->it_enable & xDMA_IT_TC) {  /* 传输完成中断 */
-        dma->SxCR |= (1 << 4);   // TCIE
-    }
-    if (cfg->it_enable & xDMA_IT_HT) {  /* 半传输中断 */
-        dma->SxCR |= (1 << 3);   // HTIE
-    }
-    if (cfg->it_enable & xDMA_IT_TE) {  /* 传输错误中断 */
-        dma->SxCR |= (1 << 2);   // TEIE
-    }
+    if (cfg->mem_inc) cr |= (1 << 10);
+    if (cfg->per_inc) cr |= (1 << 9);
+    if (cfg->mode == DMA_MODE_CIRCULAR) cr |= (1 << 8);
+    if (cfg->it_enable & xDMA_IT_TC)  cr |= (1 << 4);
+    if (cfg->it_enable & xDMA_IT_HT)  cr |= (1 << 3);
+    if (cfg->it_enable & xDMA_IT_TE)  cr |= (1 << 2);
+
+    hal_dma_stream_write_cr(ctrl, strm, cr);
 
     /* FIFO 配置 */
     uint32_t fcr = 0;
     if (cfg->fifo_mode == DMA_FIFO_ENABLE) {
-        fcr |= (1 << 2);        /* DMDIS=0, 使能直接模式？实际手册：FCR bit2 为 DMDIS，置0表示直接模式，1禁止，即使用FIFO */
-        fcr |= (0x3 << 0);      /* FTH 满阈值，例如 1/2 */
+        fcr |= (1 << 2) | (0x3 << 0);
     }
-    dma->SxFCR = fcr;
+    hal_dma_get_stream(ctrl, strm)->SxFCR = fcr;
 
     st->allocated = true;
     st->config = *cfg;
+    LOG_DEBUG("dma", "dma init ctrl %d, stream %d", ctrl, strm);
     return DMA_SUCCESS;
 }
 
 int dma_stream_release(const dma_stream_config_t *cfg)
 {
-    if (DMA_REQ_GET_CTRL(cfg->dma_request) >= xDMA_CONTROLLER_MAX || DMA_REQ_GET_STREAM(cfg->dma_request) > 7) {
-        return DMA_ERROR;
-    }
-    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
-    if (!st) {
-        return DMA_SUCCESS;
-    }
+    dma_controller_t ctrl = DMA_REQ_GET_CTRL(cfg->dma_request);
+    uint8_t          strm = DMA_REQ_GET_STREAM(cfg->dma_request);
+    if (ctrl >= xDMA_CONTROLLER_MAX || strm > 7) return DMA_ERROR;
+
+    dma_stream_state_t *st = dma_states[ctrl][strm];
+    if (!st) return DMA_SUCCESS;
+
     st->allocated = false;
-    /* 关闭流 */
-    xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
-    dma->SxCR = 0;
+    hal_dma_stream_disable(ctrl, strm);
+    hal_dma_stream_write_cr(ctrl, strm, 0);
     return DMA_SUCCESS;
 }
 
 int dma_start_transfer(const dma_stream_config_t *cfg,
                        uint32_t src_addr, uint32_t dst_addr, uint16_t count)
 {
-    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
-    if (!st) {
-        return DMA_ERROR;
-    }
-    if (!st->allocated) {
-        return DMA_ERROR;
-    }
-    xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
+    dma_controller_t ctrl = DMA_REQ_GET_CTRL(cfg->dma_request);
+    uint8_t          strm = DMA_REQ_GET_STREAM(cfg->dma_request);
+    dma_stream_state_t *st = dma_states[ctrl][strm];
+    if (!st || !st->allocated) return DMA_ERROR;
 
-    /* 停止当前传输 */
-    dma->SxCR &= ~(1 << 0);
-    /* 清除标志 */
-    dma_clear_flag(cfg);
-    /* 设置地址和数量 */
-    //SxPAR (外设地址寄存器)
-    //SxM0AR (存储器地址 0 寄存器)
-    //外设到存储器 (P2M)：外设是源 (SxPAR 是源地址)，存储器是目标 (SxM0AR 是目标地址)。
-    //存储器到外设 (M2P)：存储器是源 (SxM0AR 是源地址)，外设是目标 (SxPAR 是目标地址)。
-    if (cfg->direction == DMA_DIR_P2M) {
-        dma->SxPAR  = src_addr;   /* 根据方向，这里是外设地址 或 源 */
-        dma->SxM0AR = dst_addr;   /* 存储器地址 或 目标 */
-    } else if (cfg->direction == DMA_DIR_M2P) {
-        dma->SxPAR  = dst_addr;   /* 根据方向，这里是外设地址 或 源 */
-        dma->SxM0AR = src_addr;   /* 存储器地址 或 目标 */
-    } else {
-        dma->SxPAR  = (uint32_t)dst_addr;   // 目标内存
-        dma->SxM0AR = (uint32_t)src_addr;   // 源内存
-    }
-
-    dma->SxNDTR = count;
-    /* 使能流 */
-    dma->SxCR |= 1;
-    // 轮询 TC 标志（例如 DMA2_Stream7）
-    //uint32_t base = DMA2_STREAM_BASE(DMA_REQ_GET_STREAM(cfg->dma_request));
-    //xDMA_Base_TypeDef *dma2 = (xDMA_Base_TypeDef *)base;
-    //while (!(dma2->HISR & (1 << 26))); // TCIF7 位，请根据实际流调整
+    hal_dma_stream_disable(ctrl, strm);
+    hal_dma_clear_flags(ctrl, strm);
+    hal_dma_stream_set_dir_addr(ctrl, strm, cfg->direction, src_addr, dst_addr);
+    hal_dma_stream_set_ndtr(ctrl, strm, count);
+    hal_dma_stream_enable(ctrl, strm);
     return DMA_SUCCESS;
 }
 
 int dma_stop_transfer(const dma_stream_config_t *cfg)
 {
-    dma_stream_state_t *st = dma_states[DMA_REQ_GET_CTRL(cfg->dma_request)][DMA_REQ_GET_STREAM(cfg->dma_request)];
-    if (!st) {
-        return DMA_ERROR;
-    }
-    if (!st->allocated) {
-        return DMA_ERROR;
-    }
-    xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
-    dma->SxCR &= ~(1 << 0);
-    dma_clear_flag(cfg);
+    dma_controller_t ctrl = DMA_REQ_GET_CTRL(cfg->dma_request);
+    uint8_t          strm = DMA_REQ_GET_STREAM(cfg->dma_request);
+    dma_stream_state_t *st = dma_states[ctrl][strm];
+    if (!st || !st->allocated) return DMA_ERROR;
+
+    hal_dma_stream_disable(ctrl, strm);
+    hal_dma_clear_flags(ctrl, strm);
     return DMA_SUCCESS;
 }
 
-/* 简单忙检测：传输完成标志 */
 bool dma_is_busy(const dma_stream_config_t *cfg)
 {
-    xDMA_Stream_TypeDef *dma = DMA_Stream(cfg);
-    return (dma->SxNDTR != 0) && (dma->SxCR & 1);
-}
-/*
- * #define DMA_HIFCR_CTCIF7_Pos     (27U)
- * #define DMA_HIFCR_CFEIF7_Pos     (22U)
- *
- * #define DMA_HIFCR_CTCIF6_Pos     (21U)
- * #define DMA_HIFCR_CFEIF6_Pos     (16U)
- *
- * #define DMA_HIFCR_CTCIF5_Pos     (11U)
- * #define DMA_HIFCR_CFEIF5_Pos     (6U)
- *
- * #define DMA_HIFCR_CTCIF4_Pos     (5U)
- * #define DMA_HIFCR_CFEIF4_Pos     (0U)
- * -----------------------------------------------
- * #define DMA_LIFCR_CTCIF3_Pos     (27U)
- * #define DMA_LIFCR_CFEIF3_Pos     (22U)
- *
- * #define DMA_LIFCR_CTCIF2_Pos     (21U)
- * #define DMA_LIFCR_CFEIF2_Pos     (16U)
- *
- * #define DMA_LIFCR_CTCIF1_Pos     (11U)
- * #define DMA_LIFCR_CFEIF1_Pos     (6U)
- *
- * #define DMA_LIFCR_CTCIF0_Pos     (5U)
- * #define DMA_LIFCR_CFEIF0_Pos     (0U)
- *
- *  Bit 0: FEIF4 (流错误中断标志) —— 实际可能是“保留”或 FIFO 错误，不同型号位定义有差异
-    Bit 1: 保留
-    Bit 2: DMEIF4 (直接模式错误中断标志)
-    Bit 3: TEIF4 (传输错误中断标志)
-    Bit 4: HTIF4 (半传输中断标志)
-    Bit 5: TCIF4 (传输完成中断标志)
- * */
-void dma_clear_flag(const dma_stream_config_t *cfg) {
-    xDMA_Base_TypeDef *base = (DMA_REQ_GET_CTRL(cfg->dma_request) == DMA_1) ? (xDMA_Base_TypeDef*)xDMA1_BASE :
-                             (xDMA_Base_TypeDef*)xDMA2_BASE;
-    /*
-     * STM32F4 DMA 中断状态寄存器位布局 (每个 stream 占 6 bits, 每 2 个 stream 后有 4 bits 间隙):
-     *   LISR: Stream0[5:0], 间隙[9:6], Stream1[15:10], 间隙[19:16], Stream2[25:20], 间隙[29:26], Stream3[31:30]
-     *   HISR: Stream4[5:0], 间隙[9:6], Stream5[15:10], 间隙[19:16], Stream6[25:20], 间隙[29:26], Stream7[31:30]
-     *   stream * 6 : 每个 stream 占 6 bits
-     *   (stream >> 1) * 4 : 每 2 个 stream 之间 4 bits 间隙
-     * 清除: 向对应位写 1 (TCIF/HTIF/TEIF/DMEIF/FEIF)
-     */
-    uint32_t it_flags = 0x3F;
-    uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
-    if (stream < 4) {
-        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4); // 具体按手册，简化：清除对应流所有标志
-        base->LIFCR |= mask;  // 写1清除
-    } else {
-        stream -= 4;
-        uint32_t mask = it_flags << (stream * 6 + (stream >> 1) * 4);
-        base->HIFCR |= mask;          // 写 1 清所有对应位
-    }
+    dma_controller_t ctrl = DMA_REQ_GET_CTRL(cfg->dma_request);
+    uint8_t          strm = DMA_REQ_GET_STREAM(cfg->dma_request);
+    return hal_dma_is_busy(ctrl, strm);
 }
 
-dma_it_event_t dma_get_it_event(const dma_stream_config_t *cfg) {
-    xDMA_Base_TypeDef *base = (DMA_REQ_GET_CTRL(cfg->dma_request) == DMA_1) ? (xDMA_Base_TypeDef*)xDMA1_BASE :
-                              (xDMA_Base_TypeDef*)xDMA2_BASE;
-    uint8_t stream = DMA_REQ_GET_STREAM(cfg->dma_request);
-    uint32_t it_event = 0;
-    if (stream < 4) {
-        it_event = base->LISR;
-        it_event >>= (stream * 6 + (stream >> 1) * 4); // 具体按手册，简化：清除对应流所有标志
-    } else {
-        stream -= 4;
-        it_event = base->HISR;
-        it_event >>= (stream * 6 + (stream >> 1) * 4);
-    }
-    return it_event & 0x3F;  /* 屏蔽无关高位，仅保留 FEIF/DMEIF/TEIF/HTIF/TCIF */
+void dma_clear_flag(const dma_stream_config_t *cfg)
+{
+    hal_dma_clear_flags(DMA_REQ_GET_CTRL(cfg->dma_request),
+                        DMA_REQ_GET_STREAM(cfg->dma_request));
+}
+
+dma_it_event_t dma_get_it_event(const dma_stream_config_t *cfg)
+{
+    return hal_dma_get_it_event(DMA_REQ_GET_CTRL(cfg->dma_request),
+                                DMA_REQ_GET_STREAM(cfg->dma_request));
 }
 
 nvic_irq_num dma_get_irqnum(const dma_stream_config_t *dma_conf) {
-    if (DMA_REQ_GET_CTRL(dma_conf->dma_request) == DMA_1) {
+    if (DMA_REQ_GET_CTRL(dma_conf->dma_request) == DMA_1)
         return DMA_REQ_GET_STREAM(dma_conf->dma_request) + DMA1_ST0_IRQ;
-    } else {
-        return DMA_REQ_GET_STREAM(dma_conf->dma_request)+ DMA2_ST0_IRQ;
-    }
+    else
+        return DMA_REQ_GET_STREAM(dma_conf->dma_request) + DMA2_ST0_IRQ;
 }

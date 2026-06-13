@@ -5,6 +5,7 @@
 #ifndef STM32F4DISCOVERY_HAL_DMA_H
 #define STM32F4DISCOVERY_HAL_DMA_H
 #include "stdint.h"
+#include "stdbool.h"
 
 /* 编码公式：((ctrl)<<8) | ((stream)<<4) | (channel) */
 #define  DMA_REQ_ENCODE(ctrl, stream, ch)  (((ctrl) << 8) | ((stream) << 4) | (ch))
@@ -252,7 +253,20 @@ typedef struct {
     volatile uint32_t SxM1AR;
     volatile uint32_t SxFCR;
 } xDMA_Stream_TypeDef;
-
+// *  Bit 0: FEIF4 (流错误中断标志) —— 实际可能是“保留”或 FIFO 错误，不同型号位定义有差异
+//    Bit 1: 保留
+//    Bit 2: DMEIF4 (直接模式错误中断标志)
+//    Bit 3: TEIF4 (传输错误中断标志)
+//    Bit 4: HTIF4 (半传输中断标志)
+//    Bit 5: TCIF4 (传输完成中断标志)
+typedef enum :uint8_t {
+    DMA_IT_EVENT_NONE = 0,
+    DMA_IT_EVENT_FEIF = (1 << 0),
+    DMA_IT_EVENT_DMEIF = (1 << 2),
+    DMA_IT_EVENT_TEIF = (1 << 3),
+    DMA_IT_EVENT_HTIF = (1 << 4),
+    DMA_IT_EVENT_TCIF = (1 << 5),
+} dma_it_event_t;
 #define xDMA1_BASE       0x40026000UL
 #define xDMA2_BASE       0x40026400UL
 /*#define DMA1_BASE             (AHB1PERIPH_BASE + 0x6000UL)
@@ -275,6 +289,21 @@ typedef struct {
 #define DMA2_Stream7_BASE     (DMA2_BASE + 0x0B8UL)*/
 #define DMA1_STREAM_BASE(i)  (xDMA1_BASE + 0x10 + (i) * 0x18)  /* Stream i 寄存器起始 */
 #define DMA2_STREAM_BASE(i)  (xDMA2_BASE + 0x10 + (i) * 0x18)
+
+/* ── 寄存器级 API（纯 HAL，使用原始参数避免循环依赖）── */
+xDMA_Stream_TypeDef* hal_dma_get_stream(dma_controller_t ctrl, uint8_t stream);
+xDMA_Base_TypeDef*   hal_dma_get_base(dma_controller_t ctrl);
+
+void     hal_dma_clock_enable(dma_controller_t ctrl);
+void     hal_dma_stream_disable(dma_controller_t ctrl, uint8_t stream);
+void     hal_dma_stream_enable(dma_controller_t ctrl, uint8_t stream);
+void     hal_dma_stream_write_cr(dma_controller_t ctrl, uint8_t stream, uint32_t cr);
+void     hal_dma_stream_set_dir_addr(dma_controller_t ctrl, uint8_t stream, uint8_t dir, uint32_t src, uint32_t dst);
+void     hal_dma_stream_set_ndtr(dma_controller_t ctrl, uint8_t stream, uint16_t count);
+uint16_t hal_dma_stream_get_ndtr(dma_controller_t ctrl, uint8_t stream);
+bool     hal_dma_is_busy(dma_controller_t ctrl, uint8_t stream);
+void     hal_dma_clear_flags(dma_controller_t ctrl, uint8_t stream);
+dma_it_event_t hal_dma_get_it_event(dma_controller_t ctrl, uint8_t stream);
 
 void dma_clock_enable(dma_controller_t ctrl);
 

@@ -6,19 +6,6 @@
 #include <stddef.h>
 #include "cmsis_gcc.h"
 
-/* ───────── Flash 寄存器定义 ───────── */
-typedef struct {
-    volatile uint32_t ACR;       // 访问控制寄存器
-    volatile uint32_t KEYR;      // 密钥寄存器
-    volatile uint32_t OPTKEYR;   // 选项密钥寄存器
-    volatile uint32_t SR;        // 状态寄存器
-    volatile uint32_t CR;        // 控制寄存器
-    volatile uint32_t OPTCR;     // 选项控制寄存器
-} xFLASH_TypeDef;
-
-#define xFLASH_BASE  0x40023C00UL
-#define xFLASH       ((xFLASH_TypeDef *)xFLASH_BASE)
-
 /* ACR 位定义 */
 #define xFLASH_ACR_LATENCY_Pos   0
 #define xFLASH_ACR_LATENCY_Msk   (0x07UL << xFLASH_ACR_LATENCY_Pos)
@@ -115,4 +102,41 @@ void hal_flash_enable_dcache(bool enable)
         xFLASH->ACR |= xFLASH_ACR_DCEN;
     else
         xFLASH->ACR &= ~xFLASH_ACR_DCEN;
+}
+
+/* ═══════════════════ Flash EEPROM 操作 ═══════════════════ */
+
+void hal_flash_unlock(void)
+{
+    xFLASH->KEYR = xFLASH_KEY1;
+    xFLASH->KEYR = xFLASH_KEY2;
+}
+
+void hal_flash_lock(void)
+{
+    xFLASH->CR |= xFLASH_CR_LOCK;
+}
+
+void hal_flash_wait_bsy(void)
+{
+    while (xFLASH->SR & xFLASH_SR_BSY) __NOP();
+}
+
+void hal_flash_erase_sector(uint32_t sector_addr)
+{
+    hal_flash_unlock();
+    hal_flash_wait_bsy();
+    xFLASH->CR |= xFLASH_CR_SER;
+    xFLASH->CR |= (sector_addr & 0xFFFFF000) << 3;
+    xFLASH->CR |= xFLASH_CR_STRT;
+    hal_flash_wait_bsy();
+    hal_flash_lock();
+}
+
+void hal_flash_program_word(uint32_t addr, uint32_t data)
+{
+    hal_flash_wait_bsy();
+    xFLASH->CR |= xFLASH_CR_PG;
+    *(volatile uint32_t *)addr = data;
+    hal_flash_wait_bsy();
 }

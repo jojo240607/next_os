@@ -98,20 +98,16 @@ dev_init_override(exti_dev_init_impl) {
 
 // irq_handler method
 bool exti_irq_handler_impl(nvic_irq_t *irq_conf) {
-    // TODO: add irq_handler method
     Exti *exti = (Exti *)irq_conf->arg;
-    //params , void *arg
-    // 检查是否是EXTI线0的中断挂起标志
-    while (xEXTI->PR) {
-        // 最低位 1 的索引（0~15）
-        uint32_t bit = __builtin_ctz(xEXTI->PR);
+    uint32_t pr = hal_exti_get_pending();
+    while (pr) {
+        uint32_t bit = __builtin_ctz(pr);
         if (irq_conf->bottom_task && irq_conf->event) {
-            //将消息event传递到irq conf中
             exti->exti_event->irq_num = irq_conf->id;
             exti->exti_event->source = EVENT_SOURCE_EXTI0 + bit;
         }
-        //  清除中断标志位（写1清零）
-        xEXTI->PR |= (1 << bit);
+        hal_exti_clear_pending(bit);
+        pr = hal_exti_get_pending();
     }
     return true;
 }

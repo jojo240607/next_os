@@ -186,6 +186,13 @@ void rtc_exit_init_mode(void);
 void rtc_wait_sync(void);
 void rtc_lock(void);
 
+/* CR / ISR 原子操作 */
+void hal_rtc_set_hour_format(rtc_hour_format_t fmt);
+void hal_rtc_write_cr(uint32_t cr);
+uint32_t hal_rtc_read_cr(void);
+uint32_t hal_rtc_read_isr(void);
+void hal_rtc_clear_isr_flag(uint32_t flag);
+
 /* 备份 SRAM 内存操作 */
 int  rtc_write_backup_sram(uint8_t *data, uint16_t len);
 int  rtc_read_backup_sram(uint8_t *buffer, uint16_t len);

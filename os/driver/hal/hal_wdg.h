@@ -5,6 +5,7 @@
 #ifndef STM32F4DISCOVERY_HAL_WDG_H
 #define STM32F4DISCOVERY_HAL_WDG_H
 #include "stdint.h"
+#include "stdbool.h"
 
 #define xWWDG_BASE  0x40002C00UL
 #define xWWDG       ((xWWDG_TypeDef *)xWWDG_BASE)
@@ -49,5 +50,25 @@ typedef struct {
 #define xIWDG_KEY_UNLOCK    0x5555   // 解锁 PR 和 RLR 寄存器
 #define xIWDG_KEY_LOCK      0x0000   // 锁定 PR 和 RLR (写其他值即锁定)
 
+/* ═══════════════════════════ API ═══════════════════════════ */
+
+/* ── IWDG ── */
+void hal_iwdg_unlock(void);
+void hal_iwdg_lock(void);
+void hal_iwdg_set_prescaler(uint8_t prescaler);
+void hal_iwdg_set_reload(uint16_t reload);
+void hal_iwdg_wait_ready(void);
+void hal_iwdg_enable(void);
+void hal_iwdg_reload(void);
+bool hal_iwdg_is_reset_flag(void);
+void hal_iwdg_clear_reset_flag(void);
+
+/* ── WWDG ── */
+bool hal_wwdg_is_reset_flag(void);
+void hal_wwdg_set_window(uint8_t window);
+void hal_wwdg_set_prescaler(uint8_t prescaler);
+void hal_wwdg_enable_ewi(void);
+void hal_wwdg_clear_ewi_flag(void);
+void hal_wwdg_set_counter(uint8_t counter);
 
 #endif //STM32F4DISCOVERY_HAL_WDG_H

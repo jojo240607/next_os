@@ -42,7 +42,17 @@ void hal_exti_set_trigger(uint8_t pin, exti_mode irq_mode) {
     }
 }
 
-/* 使能 EXTI 中断（NVIC） */
+/* 使能 EXTI 中断 */
 void hal_exti_enable_irq(uint8_t pin) {
     xEXTI->IMR |= (1U << pin);
+}
+
+/* 获取所有挂起位 */
+uint32_t hal_exti_get_pending(void) {
+    return xEXTI->PR;
+}
+
+/* 清除指定引脚的挂起标志 */
+void hal_exti_clear_pending(uint8_t pin) {
+    xEXTI->PR |= (1U << pin);
 }

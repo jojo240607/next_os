@@ -5,6 +5,7 @@
 #ifndef STM32F4DISCOVERY_HAL_GPIO_H
 #define STM32F4DISCOVERY_HAL_GPIO_H
 #include "stdint.h"
+#include "stdbool.h"
 
 /* 编码公式：(port)<<4) | (pin) */
 //#define  AF_REQ_ENCODE(port, pin, mode)  (((port) << 4) | (pin))
@@ -877,4 +878,13 @@ void hal_gpio_set_af(xGPIO_TypeDef *gpiox, uint8_t pin, uint8_t af);
 void hal_gpio_set_otype(xGPIO_TypeDef *gpiox, uint8_t pin, pin_otype otype);
 void hal_gpio_set_ospeed(xGPIO_TypeDef *gpiox, uint8_t pin, pin_ospeed ospeed);
 void hal_gpio_set_pupd(xGPIO_TypeDef *gpiox, uint8_t pin, pin_pupd pupd);
+
+/* 原子引脚操作 */
+void hal_gpio_pin_set(gpio_port_t port, gpio_pin_t pin);
+void hal_gpio_pin_reset(gpio_port_t port, gpio_pin_t pin);
+void hal_gpio_pin_write(gpio_port_t port, gpio_pin_t pin, bool value);
+void hal_gpio_pin_toggle(gpio_port_t port, gpio_pin_t pin);
+bool hal_gpio_pin_read(gpio_port_t port, gpio_pin_t pin);
+void hal_gpio_pin_lock(gpio_port_t port, gpio_pin_t pin);
+
 #endif //STM32F4DISCOVERY_HAL_GPIO_H

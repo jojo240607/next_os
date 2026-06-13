@@ -74,3 +74,59 @@ void hal_gpio_set_pupd(xGPIO_TypeDef *gpiox, uint8_t pin, pin_pupd pupd)
     temp |= (pupd & 3U) << (pin << 1);
     gpiox->PUPDR = temp;
 }
+
+/* ═══════════════════ 原子引脚操作 ═══════════════════ */
+
+void hal_gpio_pin_set(gpio_port_t port, gpio_pin_t pin)
+{
+    if (port < PORT_MAX && pin < PIN_MAX) {
+        GPIOx[port]->BSRR = (1U << pin);
+    }
+}
+
+void hal_gpio_pin_reset(gpio_port_t port, gpio_pin_t pin)
+{
+    if (port < PORT_MAX && pin < PIN_MAX) {
+        GPIOx[port]->BSRR = (1U << (pin + 16));
+    }
+}
+
+void hal_gpio_pin_write(gpio_port_t port, gpio_pin_t pin, bool value)
+{
+    if (value)
+        hal_gpio_pin_set(port, pin);
+    else
+        hal_gpio_pin_reset(port, pin);
+}
+
+void hal_gpio_pin_toggle(gpio_port_t port, gpio_pin_t pin)
+{
+    if (port < PORT_MAX && pin < PIN_MAX) {
+        uint32_t odr = GPIOx[port]->ODR;
+        if (odr & (1U << pin))
+            hal_gpio_pin_reset(port, pin);
+        else
+            hal_gpio_pin_set(port, pin);
+    }
+}
+
+bool hal_gpio_pin_read(gpio_port_t port, gpio_pin_t pin)
+{
+    if (port < PORT_MAX && pin < PIN_MAX) {
+        return (GPIOx[port]->IDR & (1U << pin)) != 0;
+    }
+    return false;
+}
+
+void hal_gpio_pin_lock(gpio_port_t port, gpio_pin_t pin)
+{
+    if (port < PORT_MAX && pin < PIN_MAX) {
+        volatile uint32_t *lckr = &GPIOx[port]->LCKR;
+        uint32_t mask = (1U << pin);
+        *lckr = mask | (1U << 16);
+        *lckr = mask;
+        *lckr = mask | (1U << 16);
+        (void)*lckr;
+        (void)*lckr;
+    }
+}

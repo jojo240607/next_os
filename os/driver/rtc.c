@@ -70,11 +70,7 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
                 ((conf->sync_prediv & 0x7FFF) << 0);
 
     // 6. 配置小时格式
-    if (conf->hour_format == RTC_FORMAT_24H) {
-        xRTC->CR &= ~(1 << 6);  // FMT=0
-    } else {
-        xRTC->CR |= (1 << 6);   // FMT=1
-    }
+    hal_rtc_set_hour_format(conf->hour_format);
 
     // 7. 退出初始化模式
     rtc_exit_init_mode();
@@ -84,47 +80,35 @@ dev_ioctl_override(rtc_dev_ioctl_impl) {
 
     // 9. 中断配置
     if (conf->it_enable) {
-        //rtc_callback = cfg->callback;
-        uint32_t cr = xRTC->CR;
-        if (conf->it_enable & RTC_IT_ALARM_A) {
-            cr |= xRTC_CR_ALRAIE;
-        }
-        if (conf->it_enable & RTC_IT_ALARM_B) {
-            cr |= xRTC_CR_ALRBIE;
-        }
-        if (conf->it_enable & RTC_IT_WAKEUP) {
-            cr |= xRTC_CR_WUTIE;
-        }
-        if (conf->it_enable & RTC_IT_TIMESTAMP) {
-            cr |= xRTC_CR_TSIE;
-        }
-        xRTC->CR = cr;
-       // self->irq_conf.priority = self->fun->encode_pripority(self, 0x02, 0x00);//NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0x02, 0x00);
+        uint32_t cr = hal_rtc_read_cr();
+        if (conf->it_enable & RTC_IT_ALARM_A)   cr |= xRTC_CR_ALRAIE;
+        if (conf->it_enable & RTC_IT_ALARM_B)   cr |= xRTC_CR_ALRBIE;
+        if (conf->it_enable & RTC_IT_WAKEUP)    cr |= xRTC_CR_WUTIE;
+        if (conf->it_enable & RTC_IT_TIMESTAMP) cr |= xRTC_CR_TSIE;
+        hal_rtc_write_cr(cr);
+
         self->irq_conf->handler = rtc_irq_handler_impl;
         self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, RTC_ALARM_IRQ);
         self->fun->config_irq(self, self->irq_conf);
 
         self->irq_conf->irq_list->fun->add_int(self->irq_conf->irq_list, RTC_WKUP_IRQ);
         self->fun->config_irq(self, self->irq_conf);
-
     }
 
     rtc_lock();
 }
 
 static bool rtc_irq_handler_impl(nvic_irq_t *irq_conf) {
-    uint32_t isr = xRTC->ISR;
-    uint32_t cr  = xRTC->CR;
+    uint32_t isr = hal_rtc_read_isr();
+    uint32_t cr  = hal_rtc_read_cr();
 
     // 闹钟 A
     if ((isr & xRTC_ISR_ALRAF) && (cr & xRTC_CR_ALRAIE)) {
-        xRTC->ISR &= ~xRTC_ISR_ALRAF;   // 清除标志
-       // if (rtc_callback) rtc_callback(RTC_EVT_ALARM_A);
+        hal_rtc_clear_isr_flag(xRTC_ISR_ALRAF);
     }
     // 闹钟 B
     if ((isr & xRTC_ISR_ALRBF) && (cr & xRTC_CR_ALRBIE)) {
-        xRTC->ISR &= ~xRTC_ISR_ALRBF;
-        //if (rtc_callback) rtc_callback(RTC_EVT_ALARM_B);
+        hal_rtc_clear_isr_flag(xRTC_ISR_ALRBF);
     }
     // 唤醒定时器
     if ((isr & xRTC_ISR_WUTF) && (cr & xRTC_CR_WUTIE)) {

@@ -26,5 +26,7 @@ void hal_syscfg_clock_enable(void);
 void hal_syscfg_exti_line_config(gpio_port_t port, uint8_t pin);
 void hal_exti_set_trigger(uint8_t pin, exti_mode irq_mode);
 void hal_exti_enable_irq(uint8_t pin);
+uint32_t hal_exti_get_pending(void);
+void hal_exti_clear_pending(uint8_t pin);
 
 #endif //STM32F4DISCOVERY_HAL_EXTI_H

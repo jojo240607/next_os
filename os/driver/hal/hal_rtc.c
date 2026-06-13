@@ -288,3 +288,32 @@ int rtc_read_backup_sram(uint8_t *buffer, uint16_t len)
     return 0;
 }
 
+/* ═══════════════ CR / ISR 原子操作 ═══════════════ */
+
+void hal_rtc_set_hour_format(rtc_hour_format_t fmt)
+{
+    if (fmt == RTC_FORMAT_24H)
+        xRTC->CR &= ~(1 << 6);
+    else
+        xRTC->CR |= (1 << 6);
+}
+
+void hal_rtc_write_cr(uint32_t cr)
+{
+    xRTC->CR = cr;
+}
+
+uint32_t hal_rtc_read_cr(void)
+{
+    return xRTC->CR;
+}
+
+uint32_t hal_rtc_read_isr(void)
+{
+    return xRTC->ISR;
+}
+
+void hal_rtc_clear_isr_flag(uint32_t flag)
+{
+    xRTC->ISR &= ~flag;
+}
