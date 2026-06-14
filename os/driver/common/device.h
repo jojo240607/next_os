@@ -78,6 +78,7 @@ typedef enum : uint8_t {
     DEVICE_ADXL345,         /* ADXL345 加速度计 (I2C) */
     DEVICE_FSMC,            /* FSMC 总线 */
     DEVICE_FSMC_LCD,        /* LCD over FSMC */
+    DEVICE_USB_CDC,         /* USB CDC ACM */
     DEVICE_MAX
 } dev_id_t;
 

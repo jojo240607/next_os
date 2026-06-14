@@ -402,3 +402,13 @@ const adxl345_config_t adxl345_conf = {
         .slave_addr  = 0x53,                         /* ADXL345 I2C 地址 */
 };
 
+const usb_cdc_config_t usb_cdc_conf = {
+        .pins = {
+                .usb_dm = PA11_REQ_OTG_FS_DM,
+                .usb_dp = PA12_REQ_OTG_FS_DP,
+        },
+        .manufacturer_str = "STM32F4",
+        .product_str      = "USB CDC Test",
+        .serial_str       = "0001",
+        /* device_desc / config_desc 留 NULL 使用内置默认值 */
+};

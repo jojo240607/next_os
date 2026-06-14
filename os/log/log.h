@@ -10,6 +10,8 @@
 #include "../common/ring.h"
 #include "../scheduler/semaphore.h"
 #include "../task/task.h"
+
+#define LOG_GLOBAL_LEVEL 3
 /* 日志级别 */
 typedef enum : uint8_t {
     LOG_LEVEL_DEBUG = 0,

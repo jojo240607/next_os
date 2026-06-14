@@ -352,7 +352,7 @@ void DMA2_Stream7_IRQHandler(){
 
 void OTG_FS_IRQHandler(void)
 {
-
+    nvic_dispatch(gloable_nvic, OTG_FS_IRQ);
 }
 void NMI_Handler(void)
 {

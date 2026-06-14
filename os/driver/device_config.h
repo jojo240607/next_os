@@ -26,6 +26,7 @@
 #include "hal/hal_fpu.h"
 #include "../device/icm20948.h"
 #include "../device/adxl345.h"
+#include "usb/usb_cdc.h"
 
 extern const rcc_sysclk_config_t clk_conf;
 extern const systick_config_t sys_tick_conf;
@@ -44,6 +45,6 @@ extern const fsmc_config_t fsmc_conf;
 extern const lcd_fsmc_config_t lcd_fsmc_conf;
 extern const icm20948_config_t icm20948_conf;
 extern const adxl345_config_t adxl345_conf;
-
+extern const usb_cdc_config_t usb_cdc_conf;
 
 #endif //STM32F4DISCOVERY_DEVICE_CONFIG_H

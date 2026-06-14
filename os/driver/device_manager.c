@@ -14,6 +14,7 @@
 #include "i2s/i2s.h"
 #include "fsmc/fsmc.h"
 #include "lcd/lcd_fsmc.h"
+#include "usb/usb_cdc.h"
 
 static Device* device_manager_dev_open(Device_manager* self, dev_id_t id);
 
@@ -106,6 +107,11 @@ static const Device_list dev_lists[] = {
                 .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_LOW2, .sub_pripority = 0},
                 .conf = &lcd_fsmc_conf},
                 .device_create = (Device_create) lcd_fsmc_create,},
+        {.info = &(const device_info_t){.name = "usb_cdc",
+                .id = DEVICE_USB_CDC,
+                .priority = &(const dev_pripority_t){.peer_pripority = IRQ_PREEMPT_PRIORITY_NORMAL, .sub_pripority = 0},
+                .conf = &usb_cdc_conf,},
+                .device_create = (Device_create) usb_cdc_create,},
 
 };
 Device_manager *gloable_deviceManager = NULL;

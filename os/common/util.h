@@ -43,7 +43,7 @@
 #define MAX_TASK_NUM (32)                           //最大32个任务
 #define DEFAULT_OBJBUF_SIZE (1024 * 15)             //10k 对象池，给对象申请使用
 #define DEFAULT_CCMRAM_SIZE (MAX_TASK_NUM * 80)     //6k ccm内存池 给任务使用 tcb 80 byte *
-#define DEFAULT_STACKRAM_SIZE (1024 * 8)            //8k ccm内存池 给任务栈使用
+#define DEFAULT_STACKRAM_SIZE (1024 * 18)            //8k ccm内存池 给任务栈使用
 #define DEFAULT_STACK_SIZE (11)                     //2 ^ 11 = 2048   默认任务栈大小 MPU_SIZE_2K
 #define SYSTEM_TICKS_PER_SEC (1000)                 //1000hz / 时间片默认切换周期1ms
 

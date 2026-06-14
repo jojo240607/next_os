@@ -92,6 +92,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/hal/hal_adc.c
         os/driver/hal/hal_gpio.c
         os/driver/hal/hal_sdio.c
+        os/driver/hal/hal_usb.c
         os/driver/hal/hal_exti.c
         os/driver/hal/hal_dma.c
         os/driver/hal/hal_can.c
@@ -143,11 +144,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         os/driver/fsmc/fsmc_poll.c
         os/driver/fsmc/fsmc_dma.c
         os/driver/lcd/lcd_fsmc.c
+        os/driver/usb/usb_cdc.c
+        os/driver/usb/usb_device.c
         os/driver/device_manager.c
         os/kernel/kworker.c
         os/test/task_test1.c
         os/test/time_task.c
         os/test/uart_dma_test.c
+        os/test/usb_cdc_test.c
         os/device/icm20948.c
         os/device/adxl345.c
 

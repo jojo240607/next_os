@@ -168,4 +168,5 @@ void DMA2_Stream6_IRQHandler();
 void DMA2_Stream7_IRQHandler();
 
 void OTG_FS_IRQHandler(void);
+
 #endif // NVIC_H

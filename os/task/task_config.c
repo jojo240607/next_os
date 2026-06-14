@@ -16,6 +16,7 @@
 #include "../test/task_test1.h"
 #include "../test/uart_dma_test.h"
 #include "../kernel/kworker.h"
+#include "../test/usb_cdc_test.h"
 
 static const task_into_t systick_task_info = {
         .name = "systick",
@@ -72,6 +73,13 @@ static const task_into_t uart_dma_task_info = {
         .stack_size = MPU_SIZE_2K,
         .create = (Task_create)uart_dma_test_create
 };
+static const task_into_t usb_cdc_test_task_info = {
+        .name = "usb_cdc_test",
+        .priority = THREAD_PRIORITY_2,
+        .stack_size = MPU_SIZE_2K,
+        .create = (Task_create)usb_cdc_test_create
+};
+
 //内核态工作队列
 static const task_into_t kworker_task_info = {
         .name = "kworker",
@@ -91,6 +99,7 @@ const task_into_t * const task_lists[] = {
         (const task_into_t *)(&time_task_info),
         (const task_into_t *)(&systick_task_info),
         (const task_into_t *)(&uart_dma_task_info),
+        (const task_into_t *)(&usb_cdc_test_task_info),
 };
 
 const size_t totel_task = ARRAY_SIZE(task_lists);
