@@ -16,7 +16,6 @@
 #include "../log/log.h"
 #include "../driver/svc.h"
 #include "../driver/device_manager.h"
-extern volatile uint32_t usb_need_mask_restore;
 
 /* 虚函数实现 */
 task_init_override(usb_cdc_test_init_impl);
@@ -113,6 +112,8 @@ task_thread_override(usb_cdc_test_thread_impl)
     LOG_DEBUG("usb_cdc", "===== USB CDC send+recv test started =====");
 
     while (true) {
+        extern volatile uint32_t usb_irq_total, usb_setup_total, usb_oep_raw;
+        LOG_ERROR("usb_cdc", "irq=%lu setup=%lu oep=%08lX", usb_irq_total, usb_setup_total, usb_oep_raw);
         test->send_count++;
 
         /* ──── 1. USB CDC 发送测试数据 ──── */

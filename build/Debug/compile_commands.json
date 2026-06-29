@@ -1,0 +1,656 @@
+[
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\Src\\main.c.obj -c D:\\project\\stm32\\system\\Src\\main.c",
+  "file": "D:\\project\\stm32\\system\\Src\\main.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\Src\\main.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\Src\\sysmem.c.obj -c D:\\project\\stm32\\system\\Src\\sysmem.c",
+  "file": "D:\\project\\stm32\\system\\Src\\sysmem.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\Src\\sysmem.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -x assembler-with-cpp -MMD -MP -g -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\startup_stm32f407xx.s.obj -c D:\\project\\stm32\\system\\startup_stm32f407xx.s",
+  "file": "D:\\project\\stm32\\system\\startup_stm32f407xx.s",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\startup_stm32f407xx.s.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -x assembler-with-cpp -MMD -MP -g -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\context_switch.s.obj -c D:\\project\\stm32\\system\\os\\scheduler\\context_switch.s",
+  "file": "D:\\project\\stm32\\system\\os\\scheduler\\context_switch.s",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\context_switch.s.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\queue.c.obj -c D:\\project\\stm32\\system\\os\\common\\queue.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\queue.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\queue.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\ring.c.obj -c D:\\project\\stm32\\system\\os\\common\\ring.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\ring.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\ring.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\ringbuf.c.obj -c D:\\project\\stm32\\system\\os\\common\\ringbuf.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\ringbuf.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\ringbuf.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\list.c.obj -c D:\\project\\stm32\\system\\os\\common\\list.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\list.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\list.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\linear_pool.c.obj -c D:\\project\\stm32\\system\\os\\common\\linear_pool.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\linear_pool.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\linear_pool.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\os_init.c.obj -c D:\\project\\stm32\\system\\os\\common\\os_init.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\os_init.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\os_init.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\sys_time.c.obj -c D:\\project\\stm32\\system\\os\\common\\sys_time.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\sys_time.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\sys_time.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\common\\sys_mutex.c.obj -c D:\\project\\stm32\\system\\os\\common\\sys_mutex.c",
+  "file": "D:\\project\\stm32\\system\\os\\common\\sys_mutex.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\common\\sys_mutex.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\tcb_t.c.obj -c D:\\project\\stm32\\system\\os\\scheduler\\tcb_t.c",
+  "file": "D:\\project\\stm32\\system\\os\\scheduler\\tcb_t.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\tcb_t.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\thread_scheduler.c.obj -c D:\\project\\stm32\\system\\os\\scheduler\\thread_scheduler.c",
+  "file": "D:\\project\\stm32\\system\\os\\scheduler\\thread_scheduler.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\thread_scheduler.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\semaphore.c.obj -c D:\\project\\stm32\\system\\os\\scheduler\\semaphore.c",
+  "file": "D:\\project\\stm32\\system\\os\\scheduler\\semaphore.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\semaphore.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\mutex.c.obj -c D:\\project\\stm32\\system\\os\\scheduler\\mutex.c",
+  "file": "D:\\project\\stm32\\system\\os\\scheduler\\mutex.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\scheduler\\mutex.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\log\\log.c.obj -c D:\\project\\stm32\\system\\os\\log\\log.c",
+  "file": "D:\\project\\stm32\\system\\os\\log\\log.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\log\\log.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\task.c.obj -c D:\\project\\stm32\\system\\os\\task\\task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\task_config.c.obj -c D:\\project\\stm32\\system\\os\\task\\task_config.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\task_config.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\task_config.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\task_manager.c.obj -c D:\\project\\stm32\\system\\os\\task\\task_manager.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\task_manager.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\task_manager.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\idle_task.c.obj -c D:\\project\\stm32\\system\\os\\task\\os\\idle_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\os\\idle_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\idle_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\monitor_task.c.obj -c D:\\project\\stm32\\system\\os\\task\\os\\monitor_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\os\\monitor_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\monitor_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\log_task.c.obj -c D:\\project\\stm32\\system\\os\\task\\os\\log_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\os\\log_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\log_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\systick_task.c.obj -c D:\\project\\stm32\\system\\os\\task\\os\\systick_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\os\\systick_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\systick_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\os_cb_task.c.obj -c D:\\project\\stm32\\system\\os\\task\\os\\os_cb_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\task\\os\\os_cb_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\task\\os\\os_cb_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_scb.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_scb.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_scb.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_scb.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_svc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_svc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_svc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_svc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -x assembler-with-cpp -MMD -MP -g -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_svc_handler.s.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_svc_handler.s",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_svc_handler.s",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_svc_handler.s.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fault_diag.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fault_diag.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fault_diag.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fault_diag.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_mpu.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_mpu.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_mpu.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_mpu.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_flash.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_flash.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_flash.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_flash.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dwt.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dwt.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dwt.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dwt.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_nvic.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_nvic.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_nvic.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_nvic.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_systick.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_systick.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_systick.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_systick.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rng.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rng.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rng.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rng.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_crc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_crc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_crc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_crc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_cryp.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_cryp.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_cryp.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_cryp.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_hash.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_hash.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_hash.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_hash.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dac.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dac.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dac.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dac.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_usart.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_usart.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_usart.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_usart.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_wdg.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_wdg.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_wdg.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_wdg.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_timer.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_timer.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_timer.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_timer.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_spi.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_spi.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_spi.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_spi.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_i2c.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_i2c.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_i2c.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_i2c.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_adc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_adc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_adc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_adc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_gpio.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_gpio.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_gpio.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_gpio.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_sdio.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_sdio.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_sdio.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_sdio.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_usb.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_usb.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_usb.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_usb.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_exti.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_exti.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_exti.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_exti.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_can.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_can.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_can.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_can.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rtc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rtc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rtc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rtc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_i2s.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_i2s.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_i2s.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_i2s.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fsmc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fsmc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fsmc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fsmc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fpu.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fpu.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_fpu.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_fpu.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rcc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rcc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\hal\\hal_rcc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\hal\\hal_rcc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\device.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\device.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\device.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\device.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\device_config.c.obj -c D:\\project\\stm32\\system\\os\\driver\\device_config.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\device_config.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\device_config.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\pinmux.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\pinmux.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\pinmux.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\pinmux.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\nvic.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\nvic.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\nvic.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\nvic.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\rcc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\rcc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\rcc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\rcc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\gpio.c.obj -c D:\\project\\stm32\\system\\os\\driver\\common\\gpio.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\common\\gpio.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\common\\gpio.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\svc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\svc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\svc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\svc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usart\\usart.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usart\\usart.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usart\\usart_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usart\\usart_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usart\\usart_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usart\\usart_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usart\\usart_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usart\\usart_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usart\\usart_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\adc\\adc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\adc\\adc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\adc\\adc_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\adc\\adc_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\adc\\adc_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\adc\\adc_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\adc\\adc_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi.c.obj -c D:\\project\\stm32\\system\\os\\driver\\spi\\spi.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\spi\\spi.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\spi\\spi_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\spi\\spi_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\spi\\spi_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\spi\\spi_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\spi\\spi_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\spi\\spi_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\spi\\spi_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2c\\i2c_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2c\\i2c_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\can\\can.c.obj -c D:\\project\\stm32\\system\\os\\driver\\can\\can.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\can\\can.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\can\\can.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\can\\can_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\can\\can_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\can\\can_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\can\\can_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio.c.obj -c D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\sdio\\sdio_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\sdio\\sdio_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\systick.c.obj -c D:\\project\\stm32\\system\\os\\driver\\systick.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\systick.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\systick.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\timer.c.obj -c D:\\project\\stm32\\system\\os\\driver\\timer.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\timer.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\timer.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\exti.c.obj -c D:\\project\\stm32\\system\\os\\driver\\exti.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\exti.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\exti.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\wdg.c.obj -c D:\\project\\stm32\\system\\os\\driver\\wdg.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\wdg.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\wdg.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\rtc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\rtc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\rtc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\rtc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\pwm.c.obj -c D:\\project\\stm32\\system\\os\\driver\\pwm.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\pwm.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\pwm.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_it.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_it.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_it.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_it.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\i2s\\i2s_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\i2s\\i2s_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc_poll.c.obj -c D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc_poll.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc_poll.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc_poll.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc_dma.c.obj -c D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc_dma.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\fsmc\\fsmc_dma.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\fsmc\\fsmc_dma.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\lcd\\lcd_fsmc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\lcd\\lcd_fsmc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\lcd\\lcd_fsmc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\lcd\\lcd_fsmc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usb\\usb_cdc.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usb\\usb_cdc.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usb\\usb_cdc.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usb\\usb_cdc.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usb\\usb_device.c.obj -c D:\\project\\stm32\\system\\os\\driver\\usb\\usb_device.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\usb\\usb_device.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\usb\\usb_device.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\driver\\device_manager.c.obj -c D:\\project\\stm32\\system\\os\\driver\\device_manager.c",
+  "file": "D:\\project\\stm32\\system\\os\\driver\\device_manager.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\driver\\device_manager.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\kernel\\kworker.c.obj -c D:\\project\\stm32\\system\\os\\kernel\\kworker.c",
+  "file": "D:\\project\\stm32\\system\\os\\kernel\\kworker.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\kernel\\kworker.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\test\\task_test1.c.obj -c D:\\project\\stm32\\system\\os\\test\\task_test1.c",
+  "file": "D:\\project\\stm32\\system\\os\\test\\task_test1.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\test\\task_test1.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\test\\time_task.c.obj -c D:\\project\\stm32\\system\\os\\test\\time_task.c",
+  "file": "D:\\project\\stm32\\system\\os\\test\\time_task.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\test\\time_task.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\test\\uart_dma_test.c.obj -c D:\\project\\stm32\\system\\os\\test\\uart_dma_test.c",
+  "file": "D:\\project\\stm32\\system\\os\\test\\uart_dma_test.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\test\\uart_dma_test.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\test\\usb_cdc_test.c.obj -c D:\\project\\stm32\\system\\os\\test\\usb_cdc_test.c",
+  "file": "D:\\project\\stm32\\system\\os\\test\\usb_cdc_test.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\test\\usb_cdc_test.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\device\\icm20948.c.obj -c D:\\project\\stm32\\system\\os\\device\\icm20948.c",
+  "file": "D:\\project\\stm32\\system\\os\\device\\icm20948.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\device\\icm20948.c.obj"
+},
+{
+  "directory": "D:/project/stm32/system/build/Debug",
+  "command": "D:\\soft\\ST\\STM32CubeCLT_1.19.0\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -DDEBUG -DSTM32F407xx -DUSE_HAL_DRIVER -ID:/project/stm32/system/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type -o CMakeFiles\\stm32f4discovery.dir\\os\\device\\adxl345.c.obj -c D:\\project\\stm32\\system\\os\\device\\adxl345.c",
+  "file": "D:\\project\\stm32\\system\\os\\device\\adxl345.c",
+  "output": "CMakeFiles\\stm32f4discovery.dir\\os\\device\\adxl345.c.obj"
+}
+]

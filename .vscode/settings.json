@@ -1,0 +1,22 @@
+{
+    "cmake.debugConfig": {
+        "name": "CMake Debug (OpenOCD)",
+        "cwd": "${workspaceFolder}",
+        "executable": "${command:cmake.launchTargetPath}",
+        "request": "launch",
+        "type": "cortex-debug",
+        "servertype": "openocd",
+        "serverpath": "D:/soft/openocd/openocd-4e78563-i686-w64-mingw32/bin/openocd.exe",
+        "searchDir": ["D:/soft/openocd/openocd-4e78563-i686-w64-mingw32/share/openocd/scripts"],
+        "configFiles": [
+            "interface/stlink.cfg",
+            "target/stm32f4x.cfg"
+        ],
+        "svdFile": "STM32F407.svd",
+        "runToEntryPoint": "main",
+       // "armToolchainPath": "D:/arm-gnu-toolchain/bin"
+    },
+    "cmake.launchConfig": {
+        "name": "Run via OpenOCD"
+    }
+}

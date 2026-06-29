@@ -8,6 +8,7 @@
  */
 #include "usb_device.h"
 #include "string.h"
+#include "cmsis_gcc.h"
 
 void usb_device_init(usb_device_t *dev, const usb_device_descriptors_t *desc)
 {
@@ -30,24 +31,29 @@ void usb_device_disconnect(usb_device_t *dev)
 }
 
 /* ── SETUP 数据通路 ── */
-static void rearm_ep0_out(void) {
-    xUSB_OTG_FS->DOEPTSIZ0 = (3 << 19) | 64;
-    xUSB_OTG_FS->DOEPCTL0 |= xUSB_OTG_DOEPCTL_CNAK | xUSB_OTG_DOEPCTL_EPENA;
+/* 发完 EP0 IN 数据后立即重武装 EP0 OUT，匹配 Demo USB_OTG_EP0OutStart 时序 */
+static void rearm_ep0_out(void)
+{
+    xUSB_OTG_FS->DOEPTSIZ0 = (3 << 29) | (1 << 19) | 24;
+    xUSB_OTG_FS->DOEPCTL0  = 0x80008000;           /* EPENA|USBAEP, 匹配 Demo */
 }
 
 static void send_zlp(void)
 {
-    hal_usb_set_ep_tx_size(0, 1, 0);
-    hal_usb_ep_tx_enable(0);
-    rearm_ep0_out();
+    xUSB_OTG_FS->DIEPTSIZ0 = (1 << 19) | 0;
+    __DSB();
+    xUSB_OTG_FS->DIEPCTL0 |= xUSB_OTG_DIEPCTL_CNAK | xUSB_OTG_DIEPCTL_EPENA;
+    rearm_ep0_out();  /* 为 STATUS 阶段武装 EP0 OUT */
 }
 
 static void send_data_ep0(const uint8_t *data, uint16_t len)
 {
     hal_usb_write_txfifo(0, data, len);
-    hal_usb_set_ep_tx_size(0, 1, len);
-    hal_usb_ep_tx_enable(0);
-    rearm_ep0_out();
+    __DSB();
+    xUSB_OTG_FS->DIEPTSIZ0 = (1 << 19) | len;
+    __DSB();
+    xUSB_OTG_FS->DIEPCTL0 |= xUSB_OTG_DIEPCTL_CNAK | xUSB_OTG_DIEPCTL_EPENA;
+    rearm_ep0_out();  /* 为 STATUS 阶段武装 EP0 OUT */
 }
 
 /* ── 标准请求处理 ── */
@@ -76,10 +82,10 @@ void usb_device_handle_setup(usb_device_t *dev, uint16_t rx_buf_size)
     }
     case USB_REQ_SET_ADDRESS: {
         uint8_t addr = wValue & 0x7F;
-        hal_usb_set_address(addr);
         dev->address = addr;
+        send_zlp();                     /* 先发 ZLP（状态阶段） */
+        hal_usb_set_address(addr);      /* ZLP 后再设地址（Demo 顺序） */
         dev->state   = (addr == 0) ? USB_STATE_DEFAULT : USB_STATE_ADDRESS;
-        send_zlp();
         break;
     }
     case USB_REQ_GET_DESCRIPTOR: {

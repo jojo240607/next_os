@@ -67,12 +67,53 @@ void hal_usb_clock_enable(void)
 
 void hal_usb_core_reset(void)
 {
+    int i;
+    /* ── 匹配 Demo USB_OTG_CoreInitDev 完整序列 ── */
+    /* GAHBCFG 全局中断使能 */
     xUSB_OTG_FS->GAHBCFG  = xUSB_OTG_GAHBCFG_GINT;
-    xUSB_OTG_FS->GUSBCFG  = xUSB_OTG_GUSBCFG_FDMOD | (9 << 10) | 0x40;
+
+    /* GUSBCFG: Force Device + TRDT + PHYSEL */
+    xUSB_OTG_FS->GUSBCFG  = xUSB_OTG_GUSBCFG_FDMOD | (1 << 10) | 0x40;  /* TRDT=1 */
+
+    /* GOTGCTL: B-Device Session Override */
     xUSB_OTG_FS->GOTGCTL |= (1 << 19) | (1 << 18);
+
+    /* 断开 DP */
     xUSB_OTG_FS->DCTL    |= xUSB_OTG_DCTL_SDIS;
+
+    /* GCCFG */
     xUSB_OTG_FS->GCCFG    = (1 << 21) | (1 << 19) | (1 << 18);
+
+    /* 等 PHY 稳定 */
     for (volatile int _d = 0; _d < 2000000; _d++) __NOP();
+
+    /* FIFO 大小 */
+    xUSB_OTG_FS->GRXFSIZ    = 128;
+    xUSB_OTG_FS->DIEPTXF[0] = (128 << 16) | 64;
+
+    /* 冲所有 TX FIFO + RX FIFO（Demo 标准步骤） */
+    hal_usb_flush_tx_fifo(0x10);
+    hal_usb_flush_rx_fifo();
+
+    /* 清所有端点中断 */
+    xUSB_OTG_FS->DAINT    = 0xFFFFFFFF;
+    xUSB_OTG_FS->DIEPMSK  = 0;
+    xUSB_OTG_FS->DOEPMSK  = 0;
+    xUSB_OTG_FS->DAINTMSK = 0;
+
+    /* 禁用所有 IN 端点（匹配 Demo） */
+    for (i = 0; i < 4; i++) {
+        volatile uint32_t *diepctl  = _diepctl(i);
+        volatile uint32_t *dieptsiz = _dieptsiz(i);
+        volatile uint32_t *diepint  = _diepint(i);
+        volatile uint32_t *doepctl  = _doepctl(i);
+        volatile uint32_t *doeptsiz = _doeptsiz(i);
+        volatile uint32_t *doepint  = _doepint(i);
+        if (diepctl)  { *diepctl = 0; *dieptsiz = 0; *diepint = 0xFF; }
+        if (doepctl)  { *doepctl = 0; *doeptsiz = 0; *doepint = 0xFF; }
+    }
+
+    /* 清 GINTSTS */
     xUSB_OTG_FS->GINTSTS  = 0xBFFFFFFF;
 }
 
@@ -95,17 +136,17 @@ void hal_usb_config_fifo(uint16_t rx_size, uint16_t ep0_tx_size,
 
 void hal_usb_config_ep0(uint16_t mps)
 {
-    /* 只设 MPS，不使能（EPENA 在 ENUMDNE 中设，匹配 Demo） */
-    xUSB_OTG_FS->DIEPCTL0 = (mps << 0);
-    xUSB_OTG_FS->DOEPCTL0 = (mps << 0) | xUSB_OTG_DOEPCTL_USBAEP;
-    xUSB_OTG_FS->DOEPTSIZ0 = (3 << 19) | 0;  /* STUPCNT=3 */
+    (void)mps;
+    xUSB_OTG_FS->DIEPCTL0 = xUSB_OTG_DIEPCTL_USBAEP;    /* 不设 EPENA */
+    xUSB_OTG_FS->DOEPCTL0 = xUSB_OTG_DOEPCTL_USBAEP;    /* 不设 EPENA */
+    xUSB_OTG_FS->DOEPTSIZ0 = (3 << 29) | (1 << 19) | 0;
 }
 
 void hal_usb_enable_interrupts(void)
 {
     xUSB_OTG_FS->GAHBCFG |= xUSB_OTG_GAHBCFG_GINT;  /* 全局中断使能（CSRST 会清零） */
-    xUSB_OTG_FS->DIEPMSK  = xUSB_OTG_DIEPINT_XFRC | xUSB_OTG_DIEPINT_TOC;
-    xUSB_OTG_FS->DOEPMSK  = xUSB_OTG_DOEPINT_XFRC | xUSB_OTG_DOEPINT_STPKTRX;
+    xUSB_OTG_FS->DIEPMSK  = 0x0B;  /* Demo: XFRC+TOC+EPDISD */
+    xUSB_OTG_FS->DOEPMSK  = 0x0B;  /* Demo: XFRC+STPKTRX+EPDISD */
     xUSB_OTG_FS->DAINTMSK = (1 << 0) | (1 << 16);
     xUSB_OTG_FS->GINTMSK  = xUSB_OTG_GINTSTS_USBRST |
                             xUSB_OTG_GINTSTS_ENUMDNE |
